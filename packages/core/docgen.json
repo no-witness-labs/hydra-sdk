@@ -1,0 +1,13 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Effect-TS/docgen/main/schema.json",
+  "projectHomepage": "https://github.com/no-witness-labs/typescript-project-template",
+  "srcDir": "src",
+  "outDir": "docs",
+  "theme": "markdown",
+  "parseCompilerOptions": {
+    "strict": true,
+    "moduleResolution": "NodeNext",
+    "module": "NodeNext",
+    "target": "ES2022"
+  }
+}

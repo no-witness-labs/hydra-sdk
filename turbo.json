@@ -1,0 +1,50 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "ui": "tui",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": ["dist/**", ".turbo/**"],
+      "cache": true
+    },
+    "docs#build": {
+      "dependsOn": ["@template/core#build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": [".next/**", "out/**"],
+      "cache": true
+    },
+    "docs#dev": {
+      "dependsOn": ["@template/core#build"],
+      "cache": false,
+      "persistent": true
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "type-check": {
+      "dependsOn": ["^type-check"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": []
+    },
+    "lint": {
+      "dependsOn": ["^lint"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*", "eslint.config.*"],
+      "outputs": []
+    },
+    "test": {
+      "dependsOn": ["^test"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*", "vitest.config.*"],
+      "outputs": ["coverage/**"]
+    },
+    "docgen": {
+      "dependsOn": ["^docgen"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*", "docgen.json"],
+      "outputs": ["docs/**"]
+    },
+    "clean": {
+      "cache": false
+    }
+  }
+}

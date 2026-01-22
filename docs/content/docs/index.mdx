@@ -1,0 +1,38 @@
+---
+title: TypeScript Project Template
+description: A modern TypeScript monorepo template with best practices
+---
+
+import { Card, Cards } from "fumadocs-ui/components/card"
+
+# TypeScript Project Template
+
+A modern, type-safe TypeScript monorepo template with excellent developer experience and best practices.
+
+## Quick Start
+
+<Cards>
+  <Card title="Getting Started" description="Learn the basics and set up your first package" href="/docs/getting-started" />
+  <Card title="Core Package" description="Example core package with utilities" href="/docs/core" />
+  <Card title="API Reference" description="Complete API documentation for all modules" href="/docs/modules" />
+</Cards>
+
+## Features
+
+- **Type-Safe** - Full TypeScript support with strict mode
+- **Modular** - Monorepo structure with pnpm workspaces
+- **Modern** - ESM-only with latest tooling
+- **Fast** - Turbo for caching and parallel builds
+- **Complete** - Testing, linting, formatting, and docs included
+
+## Project Structure
+
+```
+├── packages/           # Workspace packages
+│   └── core/          # Example core package
+├── docs/              # Documentation site (Fumadocs)
+├── .changeset/        # Changeset configuration
+├── .github/           # GitHub Actions workflows
+├── turbo.json         # Turbo configuration
+└── tsconfig.base.json # Base TypeScript config
+```

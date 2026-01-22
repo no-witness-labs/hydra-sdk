@@ -1,0 +1,70 @@
+---
+title: Getting Started
+description: Learn how to set up and use this template
+---
+
+# Getting Started
+
+This template provides a complete TypeScript monorepo setup with modern tooling.
+
+## Prerequisites
+
+- Node.js 18+
+- pnpm 8+
+
+## Installation
+
+Clone the repository and install dependencies:
+
+```bash
+git clone https://github.com/no-witness-labs/typescript-project-template.git
+cd typescript-project-template
+pnpm install
+```
+
+## Development
+
+Start development mode:
+
+```bash
+pnpm dev
+```
+
+Build all packages:
+
+```bash
+pnpm build
+```
+
+Run tests:
+
+```bash
+pnpm test
+```
+
+## Creating a New Package
+
+1. Create a new directory in `packages/`
+2. Copy the structure from `packages/core/`
+3. Update `package.json` with your package name
+4. Start building!
+
+## Quick Example
+
+Here's a simple TypeScript example:
+
+```ts
+const greeting = "Hello, World!"
+console.log(greeting)
+```
+
+## Scripts
+
+| Script | Description |
+|--------|-------------|
+| `pnpm build` | Build all packages |
+| `pnpm dev` | Start development mode |
+| `pnpm test` | Run tests |
+| `pnpm lint` | Lint code |
+| `pnpm format` | Format code |
+| `pnpm type-check` | Type check all packages |

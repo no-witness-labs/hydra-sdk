@@ -1,0 +1,48 @@
+@import "tailwindcss";
+@import "fumadocs-ui/css/neutral.css";
+@import "fumadocs-ui/css/preset.css";
+@import "fumadocs-twoslash/twoslash.css";
+@import "@shikijs/twoslash/style-rich.css";
+
+/* Twoslash hover styling */
+.twoslash .twoslash-hover:hover .twoslash-popup-container {
+  background: hsl(var(--popover));
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  box-shadow:
+    0 10px 15px -3px rgb(0 0 0 / 0.1),
+    0 4px 6px -4px rgb(0 0 0 / 0.1);
+  backdrop-filter: blur(12px);
+  padding: 8px 12px;
+}
+
+.twoslash .twoslash-popup-container {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.twoslash .twoslash-popup-code {
+  color: hsl(var(--popover-foreground));
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+/* Style JSDoc tag names */
+.twoslash-tag-line .twoslash-tag-name {
+  color: hsl(var(--muted-foreground));
+  font-style: italic;
+}
+
+/* Hide @example tag in popups (code block shows below) */
+.twoslash-popup-docs .twoslash-tag-line:has(.twoslash-tag-name:is([data-tag="example"])) {
+  display: none;
+}
+
+/* Style @since tag */
+.twoslash-tag-line:has(.twoslash-tag-name[data-tag="since"]) {
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid hsl(var(--border));
+}
