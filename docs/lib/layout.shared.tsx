@@ -3,7 +3,7 @@ import type { BaseLayoutProps } from "fumadocs-ui/layouts/shared"
 export function baseOptions(): BaseLayoutProps {
   return {
     nav: {
-      title: "TypeScript Project Template"
+      title: "Hydra SDK"
     },
     links: [
       {
@@ -12,7 +12,7 @@ export function baseOptions(): BaseLayoutProps {
       },
       {
         text: "GitHub",
-        url: "https://github.com/no-witness-labs/typescript-project-template",
+        url: "https://github.com/no-witness-labs/hydra-sdk",
         external: true
       }
     ]

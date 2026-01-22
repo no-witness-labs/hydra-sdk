@@ -9,13 +9,13 @@
       "cache": true
     },
     "docs#build": {
-      "dependsOn": ["@template/core#build"],
+      "dependsOn": ["@no-witness-labs/core#build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": [".next/**", "out/**"],
       "cache": true
     },
     "docs#dev": {
-      "dependsOn": ["@template/core#build"],
+      "dependsOn": ["@no-witness-labs/core#build"],
       "cache": false,
       "persistent": true
     },

@@ -18,7 +18,7 @@ const decodeCode = (encoded: string): string | null => {
   }
 }
 
-const defaultCode = `import { add, subtract } from "@template/core"
+const defaultCode = `import { add, subtract } from "@no-witness-labs/core"
 
 // Basic arithmetic with the core package
 const sum = add(2, 3)

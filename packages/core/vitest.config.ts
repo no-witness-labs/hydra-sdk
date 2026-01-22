@@ -6,7 +6,7 @@ export default defineConfig({
     environment: "node",
     include: ["test/**/*.test.ts", "test/**/*.spec.ts"],
     alias: {
-      "@template/core": new URL("./src/index.ts", import.meta.url).pathname
+      "@no-witness-labs/core": new URL("./src/index.ts", import.meta.url).pathname
     }
   }
 })

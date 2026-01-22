@@ -8,8 +8,8 @@ const config = {
   reactStrictMode: true,
   output: "export",
   distDir: "out",
-  basePath: isCI ? "/typescript-project-template" : "",
-  assetPrefix: isCI ? "/typescript-project-template" : "",
+  basePath: isCI ? "/hydra-sdk" : "",
+  assetPrefix: isCI ? "/hydra-sdk" : "",
   trailingSlash: true,
   images: {
     unoptimized: true

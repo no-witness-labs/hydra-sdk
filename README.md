@@ -1,4 +1,4 @@
-# TypeScript Project Template
+# Hydra SDK
 
 A monorepo template for TypeScript projects with modern tooling.
 
@@ -27,7 +27,7 @@ A monorepo template for TypeScript projects with modern tooling.
 
 ```bash
 # Clone the template
-git clone https://github.com/no-witness-labs/typescript-project-template.git my-project
+git clone https://github.com/no-witness-labs/hydra-sdk.git my-project
 cd my-project
 
 # Remove the template's git history and start fresh
@@ -59,12 +59,12 @@ bun scripts/init.ts \
 
 | Placeholder                     | Example Value     | Files Affected                   |
 | ------------------------------- | ----------------- | -------------------------------- |
-| `typescript-project-template`   | `my-awesome-sdk`  | package.json, configs, workflows |
-| `@template/`                    | `@myorg/`         | package.json, imports            |
+| `hydra-sdk`                     | `my-awesome-sdk`  | package.json, configs, workflows |
+| `@no-witness-labs/`             | `@myorg/`         | package.json, imports            |
 | `no-witness-labs`               | `myorg`           | changeset config, docs           |
-| `TypeScript Project Template`   | `My Awesome SDK`  | docs title                       |
-| `[COPYRIGHT_HOLDER]` in LICENSE | `My Company Inc.` | LICENSE                          |
-| `[YEAR]` in LICENSE             | `2026`            | LICENSE                          |
+| `Hydra SDK`                     | `My Awesome SDK`  | docs title                       |
+| `No Witness Labs` in LICENSE    | `My Company Inc.` | LICENSE                          |
+| `2026` in LICENSE               | `2026`            | LICENSE                          |
 
 <details>
 <summary>Manual replacement (alternative)</summary>
@@ -84,7 +84,7 @@ find . -type f \( -name "*.json" -o -name "*.ts" -o -name "*.tsx" -o -name "*.mj
   -not -path "./node_modules/*" \
   -not -path "./.git/*" \
   -not -path "./.source/*" \
-  -exec sed -i '' "s/typescript-project-template/${PROJECT_NAME}/g" {} +
+  -exec sed -i '' "s/hydra-sdk/${PROJECT_NAME}/g" {} +
 
 find . -type f \( -name "*.json" -o -name "*.ts" -o -name "*.tsx" -o -name "*.mdx" \) \
   -not -path "./node_modules/*" \
@@ -102,7 +102,7 @@ find . -type f \( -name "*.tsx" -o -name "*.mdx" \) \
   -not -path "./node_modules/*" \
   -not -path "./.git/*" \
   -not -path "./.source/*" \
-  -exec sed -i '' "s/TypeScript Project Template/${PROJECT_TITLE}/g" {} +
+  -exec sed -i '' "s/Hydra SDK/${PROJECT_TITLE}/g" {} +
 ```
 
 Don't forget to update the LICENSE file manually with your copyright info.
@@ -233,7 +233,7 @@ When updating JSDoc or types in packages, the docs site needs a fresh start to p
 
 ```bash
 # 1. Rebuild the package
-pnpm --filter @template/core build
+pnpm --filter @no-witness-labs/core build
 
 # 2. Restart the docs dev server (Ctrl+C, then run again)
 cd docs && pnpm dev

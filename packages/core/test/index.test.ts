@@ -1,4 +1,4 @@
-import { add, subtract } from "@template/core"
+import { add, subtract } from "@no-witness-labs/core"
 import { describe, expect, it } from "vitest"
 
 describe("core", () => {

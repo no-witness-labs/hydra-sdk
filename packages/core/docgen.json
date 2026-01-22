@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/Effect-TS/docgen/main/schema.json",
-  "projectHomepage": "https://github.com/no-witness-labs/typescript-project-template",
+  "projectHomepage": "https://github.com/no-witness-labs/hydra-sdk",
   "srcDir": "src",
   "outDir": "docs",
   "theme": "markdown",
