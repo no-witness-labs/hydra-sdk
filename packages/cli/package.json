@@ -2,14 +2,18 @@
   "name": "cli",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "bin.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "devDependencies": {
-    "@types/node": "^25.0.10"
+  "dependencies": {
+    "@effect/cli": "^0.73.1",
+    "@effect/platform": "^0.94.2",
+    "@effect/platform-node": "^0.104.1",
+    "@types/node": "^25.0.10",
+    "effect": "^3.19.15"
   }
 }
