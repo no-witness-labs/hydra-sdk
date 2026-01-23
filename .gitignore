@@ -2,6 +2,7 @@
 
 # Template
 docs
+.tsbuildinfo
 
 # Dependencies
 node_modules
