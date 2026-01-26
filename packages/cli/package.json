@@ -13,7 +13,6 @@
     "@effect/cli": "^0.73.1",
     "@effect/platform": "^0.94.2",
     "@effect/platform-node": "^0.104.1",
-    "@types/node": "^25.0.10",
-    "effect": "^3.19.15"
+    "@types/node": "^25.0.10"
   }
 }
