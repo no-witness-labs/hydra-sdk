@@ -1,10 +1,29 @@
 {
-  "name": "cli",
+  "name": "@no-witness-labs/cli",
   "version": "1.0.0",
   "description": "",
-  "main": "bin.js",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "src/**/*.ts",
+    "dist/**/*.js",
+    "dist/**/*.js.map",
+    "dist/**/*.d.ts",
+    "dist/**/*.d.ts.map"
+  ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsc -b tsconfig.build.json && babel dist --plugins annotate-pure-calls --out-dir dist --source-maps",
+    "dev": "tsc -b tsconfig.build.json --watch",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src test",
+    "test": "vitest run",
+    "clean": "rm -rf dist .turbo .tsbuildinfo"
   },
   "keywords": [],
   "author": "",
@@ -12,7 +31,11 @@
   "dependencies": {
     "@effect/cli": "^0.73.1",
     "@effect/platform": "^0.94.2",
-    "@effect/platform-node": "^0.104.1",
-    "@types/node": "^25.0.10"
+    "@effect/platform-node": "^0.104.1"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.28.0",
+    "@types/node": "^22.0.0",
+    "babel-plugin-annotate-pure-calls": "^0.4.0"
   }
 }
