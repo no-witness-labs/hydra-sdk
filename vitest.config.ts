@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config"
+import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
@@ -10,8 +10,8 @@ export default defineConfig({
     pool: "forks",
     poolOptions: {
       forks: {
-        singleFork: true
-      }
+        singleFork: true,
+      },
     },
     retry: 2,
     bail: 1,
@@ -20,7 +20,13 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],
-      exclude: ["node_modules/", "dist/", "**/*.test.ts", "**/*.spec.ts", "docs/"]
-    }
-  }
-})
+      exclude: [
+        "node_modules/",
+        "dist/",
+        "**/*.test.ts",
+        "**/*.spec.ts",
+        "docs/",
+      ],
+    },
+  },
+});

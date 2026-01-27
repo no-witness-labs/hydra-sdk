@@ -1,54 +1,64 @@
-import path from "node:path"
-import { fileURLToPath } from "node:url"
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-import { fixupPluginRules } from "@eslint/compat"
-import { FlatCompat } from "@eslint/eslintrc"
-import js from "@eslint/js"
-import tsParser from "@typescript-eslint/parser"
-import _import from "eslint-plugin-import"
-import simpleImportSort from "eslint-plugin-simple-import-sort"
-import sortDestructureKeys from "eslint-plugin-sort-destructure-keys"
+import { fixupPluginRules } from "@eslint/compat";
+import { FlatCompat } from "@eslint/eslintrc";
+import js from "@eslint/js";
+import tsParser from "@typescript-eslint/parser";
+import _import from "eslint-plugin-import";
+import simpleImportSort from "eslint-plugin-simple-import-sort";
+import sortDestructureKeys from "eslint-plugin-sort-destructure-keys";
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const compat = new FlatCompat({
   baseDirectory: __dirname,
   recommendedConfig: js.configs.recommended,
-  allConfig: js.configs.all
-})
+  allConfig: js.configs.all,
+});
 
 export default [
   {
-    ignores: ["**/dist", "**/build", "**/docs", "**/*.md", "**/.turbo", "**/temp", "**/.next", "**/.source", "**/out"]
+    ignores: [
+      "**/dist",
+      "**/build",
+      "**/docs",
+      "**/*.md",
+      "**/.turbo",
+      "**/temp",
+      "**/.next",
+      "**/.source",
+      "**/out",
+    ],
   },
   ...compat.extends(
     "eslint:recommended",
     "plugin:@typescript-eslint/eslint-recommended",
-    "plugin:@typescript-eslint/recommended"
+    "plugin:@typescript-eslint/recommended",
   ),
   {
     plugins: {
       import: fixupPluginRules(_import),
       "sort-destructure-keys": sortDestructureKeys,
-      "simple-import-sort": simpleImportSort
+      "simple-import-sort": simpleImportSort,
     },
 
     languageOptions: {
       parser: tsParser,
       ecmaVersion: 2022,
-      sourceType: "module"
+      sourceType: "module",
     },
 
     settings: {
       "import/parsers": {
-        "@typescript-eslint/parser": [".ts", ".tsx"]
+        "@typescript-eslint/parser": [".ts", ".tsx"],
       },
 
       "import/resolver": {
         typescript: {
-          alwaysTryTypes: true
-        }
-      }
+          alwaysTryTypes: true,
+        },
+      },
     },
 
     rules: {
@@ -74,8 +84,8 @@ export default [
         "warn",
         {
           default: "generic",
-          readonly: "generic"
-        }
+          readonly: "generic",
+        },
       ],
 
       "@typescript-eslint/member-delimiter-style": 0,
@@ -91,8 +101,8 @@ export default [
         "error",
         {
           argsIgnorePattern: "^_",
-          varsIgnorePattern: "^_"
-        }
+          varsIgnorePattern: "^_",
+        },
       ],
 
       "@typescript-eslint/ban-ts-comment": "off",
@@ -102,13 +112,13 @@ export default [
       "@typescript-eslint/interface-name-prefix": "off",
       "@typescript-eslint/no-array-constructor": "off",
       "@typescript-eslint/no-use-before-define": "off",
-      "@typescript-eslint/no-namespace": "off"
-    }
+      "@typescript-eslint/no-namespace": "off",
+    },
   },
   {
     files: ["packages/*/src/**/*", "packages/*/test/**/*"],
     rules: {
-      "no-console": "error"
-    }
-  }
-]
+      "no-console": "error",
+    },
+  },
+];

@@ -57,14 +57,14 @@ bun scripts/init.ts \
 
 #### What Gets Replaced
 
-| Placeholder                     | Example Value     | Files Affected                   |
-| ------------------------------- | ----------------- | -------------------------------- |
-| `hydra-sdk`                     | `my-awesome-sdk`  | package.json, configs, workflows |
-| `@no-witness-labs/`             | `@myorg/`         | package.json, imports            |
-| `no-witness-labs`               | `myorg`           | changeset config, docs           |
-| `Hydra SDK`                     | `My Awesome SDK`  | docs title                       |
-| `No Witness Labs` in LICENSE    | `My Company Inc.` | LICENSE                          |
-| `2026` in LICENSE               | `2026`            | LICENSE                          |
+| Placeholder                  | Example Value     | Files Affected                   |
+| ---------------------------- | ----------------- | -------------------------------- |
+| `hydra-sdk`                  | `my-awesome-sdk`  | package.json, configs, workflows |
+| `@no-witness-labs/`          | `@myorg/`         | package.json, imports            |
+| `no-witness-labs`            | `myorg`           | changeset config, docs           |
+| `Hydra SDK`                  | `My Awesome SDK`  | docs title                       |
+| `No Witness Labs` in LICENSE | `My Company Inc.` | LICENSE                          |
+| `2026` in LICENSE            | `2026`            | LICENSE                          |
 
 <details>
 <summary>Manual replacement (alternative)</summary>
