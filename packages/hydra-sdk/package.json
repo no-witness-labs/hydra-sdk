@@ -1,7 +1,10 @@
 {
-  "name": "@no-witness-labs/cli",
-  "version": "1.1.0",
-  "description": "",
+  "name": "@no-witness-labs/hydra-sdk",
+  "version": "0.0.1",
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -24,14 +27,6 @@
     "lint": "eslint src test",
     "test": "vitest run",
     "clean": "rm -rf dist .turbo .tsbuildinfo"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "@effect/cli": "^0.73.1",
-    "@effect/platform": "^0.94.2",
-    "@effect/platform-node": "^0.104.1"
   },
   "devDependencies": {
     "@babel/cli": "^7.28.0",

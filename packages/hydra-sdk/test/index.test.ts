@@ -1,7 +1,7 @@
-import { add, subtract } from "@no-witness-labs/core";
+import { add, subtract } from "@no-witness-labs/hydra-sdk";
 import { describe, expect, it } from "vitest";
 
-describe("core", () => {
+describe("hydra-sdk", () => {
   describe("add", () => {
     it("should add two positive numbers", () => {
       expect(add(2, 3)).toBe(5);

@@ -15,7 +15,7 @@
   "dependencies": {
     "@orama/orama": "^3.1.11",
     "@stackblitz/sdk": "^1.11.0",
-    "@no-witness-labs/core": "workspace:*",
+    "@no-witness-labs/hydra-sdk": "workspace:*",
     "fumadocs-core": "^16.0.8",
     "fumadocs-mdx": "^13.0.5",
     "fumadocs-twoslash": "^3.1.10",

@@ -9,13 +9,13 @@
       "cache": true
     },
     "docs#build": {
-      "dependsOn": ["@no-witness-labs/core#build"],
+      "dependsOn": ["@no-witness-labs/hydra-sdk#build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": [".next/**", "out/**"],
       "cache": true
     },
     "docs#dev": {
-      "dependsOn": ["@no-witness-labs/core#build"],
+      "dependsOn": ["@no-witness-labs/hydra-sdk#build"],
       "cache": false,
       "persistent": true
     },
