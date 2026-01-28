@@ -6,7 +6,7 @@ export default defineConfig({
     environment: "node",
     include: ["test/**/*.test.ts", "test/**/*.spec.ts"],
     alias: {
-      "@no-witness-labs/cli": new URL("./src/index.ts", import.meta.url)
+      "@no-witness-labs/hydra-sdk": new URL("./src/index.ts", import.meta.url)
         .pathname,
     },
   },

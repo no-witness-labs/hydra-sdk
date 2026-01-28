@@ -8,7 +8,7 @@
     "rootDir": "test",
     "noEmit": true,
     "paths": {
-      "@no-witness-labs/core": ["./src/index.ts"]
+      "@no-witness-labs/hydra-sdk": ["./src/index.ts"]
     }
   },
   "references": [{ "path": "tsconfig.src.json" }]
