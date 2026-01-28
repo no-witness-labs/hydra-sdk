@@ -90,6 +90,9 @@ importers:
       '@no-witness-labs/hydra-sdk':
         specifier: workspace:*
         version: link:..
+      '@no-witness-labs/hydra-sdk-cli':
+        specifier: workspace:*
+        version: link:../packages/hydra-sdk-cli
       '@orama/orama':
         specifier: ^3.1.11
         version: 3.1.18
