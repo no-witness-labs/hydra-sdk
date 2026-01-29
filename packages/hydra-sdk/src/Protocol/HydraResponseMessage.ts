@@ -1,4 +1,4 @@
-import { Effect, Option, Record, Schema } from "effect";
+import { Effect, Option, Record, Schema, SchemaAST } from "effect";
 
 const TransactionMessageSchema = Schema.Struct({
     type: Schema.Literal("Tx ConwayEra", "Unwitnessed Tx ConwayEra", "Witnessed Tx ConwayEra"),
@@ -23,7 +23,7 @@ export type GreetingsMessage = typeof GreetingsMessageSchema.Type;
 export const CommandFailedMessageSchema = Schema.Struct({
   tag: Schema.Literal("CommandFailed"),
   clientInput: Schema.Struct({
-    tag: Schema.Literal("Init", "Abort", "NewTx", "Deccomit", "Recover", "Close", "Contest", "Fanout", "SideLoadSnapshot"),
+    tag: Schema.Literal("Init", "Abort", "NewTx", "Decommit", "Recover", "Close", "Contest", "Fanout", "SideLoadSnapshot"),
     transaction: Schema.optional(
       TransactionMessageSchema
     ),
@@ -214,43 +214,187 @@ export const TxInvalidMessageSchema = Schema.Struct({
 });
 export type TxInvalidMessage = typeof TxInvalidMessageSchema.Type;
 
-
-
-export const FinalizedMessageSchema = Schema.Struct({
-  tag: Schema.Literal("HeadIsFinalized"),
-});
-export type FinalizedMessage = typeof FinalizedMessageSchema.Type;
-
-
 export const SnapshotConfirmedMessageSchema = Schema.Struct({
   tag: Schema.Literal("SnapshotConfirmed"),
+  headId: Schema.String,
   snapshot: Schema.Struct({
-    confirmedTransactions: Schema.optional(Schema.Array(Schema.String)),
-    confirmed: Schema.optional(
-      Schema.Array(
-        Schema.Record({
-          key: Schema.String,
-          value: Schema.Unknown,
-        }),
-      ),
-    ),
+    headId: Schema.String,
+    version: Schema.Int,
+    number: Schema.Int,
+    confirmed: Schema.Array(TransactionMessageSchema),
+    utxo: Schema.String,
+    utxoToCommit: Schema.optional(Schema.String),
+    utxoToDecommit: Schema.optional(Schema.String),
   }),
+  seq: Schema.Int,
+  timestamp: Schema.DateTimeUtcFromDate,
 });
 export type SnapshotConfirmedMessage =
   typeof SnapshotConfirmedMessageSchema.Type;
 
+export const InvalidInputMessageSchema = Schema.Struct({
+  tag: Schema.Literal("InvalidInput"),
+  reason: Schema.String,
+  input: Schema.String,
+});
+export type InvalidInputMessage = typeof InvalidInputMessageSchema.Type;
+
+export const IgnoredHeadInitializingMessageSchema = Schema.Struct({
+  tag: Schema.Literal("IgnoredHeadInitializing"),
+  headId: Schema.String,
+  contestationPeriod: Schema.Int,
+  parties: Schema.Array(
+      Schema.Struct({
+        vkey: Schema.String
+    })),
+  participants: Schema.Array(Schema.String),
+  seq: Schema.Int,
+  timestamp: Schema.DateTimeUtcFromDate,
+});
+export type IgnoredHeadInitializingMessage =
+  typeof IgnoredHeadInitializingMessageSchema.Type;
+
+export const DecommitInvalidMessageSchema = Schema.Struct({
+  tag: Schema.Literal("DecommitInvalid"),
+  headId: Schema.String,
+  decommitTx: TransactionMessageSchema,
+  decommitInvalidReason: Schema.Union(
+    Schema.Struct({
+      tag: Schema.Literal("DecommitTxInvalid"),
+      localUTxO: Schema.String,
+      validationError: Schema.Struct({
+        reason: Schema.String
+      })
+    }),
+    Schema.Struct({
+      tag: Schema.Literal("DecommitAlreadyInFlight"),
+      otherDecommitTxId: Schema.String
+    })
+  ),
+  seq: Schema.Int,
+  timestamp: Schema.DateTimeUtcFromDate,
+});
+export type DecommitInvalidMessage =
+  typeof DecommitInvalidMessageSchema.Type;
+
+export const DecommitRequestedMessageSchema = Schema.Struct({
+  tag: Schema.Literal("DecommitRequested"),
+  headId: Schema.String,
+  decommitTx: TransactionMessageSchema,
+  utxoToDecommit: Schema.String, // TODO: make a better match
+  seq: Schema.Int,
+  timestamp: Schema.DateTimeUtcFromDate,
+});
+export type DecommitRequestedMessage = typeof DecommitRequestedMessageSchema.Type;
+
+export const DecommitApprovedMessageSchema = Schema.Struct({
+  tag: Schema.Literal("DecommitApproved"),
+  headId: Schema.String,
+  decommitTxId: Schema.String,
+  utxoToDecommit: Schema.String, // TODO: make a better match
+  seq: Schema.Int,
+  timestamp: Schema.DateTimeUtcFromDate,
+});
+export type DecommitApprovedMessage = typeof DecommitApprovedMessageSchema.Type;
+
+export const DecommitFinalizedMessageSchema = Schema.Struct({
+  tag: Schema.Literal("DecommitFinalized"),
+  headId: Schema.String,
+  distributedUTxO: Schema.String, // TODO: make a better match
+  seq: Schema.Int,
+  timestamp: Schema.DateTimeUtcFromDate,
+});
+export type DecommitFinalizedMessage = typeof DecommitFinalizedMessageSchema.Type;
+
+export const CommitRecordedMessageSchema = Schema.Struct({
+  tag: Schema.Literal("CommitRecorded"),
+  headId: Schema.String,
+  utxoToCommit: Schema.String, // TODO: make a better match
+  pendingDeposit: Schema.String,
+  deadline: Schema.DateTimeUtcFromDate,
+  seq: Schema.Int,
+  timestamp: Schema.DateTimeUtcFromDate,
+});
+export type CommitRecordedMessage = typeof CommitRecordedMessageSchema.Type;
+
+export const CommitApprovedMessageSchema = Schema.Struct({
+  tag: Schema.Literal("CommitApproved"),
+  headId: Schema.String,
+  utxoToCommit: Schema.String, // TODO: make a better match
+  seq: Schema.Int,
+  timestamp: Schema.DateTimeUtcFromDate,
+});
+export type CommitApprovedMessage = typeof CommitApprovedMessageSchema.Type;
+
+export const CommitFinalizedMessageSchema = Schema.Struct({
+  tag: Schema.Literal("CommitFinalized"),
+  headId: Schema.String,
+  depositTxId: Schema.String,
+  seq: Schema.Int,
+  timestamp: Schema.DateTimeUtcFromDate,
+});
+export type CommitFinalizedMessage = typeof CommitFinalizedMessageSchema.Type;
+
+export const CommitRecoveredMessageSchema = Schema.Struct({
+  tag: Schema.Literal("CommitRecovered"),
+  headId: Schema.String,
+  recoveredUTxO: Schema.String, // TODO: make a better match
+  recoveredTxId: Schema.String,
+  seq: Schema.Int,
+  timestamp: Schema.DateTimeUtcFromDate,
+});
+export type CommitRecoveredMessage = typeof CommitRecoveredMessageSchema.Type;
+
+export const SnapshotSideLoadedMessageSchema = Schema.Struct({
+  tag: Schema.Literal("SnapshotSideLoaded"),
+  headId: Schema.String,
+  snapshotNumber: Schema.Int,
+  seq: Schema.Int,
+  timestamp: Schema.DateTimeUtcFromDate,
+});
+export type SnapshotSideLoadedMessage = typeof SnapshotSideLoadedMessageSchema.Type;
+
+export const EventLogRotatedMessageSchema = Schema.Struct({
+  tag: Schema.Literal("EventLogRotated"),
+  seq: Schema.Int,
+  timestamp: Schema.DateTimeUtcFromDate,
+});
+export type EventLogRotatedMessage = typeof EventLogRotatedMessageSchema.Type;
+
 export const HydraResponseMessageSchema = Schema.Union(
+  TransactionMessageSchema,
   GreetingsMessageSchema,
   CommandFailedMessageSchema,
+  PostTxOnChainFailedMessageSchema,
+  PeerConnectedMessageSchema,
+  PeerDisconnectedMessageSchema,
+  NetworkConnectedMessageSchema,
+  NetworkDisconnectedMessageSchema,
+  NetworkVersionMismatchMessageSchema,
+  NetworkClusterIDMismatchMessageSchema,
   HeadIsInitializingMessageSchema,
+  CommittedMessageSchema,
   HeadIsOpenMessageSchema,
   HeadIsClosedMessageSchema,
-  FinalizedMessageSchema,
+  HeadIsContestedMessageSchema,
   ReadyToFanoutMessageSchema,
+  HeadIsAbortedMessageSchema,
+  HeadIsFinalizedMessageSchema,
   TxValidMessageSchema,
   TxInvalidMessageSchema,
-  PostTxOnChainFailedMessageSchema,
   SnapshotConfirmedMessageSchema,
+  InvalidInputMessageSchema,
+  IgnoredHeadInitializingMessageSchema,
+  DecommitInvalidMessageSchema,
+  DecommitRequestedMessageSchema,
+  DecommitApprovedMessageSchema,
+  DecommitFinalizedMessageSchema,
+  CommitRecordedMessageSchema,
+  CommitApprovedMessageSchema,
+  CommitFinalizedMessageSchema,
+  CommitRecoveredMessageSchema,
+  SnapshotSideLoadedMessageSchema,
+  EventLogRotatedMessageSchema,
 );
 export type HydraMessage = typeof HydraResponseMessageSchema.Type;
 
