@@ -1,11 +1,5 @@
-import { Effect, Option, Record, Schema, SchemaAST } from "effect";
-
-const TransactionMessageSchema = Schema.Struct({
-    type: Schema.Literal("Tx ConwayEra", "Unwitnessed Tx ConwayEra", "Witnessed Tx ConwayEra"),
-    description: Schema.String,
-    cborHex: Schema.String,
-    txId: Schema.String,
-  })
+import { Effect, Option, Record, Schema } from "effect";
+import * as Common from "./CommonMessage.js"
 
 export const GreetingsMessageSchema = Schema.Struct({
   tag: Schema.Literal("Greetings"),
@@ -25,7 +19,7 @@ export const CommandFailedMessageSchema = Schema.Struct({
   clientInput: Schema.Struct({
     tag: Schema.Literal("Init", "Abort", "NewTx", "Decommit", "Recover", "Close", "Contest", "Fanout", "SideLoadSnapshot"),
     transaction: Schema.optional(
-      TransactionMessageSchema
+      Common.TransactionMessageSchema
     ),
   }),
 });
@@ -205,7 +199,7 @@ export const TxInvalidMessageSchema = Schema.Struct({
   tag: Schema.Literal("TxInvalid"),
   headId: Schema.String,
   utxo: Schema.String, // TODO: make a better match
-  transaction: TransactionMessageSchema,
+  transaction: Common.TransactionMessageSchema,
   validationError: Schema.Struct({
     reason: Schema.String
   }),
@@ -221,7 +215,7 @@ export const SnapshotConfirmedMessageSchema = Schema.Struct({
     headId: Schema.String,
     version: Schema.Int,
     number: Schema.Int,
-    confirmed: Schema.Array(TransactionMessageSchema),
+    confirmed: Schema.Array(Common.TransactionMessageSchema),
     utxo: Schema.String,
     utxoToCommit: Schema.optional(Schema.String),
     utxoToDecommit: Schema.optional(Schema.String),
@@ -257,7 +251,7 @@ export type IgnoredHeadInitializingMessage =
 export const DecommitInvalidMessageSchema = Schema.Struct({
   tag: Schema.Literal("DecommitInvalid"),
   headId: Schema.String,
-  decommitTx: TransactionMessageSchema,
+  decommitTx: Common.TransactionMessageSchema,
   decommitInvalidReason: Schema.Union(
     Schema.Struct({
       tag: Schema.Literal("DecommitTxInvalid"),
@@ -280,7 +274,7 @@ export type DecommitInvalidMessage =
 export const DecommitRequestedMessageSchema = Schema.Struct({
   tag: Schema.Literal("DecommitRequested"),
   headId: Schema.String,
-  decommitTx: TransactionMessageSchema,
+  decommitTx: Common.TransactionMessageSchema,
   utxoToDecommit: Schema.String, // TODO: make a better match
   seq: Schema.Int,
   timestamp: Schema.DateTimeUtcFromDate,
@@ -362,7 +356,7 @@ export const EventLogRotatedMessageSchema = Schema.Struct({
 export type EventLogRotatedMessage = typeof EventLogRotatedMessageSchema.Type;
 
 export const HydraResponseMessageSchema = Schema.Union(
-  TransactionMessageSchema,
+  Common.TransactionMessageSchema,
   GreetingsMessageSchema,
   CommandFailedMessageSchema,
   PostTxOnChainFailedMessageSchema,

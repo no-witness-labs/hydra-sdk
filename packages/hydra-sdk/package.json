@@ -11,6 +11,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./Protocol/*": {
+      "types": "./dist/Protocol/*.d.ts",
+      "import": "./dist/Protocol/*.js"
     }
   },
   "files": [
