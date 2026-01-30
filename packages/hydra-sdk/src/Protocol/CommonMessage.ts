@@ -1,4 +1,4 @@
-import { Effect, Option, Record, Schema } from "effect";
+import { Effect, Schema } from "effect";
 
 export const TransactionMessageSchema = Schema.Struct({
     type: Schema.Literal("Tx ConwayEra", "Unwitnessed Tx ConwayEra", "Witnessed Tx ConwayEra"),

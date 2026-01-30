@@ -1,12 +1,10 @@
-import { Effect, Option, Record, Schema } from "effect";
+import { Effect, Schema } from "effect";
 import * as Common from "./CommonMessage.js"
 
 const InitMessageSchema = Schema.Struct({
     tag: Schema.Literal("Init"),
 })
 export type InitMessage = typeof InitMessageSchema.Type;
-
-const initMessage: InitMessage = {tag: "Init"}
 
 const AbortMessageSchema = Schema.Struct({
     tag: Schema.Literal("Abort"),
@@ -50,3 +48,16 @@ const SideLoadSnapshotMessageSchema = Schema.Struct({
     tag: Schema.Literal("SideLoadSnapshot"),
 })
 export type SideLoadSnapshotMessage = typeof SideLoadSnapshotMessageSchema.Type;
+
+export const RequestMessageSchema = Schema.Union(
+    InitMessageSchema,
+    AbortMessageSchema,
+    NewTxMessageSchema,
+    RecoverMessageSchema,
+    DecommitMessageSchema,
+    CloseMessageSchema,
+    ContestMessageSchema,
+    FanoutMessageSchema,
+    SideLoadSnapshotMessageSchema,
+);
+export type RequestMessage = typeof RequestMessageSchema.Type;
