@@ -44,7 +44,7 @@ describe("GreetingsMessageSchema", () => {
         me: { vkey: "d0b8f28427aa7b640c636075905cbd6574a431aeaca5b3dbafd47cfe66c35043" },
         headStatus: "Idle",
         hydraHeadId: "820082582089ff4f3ff4a6052ec9d073",
-        snapshotUtxo: "{}",
+        snapshotUtxo: "{\n    \"09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687\": {\n        \"address\": \"addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5\",\n        \"value\": {\n            \"lovelace\": 7620669\n        }\n    }\n}\n",
         timestamp: "2019-08-24T14:15:22Z",
         hydraNodeVersion: "1.0.0"
       };
@@ -77,7 +77,7 @@ describe("PostTxOnChainFailedMessageSchema", () => {
           participants: ["alice"],
           headParameters: {
             contestationPeriod: 100,
-            parties: [{ vkey: "abc" }]
+            parties: [{ vkey: "d0b8f28427aa7b640c636075905cbd6574a431aeaca5b3dbafd47cfe66c35043" }]
           }
         },
         postTxError: { error: "test" }
@@ -197,8 +197,8 @@ describe("HeadIsInitializingMessageSchema", () => {
     Effect.gen(function* () {
       const input = {
         tag: "HeadIsInitializing",
-        headId: "head1",
-        parties: [{ vkey: "abc" }],
+        headId: "820082582089ff4f3ff4a6052ec9d073",
+        parties: [{ vkey: "d0b8f28427aa7b640c636075905cbd6574a431aeaca5b3dbafd47cfe66c35043" }],
         seq: 1,
         timestamp: "2019-08-24T14:15:22Z"
       };
@@ -213,9 +213,9 @@ describe("CommittedMessageSchema", () => {
     Effect.gen(function* () {
       const input = {
         tag: "Committed",
-        headId: "head1",
-        parties: [{ vkey: "abc" }],
-        utxo: "{}",
+        headId: "820082582089ff4f3ff4a6052ec9d073",
+        parties: [{ vkey: "d0b8f28427aa7b640c636075905cbd6574a431aeaca5b3dbafd47cfe66c35043" }],
+        utxo: "{\n    \"09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687\": {\n        \"address\": \"addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5\",\n        \"value\": {\n            \"lovelace\": 7620669\n        }\n    }\n}\n",
         seq: 1,
         timestamp: "2019-08-24T14:15:22Z"
       };
@@ -230,8 +230,8 @@ describe("HeadIsOpenMessageSchema", () => {
     Effect.gen(function* () {
       const input = {
         tag: "HeadIsOpen",
-        headId: "head1",
-        utxo: "{}",
+        headId: "820082582089ff4f3ff4a6052ec9d073",
+        utxo: "{\n    \"09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687\": {\n        \"address\": \"addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5\",\n        \"value\": {\n            \"lovelace\": 7620669\n        }\n    }\n}\n",
         seq: 1,
         timestamp: "2019-08-24T14:15:22Z"
       };
@@ -246,10 +246,10 @@ describe("HeadIsClosedMessageSchema", () => {
     Effect.gen(function* () {
       const input = {
         tag: "HeadIsClosed",
-        headId: "head1",
+        headId: "820082582089ff4f3ff4a6052ec9d073",
         snapshotNumber: 5,
         contestationDeadline: "2019-08-24T14:15:22Z",
-        utxo: "{}",
+        utxo: "{\n    \"09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687\": {\n        \"address\": \"addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5\",\n        \"value\": {\n            \"lovelace\": 7620669\n        }\n    }\n}\n",
         seq: 1,
         timestamp: "2019-08-24T14:15:22Z"
       };
@@ -264,10 +264,10 @@ describe("HeadIsContestedMessageSchema", () => {
     Effect.gen(function* () {
       const input = {
         tag: "HeadIsContested",
-        headId: "head1",
+        headId: "820082582089ff4f3ff4a6052ec9d073",
         snapshotNumber: 5,
         contestationDeadline: "2019-08-24T14:15:22Z",
-        utxo: "{}",
+        utxo: "{\n    \"09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687\": {\n        \"address\": \"addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5\",\n        \"value\": {\n            \"lovelace\": 7620669\n        }\n    }\n}\n",
         seq: 1,
         timestamp: "2019-08-24T14:15:22Z"
       };
@@ -282,7 +282,7 @@ describe("ReadyToFanoutMessageSchema", () => {
     Effect.gen(function* () {
       const input = {
         tag: "ReadyToFanout",
-        headId: "head1",
+        headId: "820082582089ff4f3ff4a6052ec9d073",
         seq: 1,
         timestamp: "2019-08-24T14:15:22Z"
       };
@@ -297,8 +297,8 @@ describe("HeadIsAbortedMessageSchema", () => {
     Effect.gen(function* () {
       const input = {
         tag: "HeadIsAborted",
-        headId: "head1",
-        utxo: "{}",
+        headId: "820082582089ff4f3ff4a6052ec9d073",
+        utxo: "{\n    \"09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687\": {\n        \"address\": \"addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5\",\n        \"value\": {\n            \"lovelace\": 7620669\n        }\n    }\n}\n",
         seq: 1,
         timestamp: "2019-08-24T14:15:22Z"
       };
@@ -313,8 +313,8 @@ describe("HeadIsFinalizedMessageSchema", () => {
     Effect.gen(function* () {
       const input = {
         tag: "HeadIsFinalized",
-        headId: "head1",
-        utxo: "{}",
+        headId: "820082582089ff4f3ff4a6052ec9d073",
+        utxo: "{\n    \"09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687\": {\n        \"address\": \"addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5\",\n        \"value\": {\n            \"lovelace\": 7620669\n        }\n    }\n}\n",
         seq: 1,
         timestamp: "2019-08-24T14:15:22Z"
       };
@@ -329,7 +329,7 @@ describe("TxValidMessageSchema", () => {
     Effect.gen(function* () {
       const input = {
         tag: "TxValid",
-        headId: "head1",
+        headId: "820082582089ff4f3ff4a6052ec9d073",
         transactionId: "tx123",
         seq: 1,
         timestamp: "2019-08-24T14:15:22Z"
@@ -345,13 +345,13 @@ describe("TxInvalidMessageSchema", () => {
     Effect.gen(function* () {
       const input = {
         tag: "TxInvalid",
-        headId: "head1",
-        utxo: "{}",
+        headId: "820082582089ff4f3ff4a6052ec9d073",
+        utxo: "{\n    \"09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687\": {\n        \"address\": \"addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5\",\n        \"value\": {\n            \"lovelace\": 7620669\n        }\n    }\n}\n",
         transaction: {
-          txId: "tx123",
+          txId: "8df1616d4337ede40bbad2914f12977815234b83951bcce3bfcd735aed3f63e4",
           type: "Tx ConwayEra",
           description: "",
-          cborHex: "84a300"
+          cborHex: "820082582089ff4f3ff4a6052ec9d073b3be68b5e7596bd74a04e7b74504a8302fb2278cd95840f66eb3cd160372d617411408792c0ebd9791968e9948112894e2706697a55c10296b04019ed2f146f4d81e8ab17b9d14cf99569a2f85cbfa32320127831db202"
         },
         validationError: { reason: "Invalid signature" },
         seq: 1,
@@ -368,13 +368,13 @@ describe("SnapshotConfirmedMessageSchema", () => {
     Effect.gen(function* () {
       const input = {
         tag: "SnapshotConfirmed",
-        headId: "head1",
+        headId: "820082582089ff4f3ff4a6052ec9d073",
         snapshot: {
-          headId: "head1",
+          headId: "820082582089ff4f3ff4a6052ec9d073",
           version: 1,
           number: 5,
           confirmed: [],
-          utxo: "{}"
+          utxo: "{\n    \"09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687\": {\n        \"address\": \"addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5\",\n        \"value\": {\n            \"lovelace\": 7620669\n        }\n    }\n}\n"
         },
         seq: 1,
         timestamp: "2019-08-24T14:15:22Z"
@@ -404,9 +404,9 @@ describe("IgnoredHeadInitializingMessageSchema", () => {
     Effect.gen(function* () {
       const input = {
         tag: "IgnoredHeadInitializing",
-        headId: "head1",
+        headId: "820082582089ff4f3ff4a6052ec9d073",
         contestationPeriod: 100,
-        parties: [{ vkey: "abc" }],
+        parties: [{ vkey: "d0b8f28427aa7b640c636075905cbd6574a431aeaca5b3dbafd47cfe66c35043" }],
         participants: ["alice"],
         seq: 1,
         timestamp: "2019-08-24T14:15:22Z"
@@ -422,16 +422,16 @@ describe("DecommitInvalidMessageSchema", () => {
     Effect.gen(function* () {
       const input = {
         tag: "DecommitInvalid",
-        headId: "head1",
+        headId: "820082582089ff4f3ff4a6052ec9d073",
         decommitTx: {
-          txId: "tx123",
+          txId: "8df1616d4337ede40bbad2914f12977815234b83951bcce3bfcd735aed3f63e4",
           type: "Tx ConwayEra",
           description: "",
-          cborHex: "84a300"
+          cborHex: "820082582089ff4f3ff4a6052ec9d073b3be68b5e7596bd74a04e7b74504a8302fb2278cd95840f66eb3cd160372d617411408792c0ebd9791968e9948112894e2706697a55c10296b04019ed2f146f4d81e8ab17b9d14cf99569a2f85cbfa32320127831db202"
         },
         decommitInvalidReason: {
           tag: "DecommitTxInvalid",
-          localUTxO: "{}",
+          localUTxO: "{\n    \"09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687\": {\n        \"address\": \"addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5\",\n        \"value\": {\n            \"lovelace\": 7620669\n        }\n    }\n}\n",
           validationError: { reason: "Invalid" }
         },
         seq: 1,
@@ -446,16 +446,16 @@ describe("DecommitInvalidMessageSchema", () => {
     Effect.gen(function* () {
       const input = {
         tag: "DecommitInvalid",
-        headId: "head1",
+        headId: "820082582089ff4f3ff4a6052ec9d073",
         decommitTx: {
-          txId: "tx123",
+          txId: "8df1616d4337ede40bbad2914f12977815234b83951bcce3bfcd735aed3f63e4",
           type: "Tx ConwayEra",
           description: "",
-          cborHex: "84a300"
+          cborHex: "820082582089ff4f3ff4a6052ec9d073b3be68b5e7596bd74a04e7b74504a8302fb2278cd95840f66eb3cd160372d617411408792c0ebd9791968e9948112894e2706697a55c10296b04019ed2f146f4d81e8ab17b9d14cf99569a2f85cbfa32320127831db202"
         },
         decommitInvalidReason: {
           tag: "DecommitAlreadyInFlight",
-          otherDecommitTxId: "tx456"
+          otherDecommitTxId: "8df1616d4337ede40bbad2914f12977815234b83951bcce3bfcd735aed3f63e4"
         },
         seq: 1,
         timestamp: "2019-08-24T14:15:22Z"
@@ -471,14 +471,14 @@ describe("DecommitRequestedMessageSchema", () => {
     Effect.gen(function* () {
       const input = {
         tag: "DecommitRequested",
-        headId: "head1",
+        headId: "820082582089ff4f3ff4a6052ec9d073",
         decommitTx: {
-          txId: "tx123",
+          txId: "8df1616d4337ede40bbad2914f12977815234b83951bcce3bfcd735aed3f63e4",
           type: "Tx ConwayEra",
           description: "",
-          cborHex: "84a300"
+          cborHex: "820082582089ff4f3ff4a6052ec9d073b3be68b5e7596bd74a04e7b74504a8302fb2278cd95840f66eb3cd160372d617411408792c0ebd9791968e9948112894e2706697a55c10296b04019ed2f146f4d81e8ab17b9d14cf99569a2f85cbfa32320127831db202"
         },
-        utxoToDecommit: "{}",
+        utxoToDecommit: "{\n    \"09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687\": {\n        \"address\": \"addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5\",\n        \"value\": {\n            \"lovelace\": 7620669\n        }\n    }\n}\n",
         seq: 1,
         timestamp: "2019-08-24T14:15:22Z"
       };
@@ -493,9 +493,9 @@ describe("DecommitApprovedMessageSchema", () => {
     Effect.gen(function* () {
       const input = {
         tag: "DecommitApproved",
-        headId: "head1",
-        decommitTxId: "tx123",
-        utxoToDecommit: "{}",
+        headId: "820082582089ff4f3ff4a6052ec9d073",
+        decommitTxId: "8df1616d4337ede40bbad2914f12977815234b83951bcce3bfcd735aed3f63e4",
+        utxoToDecommit: "{\n    \"09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687\": {\n        \"address\": \"addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5\",\n        \"value\": {\n            \"lovelace\": 7620669\n        }\n    }\n}\n",
         seq: 1,
         timestamp: "2019-08-24T14:15:22Z"
       };
@@ -510,8 +510,8 @@ describe("DecommitFinalizedMessageSchema", () => {
     Effect.gen(function* () {
       const input = {
         tag: "DecommitFinalized",
-        headId: "head1",
-        distributedUTxO: "{}",
+        headId: "820082582089ff4f3ff4a6052ec9d073",
+        distributedUTxO: "{\n    \"09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687\": {\n        \"address\": \"addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5\",\n        \"value\": {\n            \"lovelace\": 7620669\n        }\n    }\n}\n",
         seq: 1,
         timestamp: "2019-08-24T14:15:22Z"
       };
@@ -526,8 +526,8 @@ describe("CommitRecordedMessageSchema", () => {
     Effect.gen(function* () {
       const input = {
         tag: "CommitRecorded",
-        headId: "head1",
-        utxoToCommit: "{}",
+        headId: "820082582089ff4f3ff4a6052ec9d073",
+        utxoToCommit: "{\n    \"09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687\": {\n        \"address\": \"addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5\",\n        \"value\": {\n            \"lovelace\": 7620669\n        }\n    }\n}\n",
         pendingDeposit: "deposit1",
         deadline: "2019-08-24T14:15:22Z",
         seq: 1,
@@ -544,8 +544,8 @@ describe("CommitApprovedMessageSchema", () => {
     Effect.gen(function* () {
       const input = {
         tag: "CommitApproved",
-        headId: "head1",
-        utxoToCommit: "{}",
+        headId: "820082582089ff4f3ff4a6052ec9d073",
+        utxoToCommit: "{\n    \"09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687\": {\n        \"address\": \"addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5\",\n        \"value\": {\n            \"lovelace\": 7620669\n        }\n    }\n}\n",
         seq: 1,
         timestamp: "2019-08-24T14:15:22Z"
       };
@@ -560,8 +560,8 @@ describe("CommitFinalizedMessageSchema", () => {
     Effect.gen(function* () {
       const input = {
         tag: "CommitFinalized",
-        headId: "head1",
-        depositTxId: "tx123",
+        headId: "820082582089ff4f3ff4a6052ec9d073",
+        depositTxId: "8df1616d4337ede40bbad2914f12977815234b83951bcce3bfcd735aed3f63e4",
         seq: 1,
         timestamp: "2019-08-24T14:15:22Z"
       };
@@ -576,9 +576,9 @@ describe("CommitRecoveredMessageSchema", () => {
     Effect.gen(function* () {
       const input = {
         tag: "CommitRecovered",
-        headId: "head1",
-        recoveredUTxO: "{}",
-        recoveredTxId: "tx123",
+        headId: "820082582089ff4f3ff4a6052ec9d073",
+        recoveredUTxO: "{\n    \"09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687\": {\n        \"address\": \"addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5\",\n        \"value\": {\n            \"lovelace\": 7620669\n        }\n    }\n}\n",
+        recoveredTxId: "8df1616d4337ede40bbad2914f12977815234b83951bcce3bfcd735aed3f63e4",
         seq: 1,
         timestamp: "2019-08-24T14:15:22Z"
       };
@@ -593,7 +593,7 @@ describe("SnapshotSideLoadedMessageSchema", () => {
     Effect.gen(function* () {
       const input = {
         tag: "SnapshotSideLoaded",
-        headId: "head1",
+        headId: "820082582089ff4f3ff4a6052ec9d073",
         snapshotNumber: 5,
         seq: 1,
         timestamp: "2019-08-24T14:15:22Z"
@@ -623,10 +623,10 @@ describe("ResponseMessageSchema", () => {
     Effect.gen(function* () {
       const greetingsInput = {
         tag: "Greetings",
-        me: { vkey: "abc" },
+        me: { vkey: "d0b8f28427aa7b640c636075905cbd6574a431aeaca5b3dbafd47cfe66c35043" },
         headStatus: "Idle",
-        hydraHeadId: "head1",
-        snapshotUtxo: "{}",
+        hydraHeadId: "820082582089ff4f3ff4a6052ec9d073",
+        snapshotUtxo: "{\n    \"09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687\": {\n        \"address\": \"addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5\",\n        \"value\": {\n            \"lovelace\": 7620669\n        }\n    }\n}\n",
         timestamp: "2019-08-24T14:15:22Z",
         hydraNodeVersion: "1.0.0"
       };
@@ -635,7 +635,7 @@ describe("ResponseMessageSchema", () => {
 
       const txValidInput = {
         tag: "TxValid",
-        headId: "head1",
+        headId: "820082582089ff4f3ff4a6052ec9d073",
         transactionId: "tx123",
         seq: 1,
         timestamp: "2019-08-24T14:15:22Z"
