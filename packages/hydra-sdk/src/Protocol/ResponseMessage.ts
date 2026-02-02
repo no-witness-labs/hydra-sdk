@@ -355,7 +355,7 @@ export const EventLogRotatedMessageSchema = Schema.Struct({
 });
 export type EventLogRotatedMessage = typeof EventLogRotatedMessageSchema.Type;
 
-export const ResponseMessageSchema = Schema.Union(
+export const RootResponseMessageSchema = Schema.Union(
   GreetingsMessageSchema,
   CommandFailedMessageSchema,
   PostTxOnChainFailedMessageSchema,
@@ -389,5 +389,152 @@ export const ResponseMessageSchema = Schema.Union(
   SnapshotSideLoadedMessageSchema,
   EventLogRotatedMessageSchema,
 );
-export type ResponseMessage = typeof ResponseMessageSchema.Type;
+export type RootResponseMessage = typeof RootResponseMessageSchema.Type;
 
+Schema.Struct({chainstate: Schema.String})
+
+export const HeadResponseSchema = Schema.Union(
+  Schema.Struct({
+    tag: Schema.Literal("Idle"),
+    contents: Schema.Struct({
+      chainState: Schema.String
+    })
+  }),
+  Schema.Struct({
+    tag: Schema.Literal("Initial"),
+    contents: Schema.Struct({
+      parameters: Schema.Struct({
+        contestationPeriod: Schema.Int,
+        parties: Schema.Array(
+          Schema.Struct({
+            vkey: Schema.String
+        })),
+      }),
+      pendingCommits: Schema.Array(
+        Schema.Struct({
+          vkey: Schema.String
+      })),
+      commited: Schema.Struct({
+            vkey: Schema.String
+      }),
+      chainState: Schema.String,
+      headId: Schema.String,
+      headSeed: Schema.String,
+    })
+  }),
+  Schema.Struct({
+    tag: Schema.Literal("Open"),
+    contents: Schema.Struct({
+      parameters: Schema.Struct({
+        contestationPeriod: Schema.Int,
+        parties: Schema.Array(
+          Schema.Struct({
+            vkey: Schema.String
+        })),
+      }),
+      coordinatedHeadState: Schema.Struct({
+        localUTxO: Schema.String, // TODO: make a better match
+        localTxs: Common.TransactionMessageSchema,
+        allTxs: Schema.Record({ key: Schema.String, value: Schema.Any }),
+        confirmedSnapshot: Schema.Union(
+          Schema.Struct({
+            tag: Schema.Literal("InitialSnapshot"),
+            headId: Schema.String,
+            initialUTxO: Schema.String,
+          }),
+          Schema.Struct({
+            tag: Schema.Literal("ConfirmedSnapshot"),
+            snapshot: Schema.Struct({
+              headId: Schema.String,
+              version: Schema.Int,
+              number: Schema.Int,
+              confirmed: Schema.Array(Common.TransactionMessageSchema),
+              utxo: Schema.String,
+              utxoToCommit: Schema.optional(Schema.String),
+              utxoToDecommit: Schema.optional(Schema.String),
+            }),
+            signatures: Schema.Struct({
+              multiSignature: Schema.String
+            }),
+          }),
+        ),
+        seenSnapshot: Schema.Union(
+          Schema.Struct({
+            tag: Schema.Literal("NoSeenSnapshot")
+          }),
+          Schema.Struct({
+            tag: Schema.Literal("LastSeenSnapshot"),
+            lastSeen: Schema.Int,
+          }),
+          Schema.Struct({
+            tag: Schema.Literal("RequestedSnapshot"),
+            lastSeen: Schema.Int,
+            requested: Schema.Int,
+          }),
+          Schema.Struct({
+            tag: Schema.Literal("SeenSnapshot"),
+            snapshot: Schema.Struct({
+              headId: Schema.String,
+              version: Schema.Int,
+              number: Schema.Int,
+              confirmed: Schema.Array(Common.TransactionMessageSchema),
+              utxo: Schema.String,
+              utxoToCommit: Schema.optional(Schema.String),
+              utxoToDecommit: Schema.optional(Schema.String),
+            }),
+            signatories: Schema.Record({ key: Schema.String, value: Schema.Any }),
+          }),
+        ),
+        pendingDeposits: Schema.Record({ key: Schema.String, value: Schema.Any }),
+        currentDepositTxId: Schema.Record({ key: Schema.String, value: Schema.Any }),
+        decommitTx: Schema.NullOr(Common.TransactionMessageSchema),
+        version: Schema.Int,
+      }),
+      chainState: Schema.String,
+      headId: Schema.String,
+      currentSlot: Schema.Int,
+      headSeed: Schema.String,
+    })
+  }),
+  Schema.Struct({
+    tag: Schema.Literal("Closed"),
+    contents: Schema.Struct({
+      parameters: Schema.Struct({
+        contestationPeriod: Schema.Int,
+        parties: Schema.Array(
+          Schema.Struct({
+            vkey: Schema.String
+        })),
+      }),
+      confirmedSnapshot: Schema.Union(
+            Schema.Struct({
+              tag: Schema.Literal("InitialSnapshot"),
+              headId: Schema.String,
+              initialUTxO: Schema.String,
+            }),
+            Schema.Struct({
+              tag: Schema.Literal("ConfirmedSnapshot"),
+              snapshot: Schema.Struct({
+                headId: Schema.String,
+                version: Schema.Int,
+                number: Schema.Int,
+                confirmed: Schema.Array(Common.TransactionMessageSchema),
+                utxo: Schema.String,
+                utxoToCommit: Schema.optional(Schema.String),
+                utxoToDecommit: Schema.optional(Schema.String),
+              }),
+              signatures: Schema.Struct({
+                multiSignature: Schema.String
+              }),
+            }),
+      ),
+      contestationDeadline: Schema.DateTimeUtc,
+      readyToFanoutSent: Schema.Boolean,
+      chainState: Schema.Any,
+      headId: Schema.String,
+      headSeed: Schema.String,
+      version: Schema.Int,
+    })
+  }),
+);
+export type HeadResponse = typeof HeadResponseSchema.Type;
