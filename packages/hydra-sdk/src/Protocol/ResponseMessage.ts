@@ -391,7 +391,58 @@ export const RootResponseMessageSchema = Schema.Union(
 );
 export type RootResponseMessage = typeof RootResponseMessageSchema.Type;
 
-Schema.Struct({chainstate: Schema.String})
+export const SeenSnapshotSchema = Schema.Union(
+    Schema.Struct({
+      tag: Schema.Literal("NoSeenSnapshot")
+    }),
+    Schema.Struct({
+      tag: Schema.Literal("LastSeenSnapshot"),
+      lastSeen: Schema.Int,
+    }),
+    Schema.Struct({
+      tag: Schema.Literal("RequestedSnapshot"),
+      lastSeen: Schema.Int,
+      requested: Schema.Int,
+    }),
+    Schema.Struct({
+      tag: Schema.Literal("SeenSnapshot"),
+      snapshot: Schema.Struct({
+        headId: Schema.String,
+        version: Schema.Int,
+        number: Schema.Int,
+        confirmed: Schema.Array(Common.TransactionMessageSchema),
+        utxo: Schema.String,
+        utxoToCommit: Schema.optional(Schema.String),
+        utxoToDecommit: Schema.optional(Schema.String),
+      }),
+      signatories: Schema.Record({ key: Schema.String, value: Schema.Any }),
+    }),
+  )
+export type SeenSnapshot = typeof SeenSnapshotSchema.Type;
+
+export const ConfirmedSnapshotSchema = Schema.Union(
+  Schema.Struct({
+    tag: Schema.Literal("InitialSnapshot"),
+    headId: Schema.String,
+    initialUTxO: Schema.String,
+  }),
+  Schema.Struct({
+    tag: Schema.Literal("ConfirmedSnapshot"),
+    snapshot: Schema.Struct({
+      headId: Schema.String,
+      version: Schema.Int,
+      number: Schema.Int,
+      confirmed: Schema.Array(Common.TransactionMessageSchema),
+      utxo: Schema.String,
+      utxoToCommit: Schema.optional(Schema.String),
+      utxoToDecommit: Schema.optional(Schema.String),
+    }),
+    signatures: Schema.Struct({
+      multiSignature: Schema.String
+    }),
+  }),
+)
+export type ConirmedSnapshot = typeof ConfirmedSnapshotSchema.Type;
 
 export const HeadResponseSchema = Schema.Union(
   Schema.Struct({
@@ -436,55 +487,8 @@ export const HeadResponseSchema = Schema.Union(
         localUTxO: Schema.String, // TODO: make a better match
         localTxs: Common.TransactionMessageSchema,
         allTxs: Schema.Record({ key: Schema.String, value: Schema.Any }),
-        confirmedSnapshot: Schema.Union(
-          Schema.Struct({
-            tag: Schema.Literal("InitialSnapshot"),
-            headId: Schema.String,
-            initialUTxO: Schema.String,
-          }),
-          Schema.Struct({
-            tag: Schema.Literal("ConfirmedSnapshot"),
-            snapshot: Schema.Struct({
-              headId: Schema.String,
-              version: Schema.Int,
-              number: Schema.Int,
-              confirmed: Schema.Array(Common.TransactionMessageSchema),
-              utxo: Schema.String,
-              utxoToCommit: Schema.optional(Schema.String),
-              utxoToDecommit: Schema.optional(Schema.String),
-            }),
-            signatures: Schema.Struct({
-              multiSignature: Schema.String
-            }),
-          }),
-        ),
-        seenSnapshot: Schema.Union(
-          Schema.Struct({
-            tag: Schema.Literal("NoSeenSnapshot")
-          }),
-          Schema.Struct({
-            tag: Schema.Literal("LastSeenSnapshot"),
-            lastSeen: Schema.Int,
-          }),
-          Schema.Struct({
-            tag: Schema.Literal("RequestedSnapshot"),
-            lastSeen: Schema.Int,
-            requested: Schema.Int,
-          }),
-          Schema.Struct({
-            tag: Schema.Literal("SeenSnapshot"),
-            snapshot: Schema.Struct({
-              headId: Schema.String,
-              version: Schema.Int,
-              number: Schema.Int,
-              confirmed: Schema.Array(Common.TransactionMessageSchema),
-              utxo: Schema.String,
-              utxoToCommit: Schema.optional(Schema.String),
-              utxoToDecommit: Schema.optional(Schema.String),
-            }),
-            signatories: Schema.Record({ key: Schema.String, value: Schema.Any }),
-          }),
-        ),
+        confirmedSnapshot: ConfirmedSnapshotSchema,
+        seenSnapshot: SeenSnapshotSchema,
         pendingDeposits: Schema.Record({ key: Schema.String, value: Schema.Any }),
         currentDepositTxId: Schema.Record({ key: Schema.String, value: Schema.Any }),
         decommitTx: Schema.NullOr(Common.TransactionMessageSchema),
@@ -506,28 +510,7 @@ export const HeadResponseSchema = Schema.Union(
             vkey: Schema.String
         })),
       }),
-      confirmedSnapshot: Schema.Union(
-            Schema.Struct({
-              tag: Schema.Literal("InitialSnapshot"),
-              headId: Schema.String,
-              initialUTxO: Schema.String,
-            }),
-            Schema.Struct({
-              tag: Schema.Literal("ConfirmedSnapshot"),
-              snapshot: Schema.Struct({
-                headId: Schema.String,
-                version: Schema.Int,
-                number: Schema.Int,
-                confirmed: Schema.Array(Common.TransactionMessageSchema),
-                utxo: Schema.String,
-                utxoToCommit: Schema.optional(Schema.String),
-                utxoToDecommit: Schema.optional(Schema.String),
-              }),
-              signatures: Schema.Struct({
-                multiSignature: Schema.String
-              }),
-            }),
-      ),
+      confirmedSnapshot: ConfirmedSnapshotSchema,
       contestationDeadline: Schema.DateTimeUtc,
       readyToFanoutSent: Schema.Boolean,
       chainState: Schema.Any,
@@ -538,3 +521,156 @@ export const HeadResponseSchema = Schema.Union(
   }),
 );
 export type HeadResponse = typeof HeadResponseSchema.Type;
+
+export const CommitResponseSchema = Common.TransactionMessageSchema;
+export type CommitResponse = typeof CommitResponseSchema.Type;
+
+export const CommitsResponseSchema = Schema.Array(Common.TransactionMessageSchema);
+export type CommitsResponse = typeof CommitsResponseSchema.Type;
+
+export const SnapshotLastSeenSchema = SeenSnapshotSchema;
+export type SnapshotLastSeen = typeof SnapshotLastSeenSchema.Type;
+
+export const SnapshotUTxOSchema = Schema.String; // TODO: make a better match
+export type SnapshotUTxO = typeof SnapshotUTxOSchema.Type;
+
+export const SnapshotResponseSchema = ConfirmedSnapshotSchema;
+export type SnapshotResponse = typeof SnapshotResponseSchema.Type;
+
+export const ProtocolParametersResponseSchema = Schema.Struct({
+  protocolVersion: Schema.Struct({
+    major: Schema.Int,
+    minor: Schema.Int,
+    patch: Schema.Int,
+  }),
+  maxBlockBodySize: Schema.Number,
+  maxBlockHeaderSize: Schema.Number,
+  maxTxSize: Schema.Number,
+  txFeeFixed: Schema.Struct({
+    lovelace: Schema.Int
+  }),
+  txFeePerByte: Schema.Int,
+  stakeAddressDeposit: Schema.Struct({
+    lovelace: Schema.Int
+  }),
+  stakePoolDeposit: Schema.Struct({
+    lovelace: Schema.Int
+  }),
+  minPoolCost: Schema.Struct({
+    lovelace: Schema.Int
+  }),
+  poolRetireMaxEpoch: Schema.Int,
+  stakePoolTargetNum: Schema.Number,
+  poolPledgeInfluence: Schema.Number,
+  monetaryExpansion: Schema.Number,
+  treasuryCut: Schema.Number,
+  costModels: Schema.Struct({
+    PlutusV1: Schema.Array(Schema.Int),
+    PlutusV2: Schema.Array(Schema.Int),
+    PlutusV3: Schema.Array(Schema.Int),
+  }),
+  executionUnitPrices: Schema.Any,
+  maxTxExecutionUnits: Schema.Struct({
+    memory: Schema.Number,
+    cpu: Schema.Number,
+  }),
+  maxTxBlockExecutionUnits: Schema.Struct({
+    memory: Schema.Number,
+    cpu: Schema.Number,
+  }),
+  maxValueSize: Schema.Number,
+  collateralPercentage: Schema.Number,
+  maxCollateralInputs: Schema.Number,
+  utxoConstPerByte: Schema.Struct({
+    lovelace: Schema.Int
+  }),
+});
+export type ProtocolParametersResponse = typeof ProtocolParametersResponseSchema.Type;
+
+export const CardanoTransactionResponseSchema = Schema.Union(
+  Schema.Struct({
+    tag: Schema.Literal("TransactionSubmitted")
+  }),
+  Schema.Struct({
+    tag: Schema.Literal("ScriptFailedInWallet"),
+    redeemerPtr: Schema.String,
+    failureReason: Schema.String,
+    failingTx: Common.TransactionMessageSchema,
+  }),
+  Schema.Struct({
+    tag: Schema.Literal("InternalWalletError"),
+    failingTx: Common.TransactionMessageSchema,
+    failure: Schema.String,
+    headUTxO: Schema.String,
+  }),
+  Schema.Struct({
+    tag: Schema.Literal("NoFuelUTXOFound"),
+    failingTx: Common.TransactionMessageSchema,
+  }),
+  Schema.Struct({
+    tag: Schema.Literal("CannotFindOwnInitial"),
+    knownUTxO: Schema.String,
+  }),
+  Schema.Struct({
+    tag: Schema.Literal("UnsupportedLegacyOutput"),
+    byronAddress: Schema.String,
+  }),
+  Schema.Struct({
+    tag: Schema.Literal("NoSeedInput"),
+  }),
+  Schema.Struct({
+    tag: Schema.Literal("InvalidStateToPost"),
+    chainState: Schema.Any,
+    txTried: Schema.Any // I am not parsing all of that
+  }),
+  Schema.Struct({
+    tag: Schema.Literal("FailedToPostTx"),
+    failureReason: Schema.String,
+    failingTx: Common.TransactionMessageSchema,
+  }),
+  Schema.Struct({
+    tag: Schema.Literal("CommittedTooMuchADAForMainnet"),
+    userCommittedLovelace: Schema.Int,
+    mainnetLimitLovelace: Schema.Int,
+  }),
+  Schema.Struct({
+    tag: Schema.Literal("FailedToDraftTxNotInitializing"),
+  }),
+  Schema.Struct({
+    tag: Schema.Literal("InvalidSeed"),
+    headSeed: Schema.String,
+  }),
+  Schema.Struct({
+    tag: Schema.Literal("InvalidHeadId"),
+    headId: Schema.String,
+  }),
+  Schema.Struct({
+    tag: Schema.Literal("FailedToConstructAbortTx"),
+  }),
+  Schema.Struct({
+    tag: Schema.Literal("FailedToConstructCloseTx"),
+  }),
+  Schema.Struct({
+    tag: Schema.Literal("FailedToConstructContestTx"),
+  }),
+  Schema.Struct({
+    tag: Schema.Literal("FailedToConstructCollectTx"),
+  }),
+  Schema.Struct({
+    tag: Schema.Literal("FailedToConstructDepositTx"),
+  }),
+  Schema.Struct({
+    tag: Schema.Literal("FailedToConstructRecoverTx"),
+  }),
+  Schema.Struct({
+    tag: Schema.Literal("FailedToConstructIncrementTx"),
+  }),
+  Schema.Struct({
+    tag: Schema.Literal("FailedToConstructDecrementTx"),
+  }),
+  Schema.Struct({
+    tag: Schema.Literal("FailedToConstructFanoutTx"),
+  }),
+
+);
+export type CardanoTransactionResponse = typeof CardanoTransactionResponseSchema.Type;
