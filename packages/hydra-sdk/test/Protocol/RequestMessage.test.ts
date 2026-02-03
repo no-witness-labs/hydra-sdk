@@ -1,6 +1,6 @@
 import { describe, it } from "@effect/vitest";
-import { Effect, Schema } from "effect";
 import { RequestMessageSchema } from "@no-witness-labs/hydra-sdk";
+import { Effect, Schema } from "effect";
 
 describe("InitMessageSchema", () => {
   it.effect("validates a correct Init message", () =>
