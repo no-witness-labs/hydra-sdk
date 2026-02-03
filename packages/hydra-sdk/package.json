@@ -1,5 +1,5 @@
 {
-  "name": "@no-witness-labs/core",
+  "name": "@no-witness-labs/hydra-sdk",
   "version": "0.0.1",
   "type": "module",
   "publishConfig": {
@@ -9,6 +9,10 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./Protocol/*": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     }
