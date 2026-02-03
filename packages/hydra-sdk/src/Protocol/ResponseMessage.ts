@@ -1,6 +1,16 @@
 import { Effect, Schema } from "effect";
 import * as Common from "./CommonMessage.js"
 
+// =============================================================================
+// Response Message Schemas
+// =============================================================================
+
+/**
+ * Greeting response from the Hydra Head.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const GreetingsMessageSchema = Schema.Struct({
   tag: Schema.Literal("Greetings"),
   me: Schema.Struct({
@@ -14,6 +24,12 @@ export const GreetingsMessageSchema = Schema.Struct({
 });
 export type GreetingsMessage = typeof GreetingsMessageSchema.Type;
 
+/**
+ * Command failed response indicating a client command could not be executed.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const CommandFailedMessageSchema = Schema.Struct({
   tag: Schema.Literal("CommandFailed"),
   clientInput: Schema.Struct({
@@ -25,6 +41,12 @@ export const CommandFailedMessageSchema = Schema.Struct({
 });
 export type CommandFailedMessage = typeof CommandFailedMessageSchema.Type;
 
+/**
+ * Post transaction on-chain failed response.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const PostTxOnChainFailedMessageSchema = Schema.Struct({
   tag: Schema.Literal("PostTxOnChainFailed"),
   postChainTx: Schema.Struct({
@@ -43,6 +65,12 @@ export const PostTxOnChainFailedMessageSchema = Schema.Struct({
 export type PostTxOnChainFailedMessage =
   typeof PostTxOnChainFailedMessageSchema.Type;
 
+/**
+ * Peer connected event.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const PeerConnectedMessageSchema = Schema.Struct({
   tag: Schema.Literal("PeerConnected"),
   peer: Schema.Struct({
@@ -55,6 +83,12 @@ export const PeerConnectedMessageSchema = Schema.Struct({
 export type PeerConnectedMessage =
   typeof PeerConnectedMessageSchema.Type;
 
+/**
+ * Peer disconnected event.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const PeerDisconnectedMessageSchema = Schema.Struct({
   tag: Schema.Literal("PeerDisconnected"),
   peer: Schema.Struct({
@@ -67,6 +101,12 @@ export const PeerDisconnectedMessageSchema = Schema.Struct({
 export type PeerDisconnectedMessage =
   typeof PeerDisconnectedMessageSchema.Type;
 
+/**
+ * Network connected event.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const NetworkConnectedMessageSchema = Schema.Struct({
   tag: Schema.Literal("NetworkConnected"),
   seq: Schema.Int,
@@ -75,6 +115,12 @@ export const NetworkConnectedMessageSchema = Schema.Struct({
 export type NetworkConnectedMessage =
   typeof NetworkConnectedMessageSchema.Type;
 
+/**
+ * Network disconnected event.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const NetworkDisconnectedMessageSchema = Schema.Struct({
   tag: Schema.Literal("NetworkDisconnected"),
   seq: Schema.Int,
@@ -83,6 +129,12 @@ export const NetworkDisconnectedMessageSchema = Schema.Struct({
 export type NetworkDisconnectedMessage =
   typeof NetworkDisconnectedMessageSchema.Type;
 
+/**
+ * Network version mismatch event.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const NetworkVersionMismatchMessageSchema = Schema.Struct({
   tag: Schema.Literal("NetworkVersionMismatch"),
   ourVersion: Schema.NullOr(Schema.Int),
@@ -93,6 +145,12 @@ export const NetworkVersionMismatchMessageSchema = Schema.Struct({
 export type NetworkVersionMismatchMessage =
   typeof NetworkVersionMismatchMessageSchema.Type;
 
+/**
+ * Network cluster ID mismatch event.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const NetworkClusterIDMismatchMessageSchema = Schema.Struct({
   tag: Schema.Literal("NetworkClusterIDMismatch"),
   clusterPeers: Schema.String,
@@ -103,6 +161,12 @@ export const NetworkClusterIDMismatchMessageSchema = Schema.Struct({
 export type NetworkClusterIDMismatchMessage =
   typeof NetworkClusterIDMismatchMessageSchema.Type;
 
+/**
+ * Head is initializing event.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const HeadIsInitializingMessageSchema = Schema.Struct({
   tag: Schema.Literal("HeadIsInitializing"),
   headId: Schema.String,
@@ -115,6 +179,12 @@ export const HeadIsInitializingMessageSchema = Schema.Struct({
 });
 export type HeadIsInitializingMessage = typeof HeadIsInitializingMessageSchema.Type;
 
+/**
+ * Committed event indicating a party has committed funds to the Head.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const CommittedMessageSchema = Schema.Struct({
   tag: Schema.Literal("Committed"),
   headId: Schema.String,
@@ -128,6 +198,12 @@ export const CommittedMessageSchema = Schema.Struct({
 });
 export type CommittedMessage = typeof CommittedMessageSchema.Type;
 
+/**
+ * Head is open event.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const HeadIsOpenMessageSchema = Schema.Struct({
   tag: Schema.Literal("HeadIsOpen"),
   headId: Schema.String,
@@ -137,6 +213,12 @@ export const HeadIsOpenMessageSchema = Schema.Struct({
 });
 export type HeadIsOpenMessage = typeof HeadIsOpenMessageSchema.Type;
 
+/**
+ * Head is closed event.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const HeadIsClosedMessageSchema = Schema.Struct({
   tag: Schema.Literal("HeadIsClosed"),
   headId: Schema.String,
@@ -148,7 +230,12 @@ export const HeadIsClosedMessageSchema = Schema.Struct({
 });
 export type HeadIsClosedMessage = typeof HeadIsClosedMessageSchema.Type;
 
-
+/**
+ * Head is contested event.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const HeadIsContestedMessageSchema = Schema.Struct({
   tag: Schema.Literal("HeadIsContested"),
   headId: Schema.String,
@@ -160,6 +247,12 @@ export const HeadIsContestedMessageSchema = Schema.Struct({
 });
 export type HeadIsContestedMessage = typeof HeadIsContestedMessageSchema.Type;
 
+/**
+ * Ready to fanout event.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const ReadyToFanoutMessageSchema = Schema.Struct({
   tag: Schema.Literal("ReadyToFanout"),
   headId: Schema.String,
@@ -168,6 +261,12 @@ export const ReadyToFanoutMessageSchema = Schema.Struct({
 });
 export type ReadyToFanoutMessage = typeof ReadyToFanoutMessageSchema.Type;
 
+/**
+ * Head is aborted event.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const HeadIsAbortedMessageSchema = Schema.Struct({
   tag: Schema.Literal("HeadIsAborted"),
   headId: Schema.String,
@@ -177,6 +276,12 @@ export const HeadIsAbortedMessageSchema = Schema.Struct({
 });
 export type HeadIsAbortedMessage = typeof HeadIsAbortedMessageSchema.Type;
 
+/**
+ * Head is finalized event.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const HeadIsFinalizedMessageSchema = Schema.Struct({
   tag: Schema.Literal("HeadIsFinalized"),
   headId: Schema.String,
@@ -186,6 +291,12 @@ export const HeadIsFinalizedMessageSchema = Schema.Struct({
 });
 export type HeadIsFinalizedMessage = typeof HeadIsFinalizedMessageSchema.Type;
 
+/**
+ * Transaction valid event.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const TxValidMessageSchema = Schema.Struct({
   tag: Schema.Literal("TxValid"),
   headId: Schema.String,
@@ -195,6 +306,12 @@ export const TxValidMessageSchema = Schema.Struct({
 });
 export type TxValidMessage = typeof TxValidMessageSchema.Type;
 
+/**
+ * Transaction invalid event.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const TxInvalidMessageSchema = Schema.Struct({
   tag: Schema.Literal("TxInvalid"),
   headId: Schema.String,
@@ -208,6 +325,12 @@ export const TxInvalidMessageSchema = Schema.Struct({
 });
 export type TxInvalidMessage = typeof TxInvalidMessageSchema.Type;
 
+/**
+ * Snapshot confirmed event.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const SnapshotConfirmedMessageSchema = Schema.Struct({
   tag: Schema.Literal("SnapshotConfirmed"),
   headId: Schema.String,
@@ -226,6 +349,12 @@ export const SnapshotConfirmedMessageSchema = Schema.Struct({
 export type SnapshotConfirmedMessage =
   typeof SnapshotConfirmedMessageSchema.Type;
 
+/**
+ * Invalid input response.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const InvalidInputMessageSchema = Schema.Struct({
   tag: Schema.Literal("InvalidInput"),
   reason: Schema.String,
@@ -233,6 +362,12 @@ export const InvalidInputMessageSchema = Schema.Struct({
 });
 export type InvalidInputMessage = typeof InvalidInputMessageSchema.Type;
 
+/**
+ * Ignored head initializing event.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const IgnoredHeadInitializingMessageSchema = Schema.Struct({
   tag: Schema.Literal("IgnoredHeadInitializing"),
   headId: Schema.String,
@@ -248,6 +383,12 @@ export const IgnoredHeadInitializingMessageSchema = Schema.Struct({
 export type IgnoredHeadInitializingMessage =
   typeof IgnoredHeadInitializingMessageSchema.Type;
 
+/**
+ * Decommit invalid event.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const DecommitInvalidMessageSchema = Schema.Struct({
   tag: Schema.Literal("DecommitInvalid"),
   headId: Schema.String,
@@ -271,6 +412,12 @@ export const DecommitInvalidMessageSchema = Schema.Struct({
 export type DecommitInvalidMessage =
   typeof DecommitInvalidMessageSchema.Type;
 
+/**
+ * Decommit requested event.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const DecommitRequestedMessageSchema = Schema.Struct({
   tag: Schema.Literal("DecommitRequested"),
   headId: Schema.String,
@@ -281,6 +428,12 @@ export const DecommitRequestedMessageSchema = Schema.Struct({
 });
 export type DecommitRequestedMessage = typeof DecommitRequestedMessageSchema.Type;
 
+/**
+ * Decommit approved event.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const DecommitApprovedMessageSchema = Schema.Struct({
   tag: Schema.Literal("DecommitApproved"),
   headId: Schema.String,
@@ -291,6 +444,12 @@ export const DecommitApprovedMessageSchema = Schema.Struct({
 });
 export type DecommitApprovedMessage = typeof DecommitApprovedMessageSchema.Type;
 
+/**
+ * Decommit finalized event.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const DecommitFinalizedMessageSchema = Schema.Struct({
   tag: Schema.Literal("DecommitFinalized"),
   headId: Schema.String,
@@ -300,6 +459,12 @@ export const DecommitFinalizedMessageSchema = Schema.Struct({
 });
 export type DecommitFinalizedMessage = typeof DecommitFinalizedMessageSchema.Type;
 
+/**
+ * Commit recorded event (incremental deposit).
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const CommitRecordedMessageSchema = Schema.Struct({
   tag: Schema.Literal("CommitRecorded"),
   headId: Schema.String,
@@ -311,6 +476,12 @@ export const CommitRecordedMessageSchema = Schema.Struct({
 });
 export type CommitRecordedMessage = typeof CommitRecordedMessageSchema.Type;
 
+/**
+ * Commit approved event (incremental deposit).
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const CommitApprovedMessageSchema = Schema.Struct({
   tag: Schema.Literal("CommitApproved"),
   headId: Schema.String,
@@ -320,6 +491,12 @@ export const CommitApprovedMessageSchema = Schema.Struct({
 });
 export type CommitApprovedMessage = typeof CommitApprovedMessageSchema.Type;
 
+/**
+ * Commit finalized event (incremental deposit).
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const CommitFinalizedMessageSchema = Schema.Struct({
   tag: Schema.Literal("CommitFinalized"),
   headId: Schema.String,
@@ -329,6 +506,12 @@ export const CommitFinalizedMessageSchema = Schema.Struct({
 });
 export type CommitFinalizedMessage = typeof CommitFinalizedMessageSchema.Type;
 
+/**
+ * Commit recovered event.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const CommitRecoveredMessageSchema = Schema.Struct({
   tag: Schema.Literal("CommitRecovered"),
   headId: Schema.String,
@@ -339,6 +522,12 @@ export const CommitRecoveredMessageSchema = Schema.Struct({
 });
 export type CommitRecoveredMessage = typeof CommitRecoveredMessageSchema.Type;
 
+/**
+ * Snapshot side-loaded event.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const SnapshotSideLoadedMessageSchema = Schema.Struct({
   tag: Schema.Literal("SnapshotSideLoaded"),
   headId: Schema.String,
@@ -348,6 +537,12 @@ export const SnapshotSideLoadedMessageSchema = Schema.Struct({
 });
 export type SnapshotSideLoadedMessage = typeof SnapshotSideLoadedMessageSchema.Type;
 
+/**
+ * Event log rotated event.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const EventLogRotatedMessageSchema = Schema.Struct({
   tag: Schema.Literal("EventLogRotated"),
   seq: Schema.Int,
@@ -355,6 +550,12 @@ export const EventLogRotatedMessageSchema = Schema.Struct({
 });
 export type EventLogRotatedMessage = typeof EventLogRotatedMessageSchema.Type;
 
+/**
+ * Union of all possible WebSocket response message types from a Hydra node.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const RootResponseMessageSchema = Schema.Union(
   GreetingsMessageSchema,
   CommandFailedMessageSchema,
@@ -391,59 +592,16 @@ export const RootResponseMessageSchema = Schema.Union(
 );
 export type RootResponseMessage = typeof RootResponseMessageSchema.Type;
 
-export const SeenSnapshotSchema = Schema.Union(
-    Schema.Struct({
-      tag: Schema.Literal("NoSeenSnapshot")
-    }),
-    Schema.Struct({
-      tag: Schema.Literal("LastSeenSnapshot"),
-      lastSeen: Schema.Int,
-    }),
-    Schema.Struct({
-      tag: Schema.Literal("RequestedSnapshot"),
-      lastSeen: Schema.Int,
-      requested: Schema.Int,
-    }),
-    Schema.Struct({
-      tag: Schema.Literal("SeenSnapshot"),
-      snapshot: Schema.Struct({
-        headId: Schema.String,
-        version: Schema.Int,
-        number: Schema.Int,
-        confirmed: Schema.Array(Common.TransactionMessageSchema),
-        utxo: Schema.String,
-        utxoToCommit: Schema.optional(Schema.String),
-        utxoToDecommit: Schema.optional(Schema.String),
-      }),
-      signatories: Schema.Record({ key: Schema.String, value: Schema.Any }),
-    }),
-  )
-export type SeenSnapshot = typeof SeenSnapshotSchema.Type;
+// =============================================================================
+// HTTP API Response Schemas
+// =============================================================================
 
-export const ConfirmedSnapshotSchema = Schema.Union(
-  Schema.Struct({
-    tag: Schema.Literal("InitialSnapshot"),
-    headId: Schema.String,
-    initialUTxO: Schema.String,
-  }),
-  Schema.Struct({
-    tag: Schema.Literal("ConfirmedSnapshot"),
-    snapshot: Schema.Struct({
-      headId: Schema.String,
-      version: Schema.Int,
-      number: Schema.Int,
-      confirmed: Schema.Array(Common.TransactionMessageSchema),
-      utxo: Schema.String,
-      utxoToCommit: Schema.optional(Schema.String),
-      utxoToDecommit: Schema.optional(Schema.String),
-    }),
-    signatures: Schema.Struct({
-      multiSignature: Schema.String
-    }),
-  }),
-)
-export type ConirmedSnapshot = typeof ConfirmedSnapshotSchema.Type;
-
+/**
+ * Response from the `/head` HTTP endpoint.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const HeadResponseSchema = Schema.Union(
   Schema.Struct({
     tag: Schema.Literal("Idle"),
@@ -487,8 +645,8 @@ export const HeadResponseSchema = Schema.Union(
         localUTxO: Schema.String, // TODO: make a better match
         localTxs: Common.TransactionMessageSchema,
         allTxs: Schema.Record({ key: Schema.String, value: Schema.Any }),
-        confirmedSnapshot: ConfirmedSnapshotSchema,
-        seenSnapshot: SeenSnapshotSchema,
+        confirmedSnapshot: Common.ConfirmedSnapshotSchema,
+        seenSnapshot: Common.SeenSnapshotSchema,
         pendingDeposits: Schema.Record({ key: Schema.String, value: Schema.Any }),
         currentDepositTxId: Schema.Record({ key: Schema.String, value: Schema.Any }),
         decommitTx: Schema.NullOr(Common.TransactionMessageSchema),
@@ -510,7 +668,7 @@ export const HeadResponseSchema = Schema.Union(
             vkey: Schema.String
         })),
       }),
-      confirmedSnapshot: ConfirmedSnapshotSchema,
+      confirmedSnapshot: Common.ConfirmedSnapshotSchema,
       contestationDeadline: Schema.DateTimeUtc,
       readyToFanoutSent: Schema.Boolean,
       chainState: Schema.Any,
@@ -522,21 +680,57 @@ export const HeadResponseSchema = Schema.Union(
 );
 export type HeadResponse = typeof HeadResponseSchema.Type;
 
+/**
+ * Response containing a single commit transaction.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const CommitResponseSchema = Common.TransactionMessageSchema;
 export type CommitResponse = typeof CommitResponseSchema.Type;
 
+/**
+ * Response containing an array of commit transactions.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const CommitsResponseSchema = Schema.Array(Common.TransactionMessageSchema);
 export type CommitsResponse = typeof CommitsResponseSchema.Type;
 
-export const SnapshotLastSeenSchema = SeenSnapshotSchema;
+/**
+ * The last seen snapshot that has been acknowledged but not yet confirmed.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
+export const SnapshotLastSeenSchema = Common.SeenSnapshotSchema;
 export type SnapshotLastSeen = typeof SnapshotLastSeenSchema.Type;
 
+/**
+ * The UTxO set from the current snapshot.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const SnapshotUTxOSchema = Schema.String; // TODO: make a better match
 export type SnapshotUTxO = typeof SnapshotUTxOSchema.Type;
 
-export const SnapshotResponseSchema = ConfirmedSnapshotSchema;
+/**
+ * Response containing a confirmed snapshot with all transaction details.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
+export const SnapshotResponseSchema = Common.ConfirmedSnapshotSchema;
 export type SnapshotResponse = typeof SnapshotResponseSchema.Type;
 
+/**
+ * Cardano protocol parameters used by the Hydra Head.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const ProtocolParametersResponseSchema = Schema.Struct({
   protocolVersion: Schema.Struct({
     major: Schema.Int,
@@ -587,6 +781,12 @@ export const ProtocolParametersResponseSchema = Schema.Struct({
 });
 export type ProtocolParametersResponse = typeof ProtocolParametersResponseSchema.Type;
 
+/**
+ * Response from the Cardano transaction endpoint.
+ *
+ * @since 0.1.0
+ * @category schemas
+ */
 export const CardanoTransactionResponseSchema = Schema.Union(
   Schema.Struct({
     tag: Schema.Literal("TransactionSubmitted")
