@@ -1,5 +1,5 @@
 import { Effect, Schema } from "effect";
-import * as Common from "./CommonMessage.js"
+import * as Common from "./CommonMessage.js";
 
 // =============================================================================
 // Request Message Schemas
@@ -12,8 +12,8 @@ import * as Common from "./CommonMessage.js"
  * @category schemas
  */
 const InitMessageSchema = Schema.Struct({
-    tag: Schema.Literal("Init"),
-})
+  tag: Schema.Literal("Init"),
+});
 export type InitMessage = typeof InitMessageSchema.Type;
 
 /**
@@ -23,8 +23,8 @@ export type InitMessage = typeof InitMessageSchema.Type;
  * @category schemas
  */
 const AbortMessageSchema = Schema.Struct({
-    tag: Schema.Literal("Abort"),
-})
+  tag: Schema.Literal("Abort"),
+});
 export type AbortMessage = typeof AbortMessageSchema.Type;
 
 /**
@@ -34,9 +34,9 @@ export type AbortMessage = typeof AbortMessageSchema.Type;
  * @category schemas
  */
 const NewTxMessageSchema = Schema.Struct({
-    tag: Schema.Literal("NewTx"),
-    transaction: Common.TransactionMessageSchema
-})
+  tag: Schema.Literal("NewTx"),
+  transaction: Common.TransactionMessageSchema,
+});
 export type NewTxMessage = typeof NewTxMessageSchema.Type;
 
 /**
@@ -46,9 +46,9 @@ export type NewTxMessage = typeof NewTxMessageSchema.Type;
  * @category schemas
  */
 const RecoverMessageSchema = Schema.Struct({
-    tag: Schema.Literal("Recover"),
-    recoverTxId: Schema.String
-})
+  tag: Schema.Literal("Recover"),
+  recoverTxId: Schema.String,
+});
 export type RecoverMessage = typeof RecoverMessageSchema.Type;
 
 /**
@@ -58,9 +58,9 @@ export type RecoverMessage = typeof RecoverMessageSchema.Type;
  * @category schemas
  */
 const DecommitMessageSchema = Schema.Struct({
-    tag: Schema.Literal("Decommit"),
-    decommitTx: Common.TransactionMessageSchema
-})
+  tag: Schema.Literal("Decommit"),
+  decommitTx: Common.TransactionMessageSchema,
+});
 export type DecommitMessage = typeof DecommitMessageSchema.Type;
 
 /**
@@ -70,8 +70,8 @@ export type DecommitMessage = typeof DecommitMessageSchema.Type;
  * @category schemas
  */
 const CloseMessageSchema = Schema.Struct({
-    tag: Schema.Literal("Close"),
-})
+  tag: Schema.Literal("Close"),
+});
 export type CloseMessage = typeof CloseMessageSchema.Type;
 
 /**
@@ -81,8 +81,8 @@ export type CloseMessage = typeof CloseMessageSchema.Type;
  * @category schemas
  */
 const ContestMessageSchema = Schema.Struct({
-    tag: Schema.Literal("Contest"),
-})
+  tag: Schema.Literal("Contest"),
+});
 export type ContestMessage = typeof ContestMessageSchema.Type;
 
 /**
@@ -92,8 +92,8 @@ export type ContestMessage = typeof ContestMessageSchema.Type;
  * @category schemas
  */
 const FanoutMessageSchema = Schema.Struct({
-    tag: Schema.Literal("Fanout"),
-})
+  tag: Schema.Literal("Fanout"),
+});
 export type FanoutMessage = typeof FanoutMessageSchema.Type;
 
 /**
@@ -103,8 +103,8 @@ export type FanoutMessage = typeof FanoutMessageSchema.Type;
  * @category schemas
  */
 const SideLoadSnapshotMessageSchema = Schema.Struct({
-    tag: Schema.Literal("SideLoadSnapshot"),
-})
+  tag: Schema.Literal("SideLoadSnapshot"),
+});
 export type SideLoadSnapshotMessage = typeof SideLoadSnapshotMessageSchema.Type;
 
 /**
@@ -114,14 +114,14 @@ export type SideLoadSnapshotMessage = typeof SideLoadSnapshotMessageSchema.Type;
  * @category schemas
  */
 export const RequestMessageSchema = Schema.Union(
-    InitMessageSchema,
-    AbortMessageSchema,
-    NewTxMessageSchema,
-    RecoverMessageSchema,
-    DecommitMessageSchema,
-    CloseMessageSchema,
-    ContestMessageSchema,
-    FanoutMessageSchema,
-    SideLoadSnapshotMessageSchema,
+  InitMessageSchema,
+  AbortMessageSchema,
+  NewTxMessageSchema,
+  RecoverMessageSchema,
+  DecommitMessageSchema,
+  CloseMessageSchema,
+  ContestMessageSchema,
+  FanoutMessageSchema,
+  SideLoadSnapshotMessageSchema,
 );
 export type RequestMessage = typeof RequestMessageSchema.Type;

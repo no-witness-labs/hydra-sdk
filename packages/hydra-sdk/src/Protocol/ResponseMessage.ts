@@ -1,5 +1,5 @@
 import { Effect, Schema } from "effect";
-import * as Common from "./CommonMessage.js"
+import * as Common from "./CommonMessage.js";
 
 // =============================================================================
 // Response Message Schemas
@@ -16,7 +16,14 @@ export const GreetingsMessageSchema = Schema.Struct({
   me: Schema.Struct({
     vkey: Schema.String,
   }),
-  headStatus: Schema.Literal("Idle", "Initializing", "Open", "Closed", "FanoutPossible", "Final"),
+  headStatus: Schema.Literal(
+    "Idle",
+    "Initializing",
+    "Open",
+    "Closed",
+    "FanoutPossible",
+    "Final",
+  ),
   hydraHeadId: Schema.String,
   snapshotUtxo: Schema.String, // TODO: make a better match
   timestamp: Schema.DateTimeUtc,
@@ -33,10 +40,18 @@ export type GreetingsMessage = typeof GreetingsMessageSchema.Type;
 export const CommandFailedMessageSchema = Schema.Struct({
   tag: Schema.Literal("CommandFailed"),
   clientInput: Schema.Struct({
-    tag: Schema.Literal("Init", "Abort", "NewTx", "Decommit", "Recover", "Close", "Contest", "Fanout", "SideLoadSnapshot"),
-    transaction: Schema.optional(
-      Common.TransactionMessageSchema
+    tag: Schema.Literal(
+      "Init",
+      "Abort",
+      "NewTx",
+      "Decommit",
+      "Recover",
+      "Close",
+      "Contest",
+      "Fanout",
+      "SideLoadSnapshot",
     ),
+    transaction: Schema.optional(Common.TransactionMessageSchema),
   }),
 });
 export type CommandFailedMessage = typeof CommandFailedMessageSchema.Type;
@@ -50,14 +65,25 @@ export type CommandFailedMessage = typeof CommandFailedMessageSchema.Type;
 export const PostTxOnChainFailedMessageSchema = Schema.Struct({
   tag: Schema.Literal("PostTxOnChainFailed"),
   postChainTx: Schema.Struct({
-    tag: Schema.Literal("InitTx", "AbortTx", "CollectComTx", "RecoverTx", "IncrementTx", "DecrementTx", "CloseTx", "ContestTx", "FanoutTx"), // TODO: Error in the docs
+    tag: Schema.Literal(
+      "InitTx",
+      "AbortTx",
+      "CollectComTx",
+      "RecoverTx",
+      "IncrementTx",
+      "DecrementTx",
+      "CloseTx",
+      "ContestTx",
+      "FanoutTx",
+    ), // TODO: Error in the docs
     participants: Schema.Array(Schema.String),
     headParameters: Schema.Struct({
       contestationPeriod: Schema.Int,
       parties: Schema.Array(
         Schema.Struct({
-          vkey: Schema.String
-      })),
+          vkey: Schema.String,
+        }),
+      ),
     }),
   }),
   postTxError: Schema.Record({ key: Schema.String, value: Schema.Any }), // Not meant to be machine-processed
@@ -80,8 +106,7 @@ export const PeerConnectedMessageSchema = Schema.Struct({
   seq: Schema.Int,
   timestamp: Schema.DateTimeUtc,
 });
-export type PeerConnectedMessage =
-  typeof PeerConnectedMessageSchema.Type;
+export type PeerConnectedMessage = typeof PeerConnectedMessageSchema.Type;
 
 /**
  * Peer disconnected event.
@@ -98,8 +123,7 @@ export const PeerDisconnectedMessageSchema = Schema.Struct({
   seq: Schema.Int,
   timestamp: Schema.DateTimeUtc,
 });
-export type PeerDisconnectedMessage =
-  typeof PeerDisconnectedMessageSchema.Type;
+export type PeerDisconnectedMessage = typeof PeerDisconnectedMessageSchema.Type;
 
 /**
  * Network connected event.
@@ -112,8 +136,7 @@ export const NetworkConnectedMessageSchema = Schema.Struct({
   seq: Schema.Int,
   timestamp: Schema.DateTimeUtc,
 });
-export type NetworkConnectedMessage =
-  typeof NetworkConnectedMessageSchema.Type;
+export type NetworkConnectedMessage = typeof NetworkConnectedMessageSchema.Type;
 
 /**
  * Network disconnected event.
@@ -172,12 +195,14 @@ export const HeadIsInitializingMessageSchema = Schema.Struct({
   headId: Schema.String,
   parties: Schema.Array(
     Schema.Struct({
-      vkey: Schema.String
-  })),
+      vkey: Schema.String,
+    }),
+  ),
   seq: Schema.Int,
   timestamp: Schema.DateTimeUtc,
 });
-export type HeadIsInitializingMessage = typeof HeadIsInitializingMessageSchema.Type;
+export type HeadIsInitializingMessage =
+  typeof HeadIsInitializingMessageSchema.Type;
 
 /**
  * Committed event indicating a party has committed funds to the Head.
@@ -190,8 +215,9 @@ export const CommittedMessageSchema = Schema.Struct({
   headId: Schema.String,
   parties: Schema.Array(
     Schema.Struct({
-      vkey: Schema.String
-  })),
+      vkey: Schema.String,
+    }),
+  ),
   utxo: Schema.String, // TODO: make a better match
   seq: Schema.Int,
   timestamp: Schema.DateTimeUtc,
@@ -318,7 +344,7 @@ export const TxInvalidMessageSchema = Schema.Struct({
   utxo: Schema.String, // TODO: make a better match
   transaction: Common.TransactionMessageSchema,
   validationError: Schema.Struct({
-    reason: Schema.String
+    reason: Schema.String,
   }),
   seq: Schema.Int,
   timestamp: Schema.DateTimeUtc,
@@ -373,9 +399,10 @@ export const IgnoredHeadInitializingMessageSchema = Schema.Struct({
   headId: Schema.String,
   contestationPeriod: Schema.Int,
   parties: Schema.Array(
-      Schema.Struct({
-        vkey: Schema.String
-    })),
+    Schema.Struct({
+      vkey: Schema.String,
+    }),
+  ),
   participants: Schema.Array(Schema.String),
   seq: Schema.Int,
   timestamp: Schema.DateTimeUtc,
@@ -398,19 +425,18 @@ export const DecommitInvalidMessageSchema = Schema.Struct({
       tag: Schema.Literal("DecommitTxInvalid"),
       localUTxO: Schema.String,
       validationError: Schema.Struct({
-        reason: Schema.String
-      })
+        reason: Schema.String,
+      }),
     }),
     Schema.Struct({
       tag: Schema.Literal("DecommitAlreadyInFlight"),
-      otherDecommitTxId: Schema.String
-    })
+      otherDecommitTxId: Schema.String,
+    }),
   ),
   seq: Schema.Int,
   timestamp: Schema.DateTimeUtc,
 });
-export type DecommitInvalidMessage =
-  typeof DecommitInvalidMessageSchema.Type;
+export type DecommitInvalidMessage = typeof DecommitInvalidMessageSchema.Type;
 
 /**
  * Decommit requested event.
@@ -426,7 +452,8 @@ export const DecommitRequestedMessageSchema = Schema.Struct({
   seq: Schema.Int,
   timestamp: Schema.DateTimeUtc,
 });
-export type DecommitRequestedMessage = typeof DecommitRequestedMessageSchema.Type;
+export type DecommitRequestedMessage =
+  typeof DecommitRequestedMessageSchema.Type;
 
 /**
  * Decommit approved event.
@@ -457,7 +484,8 @@ export const DecommitFinalizedMessageSchema = Schema.Struct({
   seq: Schema.Int,
   timestamp: Schema.DateTimeUtc,
 });
-export type DecommitFinalizedMessage = typeof DecommitFinalizedMessageSchema.Type;
+export type DecommitFinalizedMessage =
+  typeof DecommitFinalizedMessageSchema.Type;
 
 /**
  * Commit recorded event (incremental deposit).
@@ -535,7 +563,8 @@ export const SnapshotSideLoadedMessageSchema = Schema.Struct({
   seq: Schema.Int,
   timestamp: Schema.DateTimeUtc,
 });
-export type SnapshotSideLoadedMessage = typeof SnapshotSideLoadedMessageSchema.Type;
+export type SnapshotSideLoadedMessage =
+  typeof SnapshotSideLoadedMessageSchema.Type;
 
 /**
  * Event log rotated event.
@@ -606,8 +635,8 @@ export const HeadResponseSchema = Schema.Union(
   Schema.Struct({
     tag: Schema.Literal("Idle"),
     contents: Schema.Struct({
-      chainState: Schema.String
-    })
+      chainState: Schema.String,
+    }),
   }),
   Schema.Struct({
     tag: Schema.Literal("Initial"),
@@ -616,20 +645,22 @@ export const HeadResponseSchema = Schema.Union(
         contestationPeriod: Schema.Int,
         parties: Schema.Array(
           Schema.Struct({
-            vkey: Schema.String
-        })),
+            vkey: Schema.String,
+          }),
+        ),
       }),
       pendingCommits: Schema.Array(
         Schema.Struct({
-          vkey: Schema.String
-      })),
+          vkey: Schema.String,
+        }),
+      ),
       commited: Schema.Struct({
-            vkey: Schema.String
+        vkey: Schema.String,
       }),
       chainState: Schema.String,
       headId: Schema.String,
       headSeed: Schema.String,
-    })
+    }),
   }),
   Schema.Struct({
     tag: Schema.Literal("Open"),
@@ -638,8 +669,9 @@ export const HeadResponseSchema = Schema.Union(
         contestationPeriod: Schema.Int,
         parties: Schema.Array(
           Schema.Struct({
-            vkey: Schema.String
-        })),
+            vkey: Schema.String,
+          }),
+        ),
       }),
       coordinatedHeadState: Schema.Struct({
         localUTxO: Schema.String, // TODO: make a better match
@@ -647,8 +679,14 @@ export const HeadResponseSchema = Schema.Union(
         allTxs: Schema.Record({ key: Schema.String, value: Schema.Any }),
         confirmedSnapshot: Common.ConfirmedSnapshotSchema,
         seenSnapshot: Common.SeenSnapshotSchema,
-        pendingDeposits: Schema.Record({ key: Schema.String, value: Schema.Any }),
-        currentDepositTxId: Schema.Record({ key: Schema.String, value: Schema.Any }),
+        pendingDeposits: Schema.Record({
+          key: Schema.String,
+          value: Schema.Any,
+        }),
+        currentDepositTxId: Schema.Record({
+          key: Schema.String,
+          value: Schema.Any,
+        }),
         decommitTx: Schema.NullOr(Common.TransactionMessageSchema),
         version: Schema.Int,
       }),
@@ -656,7 +694,7 @@ export const HeadResponseSchema = Schema.Union(
       headId: Schema.String,
       currentSlot: Schema.Int,
       headSeed: Schema.String,
-    })
+    }),
   }),
   Schema.Struct({
     tag: Schema.Literal("Closed"),
@@ -665,8 +703,9 @@ export const HeadResponseSchema = Schema.Union(
         contestationPeriod: Schema.Int,
         parties: Schema.Array(
           Schema.Struct({
-            vkey: Schema.String
-        })),
+            vkey: Schema.String,
+          }),
+        ),
       }),
       confirmedSnapshot: Common.ConfirmedSnapshotSchema,
       contestationDeadline: Schema.DateTimeUtc,
@@ -675,7 +714,7 @@ export const HeadResponseSchema = Schema.Union(
       headId: Schema.String,
       headSeed: Schema.String,
       version: Schema.Int,
-    })
+    }),
   }),
 );
 export type HeadResponse = typeof HeadResponseSchema.Type;
@@ -695,7 +734,9 @@ export type CommitResponse = typeof CommitResponseSchema.Type;
  * @since 0.1.0
  * @category schemas
  */
-export const CommitsResponseSchema = Schema.Array(Common.TransactionMessageSchema);
+export const CommitsResponseSchema = Schema.Array(
+  Common.TransactionMessageSchema,
+);
 export type CommitsResponse = typeof CommitsResponseSchema.Type;
 
 /**
@@ -741,17 +782,17 @@ export const ProtocolParametersResponseSchema = Schema.Struct({
   maxBlockHeaderSize: Schema.Number,
   maxTxSize: Schema.Number,
   txFeeFixed: Schema.Struct({
-    lovelace: Schema.Int
+    lovelace: Schema.Int,
   }),
   txFeePerByte: Schema.Int,
   stakeAddressDeposit: Schema.Struct({
-    lovelace: Schema.Int
+    lovelace: Schema.Int,
   }),
   stakePoolDeposit: Schema.Struct({
-    lovelace: Schema.Int
+    lovelace: Schema.Int,
   }),
   minPoolCost: Schema.Struct({
-    lovelace: Schema.Int
+    lovelace: Schema.Int,
   }),
   poolRetireMaxEpoch: Schema.Int,
   stakePoolTargetNum: Schema.Number,
@@ -776,10 +817,11 @@ export const ProtocolParametersResponseSchema = Schema.Struct({
   collateralPercentage: Schema.Number,
   maxCollateralInputs: Schema.Number,
   utxoConstPerByte: Schema.Struct({
-    lovelace: Schema.Int
+    lovelace: Schema.Int,
   }),
 });
-export type ProtocolParametersResponse = typeof ProtocolParametersResponseSchema.Type;
+export type ProtocolParametersResponse =
+  typeof ProtocolParametersResponseSchema.Type;
 
 /**
  * Response from the Cardano transaction endpoint.
@@ -789,7 +831,7 @@ export type ProtocolParametersResponse = typeof ProtocolParametersResponseSchema
  */
 export const CardanoTransactionResponseSchema = Schema.Union(
   Schema.Struct({
-    tag: Schema.Literal("TransactionSubmitted")
+    tag: Schema.Literal("TransactionSubmitted"),
   }),
   Schema.Struct({
     tag: Schema.Literal("ScriptFailedInWallet"),
@@ -821,7 +863,7 @@ export const CardanoTransactionResponseSchema = Schema.Union(
   Schema.Struct({
     tag: Schema.Literal("InvalidStateToPost"),
     chainState: Schema.Any,
-    txTried: Schema.Any // I am not parsing all of that
+    txTried: Schema.Any, // I am not parsing all of that
   }),
   Schema.Struct({
     tag: Schema.Literal("FailedToPostTx"),
@@ -871,6 +913,6 @@ export const CardanoTransactionResponseSchema = Schema.Union(
   Schema.Struct({
     tag: Schema.Literal("FailedToConstructFanoutTx"),
   }),
-
 );
-export type CardanoTransactionResponse = typeof CardanoTransactionResponseSchema.Type;
+export type CardanoTransactionResponse =
+  typeof CardanoTransactionResponseSchema.Type;

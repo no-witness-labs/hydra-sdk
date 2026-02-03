@@ -11,11 +11,15 @@ import { Effect, Schema } from "effect";
  * @category schemas
  */
 export const TransactionMessageSchema = Schema.Struct({
-    type: Schema.Literal("Tx ConwayEra", "Unwitnessed Tx ConwayEra", "Witnessed Tx ConwayEra"),
-    description: Schema.String,
-    cborHex: Schema.String,
-    txId: Schema.String,
-  })
+  type: Schema.Literal(
+    "Tx ConwayEra",
+    "Unwitnessed Tx ConwayEra",
+    "Witnessed Tx ConwayEra",
+  ),
+  description: Schema.String,
+  cborHex: Schema.String,
+  txId: Schema.String,
+});
 export type TransactionMessage = typeof TransactionMessageSchema.Type;
 
 /**
@@ -25,32 +29,32 @@ export type TransactionMessage = typeof TransactionMessageSchema.Type;
  * @category schemas
  */
 export const SeenSnapshotSchema = Schema.Union(
-    Schema.Struct({
-      tag: Schema.Literal("NoSeenSnapshot")
+  Schema.Struct({
+    tag: Schema.Literal("NoSeenSnapshot"),
+  }),
+  Schema.Struct({
+    tag: Schema.Literal("LastSeenSnapshot"),
+    lastSeen: Schema.Int,
+  }),
+  Schema.Struct({
+    tag: Schema.Literal("RequestedSnapshot"),
+    lastSeen: Schema.Int,
+    requested: Schema.Int,
+  }),
+  Schema.Struct({
+    tag: Schema.Literal("SeenSnapshot"),
+    snapshot: Schema.Struct({
+      headId: Schema.String,
+      version: Schema.Int,
+      number: Schema.Int,
+      confirmed: Schema.Array(TransactionMessageSchema),
+      utxo: Schema.String,
+      utxoToCommit: Schema.optional(Schema.String),
+      utxoToDecommit: Schema.optional(Schema.String),
     }),
-    Schema.Struct({
-      tag: Schema.Literal("LastSeenSnapshot"),
-      lastSeen: Schema.Int,
-    }),
-    Schema.Struct({
-      tag: Schema.Literal("RequestedSnapshot"),
-      lastSeen: Schema.Int,
-      requested: Schema.Int,
-    }),
-    Schema.Struct({
-      tag: Schema.Literal("SeenSnapshot"),
-      snapshot: Schema.Struct({
-        headId: Schema.String,
-        version: Schema.Int,
-        number: Schema.Int,
-        confirmed: Schema.Array(TransactionMessageSchema),
-        utxo: Schema.String,
-        utxoToCommit: Schema.optional(Schema.String),
-        utxoToDecommit: Schema.optional(Schema.String),
-      }),
-      signatories: Schema.Record({ key: Schema.String, value: Schema.Any }),
-    }),
-  )
+    signatories: Schema.Record({ key: Schema.String, value: Schema.Any }),
+  }),
+);
 export type SeenSnapshot = typeof SeenSnapshotSchema.Type;
 
 /**
@@ -77,8 +81,8 @@ export const ConfirmedSnapshotSchema = Schema.Union(
       utxoToDecommit: Schema.optional(Schema.String),
     }),
     signatures: Schema.Struct({
-      multiSignature: Schema.String
+      multiSignature: Schema.String,
     }),
   }),
-)
+);
 export type ConirmedSnapshot = typeof ConfirmedSnapshotSchema.Type;

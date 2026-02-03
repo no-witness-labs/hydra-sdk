@@ -9,13 +9,19 @@
       "cache": true
     },
     "docs#build": {
-      "dependsOn": ["@no-witness-labs/hydra-sdk#build", "@no-witness-labs/hydra-sdk-cli#build"],
+      "dependsOn": [
+        "@no-witness-labs/hydra-sdk#build",
+        "@no-witness-labs/hydra-sdk-cli#build"
+      ],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": [".next/**", "out/**"],
       "cache": true
     },
     "docs#dev": {
-      "dependsOn": ["@no-witness-labs/hydra-sdk#build", "@no-witness-labs/hydra-sdk-cli#build"],
+      "dependsOn": [
+        "@no-witness-labs/hydra-sdk#build",
+        "@no-witness-labs/hydra-sdk-cli#build"
+      ],
       "cache": false,
       "persistent": true
     },
