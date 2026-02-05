@@ -30,7 +30,6 @@
   "license": "ISC",
   "dependencies": {
     "@effect/cli": "^0.73.1",
-    "@effect/platform": "^0.94.2",
     "@effect/platform-node": "^0.104.1"
   },
   "devDependencies": {

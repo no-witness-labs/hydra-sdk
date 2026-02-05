@@ -29,7 +29,6 @@
     "@babel/core": "^7.28.0",
     "@changesets/changelog-github": "^0.5.1",
     "@changesets/cli": "^2.29.6",
-    "@effect/docgen": "^0.5.2",
     "@effect/vitest": "^0.27.0",
     "@eslint/compat": "^2.0.1",
     "@eslint/eslintrc": "^3.3.3",
@@ -52,5 +51,9 @@
   },
   "peerDependencies": {
     "effect": "^3.19.15"
+  },
+  "dependencies": {
+    "@effect/docgen": "^0.5.2",
+    "@effect/platform": "^0.94.2"
   }
 }
