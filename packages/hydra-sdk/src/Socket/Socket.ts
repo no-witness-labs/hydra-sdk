@@ -1,6 +1,8 @@
 import { Socket } from "@effect/platform";
-import { Effect, PubSub, Schedule } from "effect";
+import { WebSocketConstructor } from "@effect/platform/Socket";
+import { Effect, Layer, PubSub, Queue, Schedule } from "effect";
 import { RuntimeFiber } from "effect/Fiber";
+import { WebSocket } from "ws";
 
 type SocketConfig = {
   url: string;
@@ -14,43 +16,44 @@ export class SocketController extends Effect.Service<SocketController>()(
         yield* Effect.log(`SocketController was created at: ${url}`);
 
         const socket: Socket.Socket = yield* Socket.makeWebSocket(url);
-        const messageQueue: PubSub.PubSub<Uint8Array<ArrayBufferLike>> =
-          yield* PubSub.unbounded<Uint8Array>();
+        const messageQueue: Queue.Queue<Uint8Array> = yield* Queue.unbounded<Uint8Array>();
 
         const retryPolicy = Schedule.intersect(
           Schedule.exponential("100 millis"),
           Schedule.recurs(20),
         );
 
-        const socketConnectionFiber: RuntimeFiber<void, Socket.SocketError> =
-          yield* Effect.fork(
-            socket.run((data) => {
-              return Effect.gen(function* () {
-                yield* Effect.logDebug(`Socket Message received: ${data}`);
-                return yield* PubSub.publish(messageQueue, data);
-              });
-            }),
-          );
-
-        const socketFiber = yield* Effect.fork(
-          Effect.retry(socketConnectionFiber, retryPolicy).pipe(
-            Effect.tapError((error) =>
-              Effect.logError(`Socket connection failed: ${error}`),
-            ),
-          ),
+        const socketConnection = socket.run((data) => {
+          return Queue.offer(messageQueue, data);
+        }, {
+          onOpen: Effect.logInfo("Socket connected successfully")
+        }).pipe(
+            Effect.tap(Effect.logInfo(`Socket message received`)),
+            Effect.tapError((e) => Effect.logInfo(`Socket error received: ${e}`)),
+            Effect.tapDefect((d) => Effect.logInfo(`Socket defect received: ${d}`)),
+            Effect.forever
         );
 
+        const socketFiber: RuntimeFiber<void, Socket.SocketError> =
+            yield* Effect.fork(
+                Effect.retry(socketConnection, retryPolicy)
+            )
+
         const sendMessage = (chunk: string | Uint8Array) =>
-          socket.writer.pipe(
-            Effect.flatMap((write) => write(chunk)),
-            Effect.tapError((e) =>
-              Effect.logError(`Failed to send message: ${e}`),
+          Effect.scoped(
+            socket.writer.pipe(
+              Effect.flatMap((write) => write(chunk)),
+              Effect.tapError((e) =>
+                Effect.logInfo(`Failed to send message: ${e}`),
+              ),
             ),
           );
 
         const close = () =>
-          socket.writer.pipe(
-            Effect.flatMap((write) => write(new Socket.CloseEvent())),
+          Effect.scoped(
+            socket.writer.pipe(
+              Effect.flatMap((write) => write(new Socket.CloseEvent())),
+            ),
           );
 
         return {
@@ -60,5 +63,10 @@ export class SocketController extends Effect.Service<SocketController>()(
           close,
         };
       }),
+    dependencies: [
+        Layer.succeed(WebSocketConstructor, (url, options) => {
+      return new WebSocket(url, options) as unknown as globalThis.WebSocket;
+    }),
+    ]
   },
 ) {}
