@@ -31,14 +31,17 @@ describe("Socket",
     Effect.gen(function* () {
       const server = yield* makeServer;
       const socketController = yield* Socket.SocketController;
+      // Check that server is connected
+      yield* Effect.promise(() => server.connected)
 
-      const message = "Server hello"
+      const message = "Controller hello"
 
       yield* Effect.logInfo(`Sending message: ${message}`)
       const encodedMessage: Uint8Array = new TextEncoder().encode(message);
       yield* socketController.sendMessage(encodedMessage)
 
       const receivedRawMessage = yield* Effect.promise(() => server.nextMessage as Promise<Uint8Array>)
+
       const receivedMessage = new TextDecoder().decode(receivedRawMessage)
       yield* Effect.logInfo(`Received message: ${receivedMessage}`)
 
@@ -49,6 +52,33 @@ describe("Socket",
       Effect.provide(MockWebSocketLayer),
       Effect.provide(Logger.pretty),
     ),
-  );
+  ),
+    it.scoped.only("SocketController can receive messages", () =>
+    Effect.gen(function* () {
+      const server = yield* makeServer;
+      const socketController = yield* Socket.SocketController;
+      // Check that server is connected
+      yield* Effect.promise(() => server.connected)
+
+      const message = "Server hello"
+
+      yield* Effect.logInfo(`Sending message: ${message}`)
+      // No need to encode since `server` does it by default:
+      server.send(message)
+
+      const receivedRawMessage = yield* socketController.messageQueue.take
+      yield* Effect.logInfo(`ReceivedRaw message: ${receivedRawMessage}`)
+
+      const receivedMessage = new TextDecoder().decode(receivedRawMessage)
+      yield* Effect.logInfo(`Received message: ${receivedMessage}`)
+
+      expect(message).toEqual(receivedMessage);
+
+    },).pipe(
+      Effect.provide(Socket.SocketController.DefaultWithoutDependencies({url})),
+      Effect.provide(MockWebSocketLayer),
+      Effect.provide(Logger.pretty),
+    ),
+  )
 });
 
