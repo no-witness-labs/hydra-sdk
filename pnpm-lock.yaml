@@ -13,10 +13,10 @@ importers:
         version: 0.5.2(tsx@4.21.0)(typescript@5.9.3)
       '@effect/platform':
         specifier: ^0.94.2
-        version: 0.94.4(effect@3.19.15)
+        version: 0.94.4(effect@3.19.16)
       effect:
         specifier: ^3.19.15
-        version: 3.19.15
+        version: 3.19.16
     devDependencies:
       '@babel/cli':
         specifier: ^7.28.6
@@ -32,13 +32,16 @@ importers:
         version: 2.29.8(@types/node@25.2.2)
       '@effect/vitest':
         specifier: ^0.27.0
-        version: 0.27.0(effect@3.19.15)(vitest@4.0.18(@types/node@25.2.2)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2))
+        version: 0.27.0(effect@3.19.16)(vitest@4.0.18(@types/node@25.2.2)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2))
       '@eslint/compat':
         specifier: ^2.0.2
         version: 2.0.2(eslint@10.0.0(jiti@2.6.1))
       '@eslint/eslintrc':
         specifier: ^3.3.3
         version: 3.3.3
+      '@eslint/js':
+        specifier: ^10.0.1
+        version: 10.0.1(eslint@10.0.0(jiti@2.6.1))
       '@typescript-eslint/eslint-plugin':
         specifier: ^8.54.0
         version: 8.54.0(@typescript-eslint/parser@8.54.0(eslint@10.0.0(jiti@2.6.1))(typescript@5.9.3))(eslint@10.0.0(jiti@2.6.1))(typescript@5.9.3)
@@ -676,6 +679,15 @@ packages:
   '@eslint/eslintrc@3.3.3':
     resolution: {integrity: sha512-Kr+LPIUVKz2qkx1HAMH8q1q6azbqBAsXJUxBl/ODDuVPX45Z9DfwB8tPjTi6nNZ8BuM3nbJxC5zCAg5elnBUTQ==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+
+  '@eslint/js@10.0.1':
+    resolution: {integrity: sha512-zeR9k5pd4gxjZ0abRoIaxdc7I3nDktoXZk2qOv9gCNWx3mVwEn32VRhyLaRsDiJjTs0xq/T8mfPtyuXu7GWBcA==}
+    engines: {node: ^20.19.0 || ^22.13.0 || >=24}
+    peerDependencies:
+      eslint: ^10.0.0
+    peerDependenciesMeta:
+      eslint:
+        optional: true
 
   '@eslint/object-schema@3.0.1':
     resolution: {integrity: sha512-P9cq2dpr+LU8j3qbLygLcSZrl2/ds/pUpfnHNNuk5HW7mnngHs+6WSq5C9mO3rqRX8A1poxqLTC9cu0KOyJlBg==}
@@ -2472,9 +2484,6 @@ packages:
 
   eastasianwidth@0.2.0:
     resolution: {integrity: sha512-I88TYZWc9XiYHRQ4/3c5rjjfgkjhLyW2luGIheGERbNQ6OY7yTybanSpDXZa8y7VUP9YmDcYa+eyq4ca7iLqWA==}
-
-  effect@3.19.15:
-    resolution: {integrity: sha512-vzMmgfZKLcojmUjBdlQx+uaKryO7yULlRxjpDnHdnvcp1NPHxJyoM6IOXBLlzz2I/uPtZpGKavt5hBv7IvGZkA==}
 
   effect@3.19.16:
     resolution: {integrity: sha512-7+XC3vGrbAhCHd8LTFHvnZjRpZKZ8YHRZqJTkpNoxcJ2mCyNs2SwI+6VkV/ij8Y3YW7wfBN4EbU06/F5+m/wkQ==}
@@ -5416,13 +5425,6 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@effect/platform@0.94.4(effect@3.19.15)':
-    dependencies:
-      effect: 3.19.15
-      find-my-way-ts: 0.1.6
-      msgpackr: 1.11.8
-      multipasta: 0.2.7
-
   '@effect/platform@0.94.4(effect@3.19.16)':
     dependencies:
       effect: 3.19.16
@@ -5458,9 +5460,9 @@ snapshots:
     dependencies:
       effect: 3.19.16
 
-  '@effect/vitest@0.27.0(effect@3.19.15)(vitest@4.0.18(@types/node@25.2.2)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2))':
+  '@effect/vitest@0.27.0(effect@3.19.16)(vitest@4.0.18(@types/node@25.2.2)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2))':
     dependencies:
-      effect: 3.19.15
+      effect: 3.19.16
       vitest: 4.0.18(@types/node@25.2.2)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2)
 
   '@effect/workflow@0.16.0(@effect/experimental@0.58.0(@effect/platform@0.94.4(effect@3.19.16))(effect@3.19.16))(@effect/platform@0.94.4(effect@3.19.16))(@effect/rpc@0.73.0(@effect/platform@0.94.4(effect@3.19.16))(effect@3.19.16))(effect@3.19.16)':
@@ -5606,6 +5608,10 @@ snapshots:
       strip-json-comments: 3.1.1
     transitivePeerDependencies:
       - supports-color
+
+  '@eslint/js@10.0.1(eslint@10.0.0(jiti@2.6.1))':
+    optionalDependencies:
+      eslint: 10.0.0(jiti@2.6.1)
 
   '@eslint/object-schema@3.0.1': {}
 
@@ -7331,11 +7337,6 @@ snapshots:
       gopd: 1.2.0
 
   eastasianwidth@0.2.0: {}
-
-  effect@3.19.15:
-    dependencies:
-      '@standard-schema/spec': 1.1.0
-      fast-check: 3.23.2
 
   effect@3.19.16:
     dependencies:
