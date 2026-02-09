@@ -55,29 +55,29 @@ describe("Socket", () => {
   );
 
   it.scoped.only("SocketController can receive messages", () =>
-      Effect.gen(function* () {
-        const server = yield* makeServer;
-        const socketController = yield* Socket.SocketController;
-        // Check that server is connected
-        yield* Effect.promise(() => server.connected);
+    Effect.gen(function* () {
+      const server = yield* makeServer;
+      const socketController = yield* Socket.SocketController;
+      // Check that server is connected
+      yield* Effect.promise(() => server.connected);
 
-        const message = "Server hello";
+      const message = "Server hello";
 
-        yield* Effect.logInfo(`Server sending message: ${message}`);
-        // No need to encode since `server` does it by default:
-        server.send(message);
+      yield* Effect.logInfo(`Server sending message: ${message}`);
+      // No need to encode since `server` does it by default:
+      server.send(message);
 
-        const receivedRawMessage = yield* socketController.messageQueue.take;
-        const receivedMessage = new TextDecoder().decode(receivedRawMessage);
-        yield* Effect.logInfo(`Client received message: ${receivedMessage}`);
+      const receivedRawMessage = yield* socketController.messageQueue.take;
+      const receivedMessage = new TextDecoder().decode(receivedRawMessage);
+      yield* Effect.logInfo(`Client received message: ${receivedMessage}`);
 
-        expect(message).toEqual(receivedMessage);
-      }).pipe(
-        Effect.provide(
-          Socket.SocketController.DefaultWithoutDependencies({ url }),
-        ),
-        Effect.provide(MockWebSocketLayer),
-        Effect.provide(Logger.pretty),
+      expect(message).toEqual(receivedMessage);
+    }).pipe(
+      Effect.provide(
+        Socket.SocketController.DefaultWithoutDependencies({ url }),
       ),
+      Effect.provide(MockWebSocketLayer),
+      Effect.provide(Logger.pretty),
+    ),
   );
 });
