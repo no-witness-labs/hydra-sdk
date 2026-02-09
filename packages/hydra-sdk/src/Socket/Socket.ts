@@ -66,28 +66,36 @@ export class SocketController extends Effect.Service<SocketController>()(
         yield* Effect.log(`SocketController was created at: ${url}`);
 
         const socket: Socket.Socket = yield* Socket.makeWebSocket(url);
-        const messageQueue: Queue.Queue<Uint8Array> = yield* Queue.unbounded<Uint8Array>();
+        const messageQueue: Queue.Queue<Uint8Array> =
+          yield* Queue.unbounded<Uint8Array>();
 
         const retryPolicy = Schedule.intersect(
           Schedule.exponential("100 millis"),
           Schedule.recurs(20),
         );
 
-        const socketConnection = socket.run((data) => {
-          return Queue.offer(messageQueue, data);
-        }, {
-          onOpen: Effect.logInfo("Socket connected successfully")
-        }).pipe(
+        const socketConnection = socket
+          .run(
+            (data) => {
+              return Queue.offer(messageQueue, data);
+            },
+            {
+              onOpen: Effect.logInfo("Socket connected successfully"),
+            },
+          )
+          .pipe(
             Effect.tap(Effect.logInfo(`Socket message received`)),
-            Effect.tapError((e) => Effect.logInfo(`Socket error received: ${e}`)),
-            Effect.tapDefect((d) => Effect.logInfo(`Socket defect received: ${d}`)),
-            Effect.forever
-        );
+            Effect.tapError((e) =>
+              Effect.logInfo(`Socket error received: ${e}`),
+            ),
+            Effect.tapDefect((d) =>
+              Effect.logInfo(`Socket defect received: ${d}`),
+            ),
+            Effect.forever,
+          );
 
         const socketFiber: RuntimeFiber<void, Socket.SocketError> =
-            yield* Effect.fork(
-                Effect.retry(socketConnection, retryPolicy)
-            )
+          yield* Effect.fork(Effect.retry(socketConnection, retryPolicy));
 
         /**
          * Send a message through the WebSocket connection.
@@ -153,6 +161,6 @@ export class SocketController extends Effect.Service<SocketController>()(
       Layer.succeed(WebSocketConstructor, (url, options) => {
         return new WebSocket(url, options) as unknown as globalThis.WebSocket;
       }),
-    ]
+    ],
   },
 ) {}
