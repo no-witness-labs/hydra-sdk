@@ -25,7 +25,7 @@ const MockWebSocketLayer = Layer.succeed(
 );
 
 describe("Socket", () => {
-  it.scoped.only("SocketController can send messages", () =>
+  it.scoped("SocketController can send messages", () =>
     Effect.gen(function* () {
       const server = yield* makeServer;
       const socketController = yield* Socket.SocketController;
@@ -54,7 +54,7 @@ describe("Socket", () => {
     ),
   );
 
-  it.scoped.only("SocketController can receive messages", () =>
+  it.scoped("SocketController can receive messages", () =>
     Effect.gen(function* () {
       const server = yield* makeServer;
       const socketController = yield* Socket.SocketController;
