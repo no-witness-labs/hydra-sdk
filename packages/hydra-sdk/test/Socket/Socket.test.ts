@@ -36,14 +36,13 @@ describe("Socket",
 
       const message = "Controller hello"
 
-      yield* Effect.logInfo(`Sending message: ${message}`)
+      yield* Effect.logInfo(`Client sending message: ${message}`)
       const encodedMessage: Uint8Array = new TextEncoder().encode(message);
       yield* socketController.sendMessage(encodedMessage)
 
       const receivedRawMessage = yield* Effect.promise(() => server.nextMessage as Promise<Uint8Array>)
-
       const receivedMessage = new TextDecoder().decode(receivedRawMessage)
-      yield* Effect.logInfo(`Received message: ${receivedMessage}`)
+      yield* Effect.logInfo(`Server received message: ${receivedMessage}`)
 
       expect(message).toEqual(receivedMessage);
 
@@ -62,15 +61,13 @@ describe("Socket",
 
       const message = "Server hello"
 
-      yield* Effect.logInfo(`Sending message: ${message}`)
+      yield* Effect.logInfo(`Server sending message: ${message}`)
       // No need to encode since `server` does it by default:
       server.send(message)
 
       const receivedRawMessage = yield* socketController.messageQueue.take
-      yield* Effect.logInfo(`ReceivedRaw message: ${receivedRawMessage}`)
-
       const receivedMessage = new TextDecoder().decode(receivedRawMessage)
-      yield* Effect.logInfo(`Received message: ${receivedMessage}`)
+      yield* Effect.logInfo(`Client received message: ${receivedMessage}`)
 
       expect(message).toEqual(receivedMessage);
 
