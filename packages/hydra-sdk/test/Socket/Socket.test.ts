@@ -1,10 +1,9 @@
-import { it, describe } from "@effect/vitest";
-import { Effect, Layer, Logger, PubSub } from "effect";
-import { WS } from "vitest-websocket-mock";
-import { Socket } from "@no-witness-labs/hydra-sdk";
-import { Scope } from "effect/Scope";
-import { Dequeue } from "effect/Queue";
 import { WebSocketConstructor } from "@effect/platform/Socket";
+import { describe, it } from "@effect/vitest";
+import { Socket } from "@no-witness-labs/hydra-sdk";
+import { Effect, Layer, Logger } from "effect";
+import type { Scope } from "effect/Scope";
+import { WS } from "vitest-websocket-mock";
 
 const url = `ws://localhost:1234`;
 
@@ -26,7 +25,7 @@ const MockWebSocketLayer = Layer.succeed(
 );
 
 describe("Socket", () => {
-  (it.scoped.only("SocketController can send messages", () =>
+  it.scoped.only("SocketController can send messages", () =>
     Effect.gen(function* () {
       const server = yield* makeServer;
       const socketController = yield* Socket.SocketController;
@@ -53,8 +52,9 @@ describe("Socket", () => {
       Effect.provide(MockWebSocketLayer),
       Effect.provide(Logger.pretty),
     ),
-  ),
-    it.scoped.only("SocketController can receive messages", () =>
+  );
+
+  it.scoped.only("SocketController can receive messages", () =>
       Effect.gen(function* () {
         const server = yield* makeServer;
         const socketController = yield* Socket.SocketController;
@@ -79,5 +79,5 @@ describe("Socket", () => {
         Effect.provide(MockWebSocketLayer),
         Effect.provide(Logger.pretty),
       ),
-    ));
+  );
 });

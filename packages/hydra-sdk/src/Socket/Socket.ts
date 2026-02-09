@@ -1,7 +1,7 @@
 import { Socket } from "@effect/platform";
 import { WebSocketConstructor } from "@effect/platform/Socket";
-import { Effect, Fiber, Layer, Queue, Schedule } from "effect";
-import { RuntimeFiber } from "effect/Fiber";
+import { Effect, Layer, Queue, Schedule } from "effect";
+import type { RuntimeFiber } from "effect/Fiber";
 import { WebSocket } from "ws";
 
 // =============================================================================
