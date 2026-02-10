@@ -19,8 +19,13 @@ export class HydraStateMachine extends Effect.Service<HydraStateMachine>()(
         Effect.gen(function* () {
           let rawMessage: Uint8Array;
           while ((rawMessage = yield* messageQueue.take)) {
-            yield* Effect.logInfo(`DEBUG: caught rawMessage: ${rawMessage}`)
             const messageText: string = new TextDecoder().decode(rawMessage);
+            yield* Effect.logInfo(`DEBUG: caught messageText: ${messageText}`)
+            const mbDebugStatus = Effect.option(Schema.decode(
+                  Schema.parseJson(Protocol.WebSocketResponseMessageSchema),
+                )(messageText))
+            yield* Effect.logInfo(`DEBUG: mbDebugStatus: ${JSON.stringify(mbDebugStatus)}`)
+
             const maybeStatus: Option.Option<Protocol.Status> =
               yield* Effect.option(
                 Schema.decode(
@@ -29,6 +34,9 @@ export class HydraStateMachine extends Effect.Service<HydraStateMachine>()(
               ).pipe(
                 Effect.map(Option.flatMap(Protocol.socketMessageToStatus)),
               );
+
+            yield* Effect.logInfo(`DEBUG: maybeStatus: ${JSON.stringify(maybeStatus)}`)
+
 
             if (Option.isSome(maybeStatus)) {
               const statusRaw = yield* maybeStatus;

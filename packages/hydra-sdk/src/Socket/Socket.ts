@@ -80,8 +80,10 @@ export class SocketController extends Effect.Service<SocketController>()(
               return PubSub.publish(messageQueue, data);
             },
             {
-              onOpen: Effect.logInfo("Socket connected successfully"),
-            },
+              onOpen: Effect.gen(function* () {
+                yield* Effect.logInfo("Socket connected successfully");
+                yield* Effect.sleep("50 millis"); // Small delay to ensure handler is ready
+              }),            },
           )
           .pipe(
             Effect.tap(Effect.logInfo(`Socket message received`)),
