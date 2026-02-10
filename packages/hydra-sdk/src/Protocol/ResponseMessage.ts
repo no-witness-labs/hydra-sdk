@@ -620,7 +620,8 @@ export const WebSocketResponseMessageSchema = Schema.Union(
   SnapshotSideLoadedMessageSchema,
   EventLogRotatedMessageSchema,
 );
-export type WebSocketResponseMessage = typeof WebSocketResponseMessageSchema.Type;
+export type WebSocketResponseMessage =
+  typeof WebSocketResponseMessageSchema.Type;
 
 // =============================================================================
 // HTTP API Response Schemas

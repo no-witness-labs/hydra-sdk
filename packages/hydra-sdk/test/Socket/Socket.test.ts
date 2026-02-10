@@ -58,7 +58,7 @@ describe("Socket", () => {
     Effect.gen(function* () {
       const server = yield* makeServer;
       const socketController = yield* Socket.SocketController;
-      const messageQueue = yield* socketController.messageQueue.subscribe
+      const messageQueue = yield* socketController.messageQueue.subscribe;
 
       // Check that server is connected
       yield* Effect.promise(() => server.connected);

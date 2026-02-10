@@ -1,1 +1,1 @@
-export * from "./HeadStateMachine.js"
+export * from "./HeadStateMachine.js";

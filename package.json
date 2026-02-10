@@ -1,5 +1,5 @@
 {
-  "name": "@no-witness-labs/hydra-sdk",
+  "name": "@no-witness-labs/hydra-sdk-monorepo",
   "version": "0.1.0",
   "type": "module",
   "packageManager": "pnpm@9.0.0",
