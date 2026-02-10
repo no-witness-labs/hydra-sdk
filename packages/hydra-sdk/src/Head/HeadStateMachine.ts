@@ -19,6 +19,7 @@ export class HydraStateMachine extends Effect.Service<HydraStateMachine>()(
         Effect.gen(function* () {
           let rawMessage: Uint8Array;
           while ((rawMessage = yield* messageQueue.take)) {
+            yield* Effect.logInfo(`DEBUG: caught rawMessage: ${rawMessage}`)
             const messageText: string = new TextDecoder().decode(rawMessage);
             const maybeStatus: Option.Option<Protocol.Status> =
               yield* Effect.option(
