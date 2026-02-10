@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import { Option, Schema } from "effect";
 
 import * as Common from "./CommonMessage.js";
 
@@ -586,7 +586,7 @@ export type EventLogRotatedMessage = typeof EventLogRotatedMessageSchema.Type;
  * @since 0.1.0
  * @category schemas
  */
-export const RootResponseMessageSchema = Schema.Union(
+export const WebSocketResponseMessageSchema = Schema.Union(
   GreetingsMessageSchema,
   CommandFailedMessageSchema,
   PostTxOnChainFailedMessageSchema,
@@ -620,7 +620,7 @@ export const RootResponseMessageSchema = Schema.Union(
   SnapshotSideLoadedMessageSchema,
   EventLogRotatedMessageSchema,
 );
-export type RootResponseMessage = typeof RootResponseMessageSchema.Type;
+export type WebSocketResponseMessage = typeof WebSocketResponseMessageSchema.Type;
 
 // =============================================================================
 // HTTP API Response Schemas

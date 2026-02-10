@@ -28,7 +28,7 @@ import {
   PeerDisconnectedMessageSchema,
   PostTxOnChainFailedMessageSchema,
   ReadyToFanoutMessageSchema,
-  RootResponseMessageSchema,
+  WebSocketResponseMessageSchema,
   SnapshotConfirmedMessageSchema,
   SnapshotSideLoadedMessageSchema,
   TxInvalidMessageSchema,
@@ -893,7 +893,7 @@ describe("EventLogRotatedMessageSchema", () => {
   );
 });
 
-describe("RootResponseMessageSchema", () => {
+describe("WebSocketResponseMessageSchema", () => {
   it.effect("encodes different message types", () =>
     Effect.gen(function* () {
       const greetingsExpected = {
@@ -910,9 +910,9 @@ describe("RootResponseMessageSchema", () => {
       };
 
       const greetingsDecoded = yield* Schema.decodeUnknown(
-        RootResponseMessageSchema,
+        WebSocketResponseMessageSchema,
       )(greetingsExpected);
-      const greetingsEncoded = yield* Schema.encode(RootResponseMessageSchema)(
+      const greetingsEncoded = yield* Schema.encode(WebSocketResponseMessageSchema)(
         greetingsDecoded,
       );
       expect(greetingsEncoded).toEqual(greetingsExpected);
@@ -926,9 +926,9 @@ describe("RootResponseMessageSchema", () => {
       };
 
       const txValidDecoded = yield* Schema.decodeUnknown(
-        RootResponseMessageSchema,
+        WebSocketResponseMessageSchema,
       )(txValidExpected);
-      const txValidEncoded = yield* Schema.encode(RootResponseMessageSchema)(
+      const txValidEncoded = yield* Schema.encode(WebSocketResponseMessageSchema)(
         txValidDecoded,
       );
       expect(txValidEncoded).toEqual(txValidExpected);
