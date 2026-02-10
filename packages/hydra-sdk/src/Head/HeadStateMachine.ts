@@ -1,12 +1,11 @@
 import {
   Effect,
   pipe,
-  PubSub,
   Option,
   Schema,
 } from "effect";
-import { Socket, socketMessageToStatus } from "@no-witness-labs/hydra-sdk";
-import { WebSocketResponseMessageSchema, Status } from "@no-witness-labs/hydra-sdk"
+import { Socket, Head, Protocol } from "@no-witness-labs/hydra-sdk";
+import { } from "@no-witness-labs/hydra-sdk"
 import {
   FetchHttpClient,
 } from "@effect/platform";
@@ -18,19 +17,19 @@ export class HydraStateMachine extends Effect.Service<HydraStateMachine>()("Hydr
     yield* Effect.log("HydraStateMachine was created");
 
     const socketController = yield* Socket.SocketController
-
-    let status: Status = "DISCONNECTED";
+    const messageQueue = yield* socketController.messageQueue.subscribe
+    let status: Protocol.Status = "DISCONNECTED";
 
     const statusFiber = yield* Effect.fork(
       Effect.gen(function* () {
         let rawMessage: Uint8Array;
-        while ((rawMessage = yield* socketController.messageQueue.take)) {
+        while ((rawMessage = yield* messageQueue.take)) {
           const messageText: string = new TextDecoder().decode(rawMessage);
-          const maybeStatus: Option.Option<Status> =
+          const maybeStatus: Option.Option<Protocol.Status> =
               yield* Effect.option(
-                Schema.decode(Schema.parseJson(WebSocketResponseMessageSchema))(messageText),
+                Schema.decode(Schema.parseJson(Protocol.WebSocketResponseMessageSchema))(messageText),
               ).pipe(
-                Effect.map(Option.flatMap(socketMessageToStatus)),
+                Effect.map(Option.flatMap(Protocol.socketMessageToStatus)),
               )
 
 

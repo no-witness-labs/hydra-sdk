@@ -1,1 +1,1 @@
-export * as Socket from "./Socket.js";
+export * from "./Socket.js";

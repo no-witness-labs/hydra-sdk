@@ -1,5 +1,5 @@
 import { describe, it } from "@effect/vitest";
-import { RequestMessageSchema } from "@no-witness-labs/hydra-sdk";
+import { Protocol } from "@no-witness-labs/hydra-sdk";
 import { Effect, Schema } from "effect";
 
 describe("InitMessageSchema", () => {
@@ -9,7 +9,7 @@ describe("InitMessageSchema", () => {
         tag: "Init",
       };
 
-      yield* Schema.decodeUnknown(RequestMessageSchema)(input);
+      yield* Schema.decodeUnknown(Protocol.RequestMessageSchema)(input);
     }),
   );
 });
@@ -21,7 +21,7 @@ describe("AbortMessageSchema", () => {
         tag: "Abort",
       };
 
-      yield* Schema.decodeUnknown(RequestMessageSchema)(input);
+      yield* Schema.decodeUnknown(Protocol.RequestMessageSchema)(input);
     }),
   );
 });
@@ -40,7 +40,7 @@ describe("NewTxMessageSchema", () => {
         },
       };
 
-      yield* Schema.decodeUnknown(RequestMessageSchema)(input);
+      yield* Schema.decodeUnknown(Protocol.RequestMessageSchema)(input);
     }),
   );
 });
@@ -54,7 +54,7 @@ describe("RecoverMessageSchema", () => {
           "8df1616d4337ede40bbad2914f12977815234b83951bcce3bfcd735aed3f63e4",
       };
 
-      yield* Schema.decodeUnknown(RequestMessageSchema)(input);
+      yield* Schema.decodeUnknown(Protocol.RequestMessageSchema)(input);
     }),
   );
 });
@@ -73,7 +73,7 @@ describe("DecommitMessageSchema", () => {
         },
       };
 
-      yield* Schema.decodeUnknown(RequestMessageSchema)(input);
+      yield* Schema.decodeUnknown(Protocol.RequestMessageSchema)(input);
     }),
   );
 });
@@ -85,7 +85,7 @@ describe("CloseMessageSchema", () => {
         tag: "Close",
       };
 
-      yield* Schema.decodeUnknown(RequestMessageSchema)(input);
+      yield* Schema.decodeUnknown(Protocol.RequestMessageSchema)(input);
     }),
   );
 });
@@ -97,7 +97,7 @@ describe("ContestMessageSchema", () => {
         tag: "Contest",
       };
 
-      yield* Schema.decodeUnknown(RequestMessageSchema)(input);
+      yield* Schema.decodeUnknown(Protocol.RequestMessageSchema)(input);
     }),
   );
 });
@@ -109,7 +109,7 @@ describe("FanoutMessageSchema", () => {
         tag: "Fanout",
       };
 
-      yield* Schema.decodeUnknown(RequestMessageSchema)(input);
+      yield* Schema.decodeUnknown(Protocol.RequestMessageSchema)(input);
     }),
   );
 });
@@ -121,18 +121,18 @@ describe("SideLoadSnapshotMessageSchema", () => {
         tag: "SideLoadSnapshot",
       };
 
-      yield* Schema.decodeUnknown(RequestMessageSchema)(input);
+      yield* Schema.decodeUnknown(Protocol.RequestMessageSchema)(input);
     }),
   );
 });
 
-describe("RequestMessageSchema", () => {
+describe("Protocol.RequestMessageSchema", () => {
   it.effect("validates a union of different request message types", () =>
     Effect.gen(function* () {
       const initInput = {
         tag: "Init",
       };
-      yield* Schema.decodeUnknown(RequestMessageSchema)(initInput);
+      yield* Schema.decodeUnknown(Protocol.RequestMessageSchema)(initInput);
 
       const newTxInput = {
         tag: "NewTx",
@@ -144,12 +144,12 @@ describe("RequestMessageSchema", () => {
             "820082582089ff4f3ff4a6052ec9d073b3be68b5e7596bd74a04e7b74504a8302fb2278cd95840f66eb3cd160372d617411408792c0ebd9791968e9948112894e2706697a55c10296b04019ed2f146f4d81e8ab17b9d14cf99569a2f85cbfa32320127831db202",
         },
       };
-      yield* Schema.decodeUnknown(RequestMessageSchema)(newTxInput);
+      yield* Schema.decodeUnknown(Protocol.RequestMessageSchema)(newTxInput);
 
       const closeInput = {
         tag: "Close",
       };
-      yield* Schema.decodeUnknown(RequestMessageSchema)(closeInput);
+      yield* Schema.decodeUnknown(Protocol.RequestMessageSchema)(closeInput);
     }),
   );
 });

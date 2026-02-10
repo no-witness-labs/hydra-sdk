@@ -1,5 +1,5 @@
 import { Option, Schema } from "effect";
-import { WebSocketResponseMessage, GreetingsMessageSchema } from "@no-witness-labs/hydra-sdk"
+import { Protocol } from "@no-witness-labs/hydra-sdk"
 
 export type Status =
   | "DISCONNECTED"
@@ -12,9 +12,9 @@ export type Status =
   | "FINAL";
 
   export function socketMessageToStatus(
-    socketMessage: WebSocketResponseMessage,
+    socketMessage: Protocol.WebSocketResponseMessage,
   ): Option.Option<Status> {
-    if (Schema.is(GreetingsMessageSchema)(socketMessage)){
+    if (Schema.is(Protocol.GreetingsMessageSchema)(socketMessage)){
       switch (socketMessage.headStatus) {
         case "Idle":
           return Option.some("IDLE");

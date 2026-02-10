@@ -4,6 +4,7 @@ import * as Command from "@effect/cli/Command";
 import * as NodeContext from "@effect/platform-node/NodeContext";
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as Effect from "effect/Effect";
+import { Head, Protocol, Socket } from "@no-witness-labs/hydra-sdk"
 
 export const statusCommand = Command.make("status", {}).pipe(
   Command.withHandler(() => statusHead),

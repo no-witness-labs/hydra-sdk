@@ -31,7 +31,8 @@
   "dependencies": {
     "@effect/cli": "^0.73.2",
     "@effect/platform": "^0.94.4",
-    "@effect/platform-node": "^0.104.1"
+    "@effect/platform-node": "^0.104.1",
+    "@no-witness-labs/hydra-sdk": "workspace:*"
   },
   "devDependencies": {
     "@babel/cli": "^7.28.6",

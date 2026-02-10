@@ -1,39 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import {
-  CommandFailedMessageSchema,
-  CommitApprovedMessageSchema,
-  CommitFinalizedMessageSchema,
-  CommitRecordedMessageSchema,
-  CommitRecoveredMessageSchema,
-  CommittedMessageSchema,
-  DecommitApprovedMessageSchema,
-  DecommitFinalizedMessageSchema,
-  DecommitInvalidMessageSchema,
-  DecommitRequestedMessageSchema,
-  EventLogRotatedMessageSchema,
-  GreetingsMessageSchema,
-  HeadIsAbortedMessageSchema,
-  HeadIsClosedMessageSchema,
-  HeadIsContestedMessageSchema,
-  HeadIsFinalizedMessageSchema,
-  HeadIsInitializingMessageSchema,
-  HeadIsOpenMessageSchema,
-  IgnoredHeadInitializingMessageSchema,
-  InvalidInputMessageSchema,
-  NetworkClusterIDMismatchMessageSchema,
-  NetworkConnectedMessageSchema,
-  NetworkDisconnectedMessageSchema,
-  NetworkVersionMismatchMessageSchema,
-  PeerConnectedMessageSchema,
-  PeerDisconnectedMessageSchema,
-  PostTxOnChainFailedMessageSchema,
-  ReadyToFanoutMessageSchema,
-  WebSocketResponseMessageSchema,
-  SnapshotConfirmedMessageSchema,
-  SnapshotSideLoadedMessageSchema,
-  TxInvalidMessageSchema,
-  TxValidMessageSchema,
-} from "@no-witness-labs/hydra-sdk";
+import { Protocol } from "@no-witness-labs/hydra-sdk";
 import { Effect, Schema } from "effect";
 
 describe("GreetingsMessageSchema", () => {
@@ -52,10 +18,10 @@ describe("GreetingsMessageSchema", () => {
         hydraNodeVersion: "1.0.0",
       };
 
-      const decoded = yield* Schema.decodeUnknown(GreetingsMessageSchema)(
+      const decoded = yield* Schema.decodeUnknown(Protocol.GreetingsMessageSchema)(
         expected,
       );
-      const encoded = yield* Schema.encode(GreetingsMessageSchema)(decoded);
+      const encoded = yield* Schema.encode(Protocol.GreetingsMessageSchema)(decoded);
 
       expect(encoded).toEqual(expected);
     }),
@@ -70,10 +36,10 @@ describe("CommandFailedMessageSchema", () => {
         clientInput: { tag: "Init" },
       };
 
-      const decoded = yield* Schema.decodeUnknown(CommandFailedMessageSchema)(
+      const decoded = yield* Schema.decodeUnknown(Protocol.CommandFailedMessageSchema)(
         expected,
       );
-      const encoded = yield* Schema.encode(CommandFailedMessageSchema)(decoded);
+      const encoded = yield* Schema.encode(Protocol.CommandFailedMessageSchema)(decoded);
 
       expect(encoded).toEqual(expected);
     }),
@@ -103,9 +69,9 @@ describe("PostTxOnChainFailedMessageSchema", () => {
         };
 
         const decoded = yield* Schema.decodeUnknown(
-          PostTxOnChainFailedMessageSchema,
+          Protocol.PostTxOnChainFailedMessageSchema,
         )(expected);
-        const encoded = yield* Schema.encode(PostTxOnChainFailedMessageSchema)(
+        const encoded = yield* Schema.encode(Protocol.PostTxOnChainFailedMessageSchema)(
           decoded,
         );
 
@@ -124,10 +90,10 @@ describe("PeerConnectedMessageSchema", () => {
         timestamp: "2019-08-24T14:15:22.000Z",
       };
 
-      const decoded = yield* Schema.decodeUnknown(PeerConnectedMessageSchema)(
+      const decoded = yield* Schema.decodeUnknown(Protocol.PeerConnectedMessageSchema)(
         expected,
       );
-      const encoded = yield* Schema.encode(PeerConnectedMessageSchema)(decoded);
+      const encoded = yield* Schema.encode(Protocol.PeerConnectedMessageSchema)(decoded);
 
       expect(encoded).toEqual(expected);
     }),
@@ -147,9 +113,9 @@ describe("PeerDisconnectedMessageSchema", () => {
         };
 
         const decoded = yield* Schema.decodeUnknown(
-          PeerDisconnectedMessageSchema,
+          Protocol.PeerDisconnectedMessageSchema,
         )(expected);
-        const encoded = yield* Schema.encode(PeerDisconnectedMessageSchema)(
+        const encoded = yield* Schema.encode(Protocol.PeerDisconnectedMessageSchema)(
           decoded,
         );
 
@@ -170,9 +136,9 @@ describe("NetworkConnectedMessageSchema", () => {
         };
 
         const decoded = yield* Schema.decodeUnknown(
-          NetworkConnectedMessageSchema,
+          Protocol.NetworkConnectedMessageSchema,
         )(expected);
-        const encoded = yield* Schema.encode(NetworkConnectedMessageSchema)(
+        const encoded = yield* Schema.encode(Protocol.NetworkConnectedMessageSchema)(
           decoded,
         );
 
@@ -193,9 +159,9 @@ describe("NetworkDisconnectedMessageSchema", () => {
         };
 
         const decoded = yield* Schema.decodeUnknown(
-          NetworkDisconnectedMessageSchema,
+          Protocol.NetworkDisconnectedMessageSchema,
         )(expected);
-        const encoded = yield* Schema.encode(NetworkDisconnectedMessageSchema)(
+        const encoded = yield* Schema.encode(Protocol.NetworkDisconnectedMessageSchema)(
           decoded,
         );
 
@@ -218,10 +184,10 @@ describe("NetworkVersionMismatchMessageSchema", () => {
         };
 
         const decoded = yield* Schema.decodeUnknown(
-          NetworkVersionMismatchMessageSchema,
+          Protocol.NetworkVersionMismatchMessageSchema,
         )(expected);
         const encoded = yield* Schema.encode(
-          NetworkVersionMismatchMessageSchema,
+          Protocol.NetworkVersionMismatchMessageSchema,
         )(decoded);
 
         expect(encoded).toEqual(expected);
@@ -239,9 +205,9 @@ describe("NetworkVersionMismatchMessageSchema", () => {
       };
 
       const decoded = yield* Schema.decodeUnknown(
-        NetworkVersionMismatchMessageSchema,
+        Protocol.NetworkVersionMismatchMessageSchema,
       )(expected);
-      const encoded = yield* Schema.encode(NetworkVersionMismatchMessageSchema)(
+      const encoded = yield* Schema.encode(Protocol.NetworkVersionMismatchMessageSchema)(
         decoded,
       );
 
@@ -264,10 +230,10 @@ describe("NetworkClusterIDMismatchMessageSchema", () => {
         };
 
         const decoded = yield* Schema.decodeUnknown(
-          NetworkClusterIDMismatchMessageSchema,
+          Protocol.NetworkClusterIDMismatchMessageSchema,
         )(expected);
         const encoded = yield* Schema.encode(
-          NetworkClusterIDMismatchMessageSchema,
+          Protocol.NetworkClusterIDMismatchMessageSchema,
         )(decoded);
 
         expect(encoded).toEqual(expected);
@@ -293,9 +259,9 @@ describe("HeadIsInitializingMessageSchema", () => {
         };
 
         const decoded = yield* Schema.decodeUnknown(
-          HeadIsInitializingMessageSchema,
+          Protocol.HeadIsInitializingMessageSchema,
         )(expected);
-        const encoded = yield* Schema.encode(HeadIsInitializingMessageSchema)(
+        const encoded = yield* Schema.encode(Protocol.HeadIsInitializingMessageSchema)(
           decoded,
         );
 
@@ -320,10 +286,10 @@ describe("CommittedMessageSchema", () => {
         timestamp: "2019-08-24T14:15:22.000Z",
       };
 
-      const decoded = yield* Schema.decodeUnknown(CommittedMessageSchema)(
+      const decoded = yield* Schema.decodeUnknown(Protocol.CommittedMessageSchema)(
         expected,
       );
-      const encoded = yield* Schema.encode(CommittedMessageSchema)(decoded);
+      const encoded = yield* Schema.encode(Protocol.CommittedMessageSchema)(decoded);
 
       expect(encoded).toEqual(expected);
     }),
@@ -341,10 +307,10 @@ describe("HeadIsOpenMessageSchema", () => {
         timestamp: "2019-08-24T14:15:22.000Z",
       };
 
-      const decoded = yield* Schema.decodeUnknown(HeadIsOpenMessageSchema)(
+      const decoded = yield* Schema.decodeUnknown(Protocol.HeadIsOpenMessageSchema)(
         expected,
       );
-      const encoded = yield* Schema.encode(HeadIsOpenMessageSchema)(decoded);
+      const encoded = yield* Schema.encode(Protocol.HeadIsOpenMessageSchema)(decoded);
 
       expect(encoded).toEqual(expected);
     }),
@@ -364,10 +330,10 @@ describe("HeadIsClosedMessageSchema", () => {
         timestamp: "2019-08-24T14:15:22.000Z",
       };
 
-      const decoded = yield* Schema.decodeUnknown(HeadIsClosedMessageSchema)(
+      const decoded = yield* Schema.decodeUnknown(Protocol.HeadIsClosedMessageSchema)(
         expected,
       );
-      const encoded = yield* Schema.encode(HeadIsClosedMessageSchema)(decoded);
+      const encoded = yield* Schema.encode(Protocol.HeadIsClosedMessageSchema)(decoded);
 
       expect(encoded).toEqual(expected);
     }),
@@ -387,10 +353,10 @@ describe("HeadIsContestedMessageSchema", () => {
         timestamp: "2019-08-24T14:15:22.000Z",
       };
 
-      const decoded = yield* Schema.decodeUnknown(HeadIsContestedMessageSchema)(
+      const decoded = yield* Schema.decodeUnknown(Protocol.HeadIsContestedMessageSchema)(
         expected,
       );
-      const encoded = yield* Schema.encode(HeadIsContestedMessageSchema)(
+      const encoded = yield* Schema.encode(Protocol.HeadIsContestedMessageSchema)(
         decoded,
       );
 
@@ -409,10 +375,10 @@ describe("ReadyToFanoutMessageSchema", () => {
         timestamp: "2019-08-24T14:15:22.000Z",
       };
 
-      const decoded = yield* Schema.decodeUnknown(ReadyToFanoutMessageSchema)(
+      const decoded = yield* Schema.decodeUnknown(Protocol.ReadyToFanoutMessageSchema)(
         expected,
       );
-      const encoded = yield* Schema.encode(ReadyToFanoutMessageSchema)(decoded);
+      const encoded = yield* Schema.encode(Protocol.ReadyToFanoutMessageSchema)(decoded);
 
       expect(encoded).toEqual(expected);
     }),
@@ -430,10 +396,10 @@ describe("HeadIsAbortedMessageSchema", () => {
         timestamp: "2019-08-24T14:15:22.000Z",
       };
 
-      const decoded = yield* Schema.decodeUnknown(HeadIsAbortedMessageSchema)(
+      const decoded = yield* Schema.decodeUnknown(Protocol.HeadIsAbortedMessageSchema)(
         expected,
       );
-      const encoded = yield* Schema.encode(HeadIsAbortedMessageSchema)(decoded);
+      const encoded = yield* Schema.encode(Protocol.HeadIsAbortedMessageSchema)(decoded);
 
       expect(encoded).toEqual(expected);
     }),
@@ -451,10 +417,10 @@ describe("HeadIsFinalizedMessageSchema", () => {
         timestamp: "2019-08-24T14:15:22.000Z",
       };
 
-      const decoded = yield* Schema.decodeUnknown(HeadIsFinalizedMessageSchema)(
+      const decoded = yield* Schema.decodeUnknown(Protocol.HeadIsFinalizedMessageSchema)(
         expected,
       );
-      const encoded = yield* Schema.encode(HeadIsFinalizedMessageSchema)(
+      const encoded = yield* Schema.encode(Protocol.HeadIsFinalizedMessageSchema)(
         decoded,
       );
 
@@ -475,8 +441,8 @@ describe("TxValidMessageSchema", () => {
       };
 
       const decoded =
-        yield* Schema.decodeUnknown(TxValidMessageSchema)(expected);
-      const encoded = yield* Schema.encode(TxValidMessageSchema)(decoded);
+        yield* Schema.decodeUnknown(Protocol.TxValidMessageSchema)(expected);
+      const encoded = yield* Schema.encode(Protocol.TxValidMessageSchema)(decoded);
 
       expect(encoded).toEqual(expected);
     }),
@@ -502,10 +468,10 @@ describe("TxInvalidMessageSchema", () => {
         timestamp: "2019-08-24T14:15:22.000Z",
       };
 
-      const decoded = yield* Schema.decodeUnknown(TxInvalidMessageSchema)(
+      const decoded = yield* Schema.decodeUnknown(Protocol.TxInvalidMessageSchema)(
         expected,
       );
-      const encoded = yield* Schema.encode(TxInvalidMessageSchema)(decoded);
+      const encoded = yield* Schema.encode(Protocol.TxInvalidMessageSchema)(decoded);
 
       expect(encoded).toEqual(expected);
     }),
@@ -532,9 +498,9 @@ describe("SnapshotConfirmedMessageSchema", () => {
         };
 
         const decoded = yield* Schema.decodeUnknown(
-          SnapshotConfirmedMessageSchema,
+          Protocol.SnapshotConfirmedMessageSchema,
         )(expected);
-        const encoded = yield* Schema.encode(SnapshotConfirmedMessageSchema)(
+        const encoded = yield* Schema.encode(Protocol.SnapshotConfirmedMessageSchema)(
           decoded,
         );
 
@@ -552,10 +518,10 @@ describe("InvalidInputMessageSchema", () => {
         input: "invalid data",
       };
 
-      const decoded = yield* Schema.decodeUnknown(InvalidInputMessageSchema)(
+      const decoded = yield* Schema.decodeUnknown(Protocol.InvalidInputMessageSchema)(
         expected,
       );
-      const encoded = yield* Schema.encode(InvalidInputMessageSchema)(decoded);
+      const encoded = yield* Schema.encode(Protocol.InvalidInputMessageSchema)(decoded);
 
       expect(encoded).toEqual(expected);
     }),
@@ -582,10 +548,10 @@ describe("IgnoredHeadInitializingMessageSchema", () => {
         };
 
         const decoded = yield* Schema.decodeUnknown(
-          IgnoredHeadInitializingMessageSchema,
+          Protocol.IgnoredHeadInitializingMessageSchema,
         )(expected);
         const encoded = yield* Schema.encode(
-          IgnoredHeadInitializingMessageSchema,
+          Protocol.IgnoredHeadInitializingMessageSchema,
         )(decoded);
 
         expect(encoded).toEqual(expected);
@@ -616,10 +582,10 @@ describe("DecommitInvalidMessageSchema", () => {
         timestamp: "2019-08-24T14:15:22.000Z",
       };
 
-      const decoded = yield* Schema.decodeUnknown(DecommitInvalidMessageSchema)(
+      const decoded = yield* Schema.decodeUnknown(Protocol.DecommitInvalidMessageSchema)(
         expected,
       );
-      const encoded = yield* Schema.encode(DecommitInvalidMessageSchema)(
+      const encoded = yield* Schema.encode(Protocol.DecommitInvalidMessageSchema)(
         decoded,
       );
 
@@ -648,10 +614,10 @@ describe("DecommitInvalidMessageSchema", () => {
         timestamp: "2019-08-24T14:15:22.000Z",
       };
 
-      const decoded = yield* Schema.decodeUnknown(DecommitInvalidMessageSchema)(
+      const decoded = yield* Schema.decodeUnknown(Protocol.DecommitInvalidMessageSchema)(
         expected,
       );
-      const encoded = yield* Schema.encode(DecommitInvalidMessageSchema)(
+      const encoded = yield* Schema.encode(Protocol.DecommitInvalidMessageSchema)(
         decoded,
       );
 
@@ -682,9 +648,9 @@ describe("DecommitRequestedMessageSchema", () => {
         };
 
         const decoded = yield* Schema.decodeUnknown(
-          DecommitRequestedMessageSchema,
+          Protocol.DecommitRequestedMessageSchema,
         )(expected);
-        const encoded = yield* Schema.encode(DecommitRequestedMessageSchema)(
+        const encoded = yield* Schema.encode(Protocol.DecommitRequestedMessageSchema)(
           decoded,
         );
 
@@ -710,9 +676,9 @@ describe("DecommitApprovedMessageSchema", () => {
         };
 
         const decoded = yield* Schema.decodeUnknown(
-          DecommitApprovedMessageSchema,
+          Protocol.DecommitApprovedMessageSchema,
         )(expected);
-        const encoded = yield* Schema.encode(DecommitApprovedMessageSchema)(
+        const encoded = yield* Schema.encode(Protocol.DecommitApprovedMessageSchema)(
           decoded,
         );
 
@@ -736,9 +702,9 @@ describe("DecommitFinalizedMessageSchema", () => {
         };
 
         const decoded = yield* Schema.decodeUnknown(
-          DecommitFinalizedMessageSchema,
+          Protocol.DecommitFinalizedMessageSchema,
         )(expected);
-        const encoded = yield* Schema.encode(DecommitFinalizedMessageSchema)(
+        const encoded = yield* Schema.encode(Protocol.DecommitFinalizedMessageSchema)(
           decoded,
         );
 
@@ -761,10 +727,10 @@ describe("CommitRecordedMessageSchema", () => {
         timestamp: "2019-08-24T14:15:22.000Z",
       };
 
-      const decoded = yield* Schema.decodeUnknown(CommitRecordedMessageSchema)(
+      const decoded = yield* Schema.decodeUnknown(Protocol.CommitRecordedMessageSchema)(
         expected,
       );
-      const encoded = yield* Schema.encode(CommitRecordedMessageSchema)(
+      const encoded = yield* Schema.encode(Protocol.CommitRecordedMessageSchema)(
         decoded,
       );
 
@@ -785,10 +751,10 @@ describe("CommitApprovedMessageSchema", () => {
         timestamp: "2019-08-24T14:15:22.000Z",
       };
 
-      const decoded = yield* Schema.decodeUnknown(CommitApprovedMessageSchema)(
+      const decoded = yield* Schema.decodeUnknown(Protocol.CommitApprovedMessageSchema)(
         expected,
       );
-      const encoded = yield* Schema.encode(CommitApprovedMessageSchema)(
+      const encoded = yield* Schema.encode(Protocol.CommitApprovedMessageSchema)(
         decoded,
       );
 
@@ -809,10 +775,10 @@ describe("CommitFinalizedMessageSchema", () => {
         timestamp: "2019-08-24T14:15:22.000Z",
       };
 
-      const decoded = yield* Schema.decodeUnknown(CommitFinalizedMessageSchema)(
+      const decoded = yield* Schema.decodeUnknown(Protocol.CommitFinalizedMessageSchema)(
         expected,
       );
-      const encoded = yield* Schema.encode(CommitFinalizedMessageSchema)(
+      const encoded = yield* Schema.encode(Protocol.CommitFinalizedMessageSchema)(
         decoded,
       );
 
@@ -835,10 +801,10 @@ describe("CommitRecoveredMessageSchema", () => {
         timestamp: "2019-08-24T14:15:22.000Z",
       };
 
-      const decoded = yield* Schema.decodeUnknown(CommitRecoveredMessageSchema)(
+      const decoded = yield* Schema.decodeUnknown(Protocol.CommitRecoveredMessageSchema)(
         expected,
       );
-      const encoded = yield* Schema.encode(CommitRecoveredMessageSchema)(
+      const encoded = yield* Schema.encode(Protocol.CommitRecoveredMessageSchema)(
         decoded,
       );
 
@@ -861,9 +827,9 @@ describe("SnapshotSideLoadedMessageSchema", () => {
         };
 
         const decoded = yield* Schema.decodeUnknown(
-          SnapshotSideLoadedMessageSchema,
+          Protocol.SnapshotSideLoadedMessageSchema,
         )(expected);
-        const encoded = yield* Schema.encode(SnapshotSideLoadedMessageSchema)(
+        const encoded = yield* Schema.encode(Protocol.SnapshotSideLoadedMessageSchema)(
           decoded,
         );
 
@@ -881,10 +847,10 @@ describe("EventLogRotatedMessageSchema", () => {
         timestamp: "2019-08-24T14:15:22.000Z",
       };
 
-      const decoded = yield* Schema.decodeUnknown(EventLogRotatedMessageSchema)(
+      const decoded = yield* Schema.decodeUnknown(Protocol.EventLogRotatedMessageSchema)(
         expected,
       );
-      const encoded = yield* Schema.encode(EventLogRotatedMessageSchema)(
+      const encoded = yield* Schema.encode(Protocol.EventLogRotatedMessageSchema)(
         decoded,
       );
 
@@ -910,9 +876,9 @@ describe("WebSocketResponseMessageSchema", () => {
       };
 
       const greetingsDecoded = yield* Schema.decodeUnknown(
-        WebSocketResponseMessageSchema,
+        Protocol.WebSocketResponseMessageSchema,
       )(greetingsExpected);
-      const greetingsEncoded = yield* Schema.encode(WebSocketResponseMessageSchema)(
+      const greetingsEncoded = yield* Schema.encode(Protocol.WebSocketResponseMessageSchema)(
         greetingsDecoded,
       );
       expect(greetingsEncoded).toEqual(greetingsExpected);
@@ -926,9 +892,9 @@ describe("WebSocketResponseMessageSchema", () => {
       };
 
       const txValidDecoded = yield* Schema.decodeUnknown(
-        WebSocketResponseMessageSchema,
+        Protocol.WebSocketResponseMessageSchema,
       )(txValidExpected);
-      const txValidEncoded = yield* Schema.encode(WebSocketResponseMessageSchema)(
+      const txValidEncoded = yield* Schema.encode(Protocol.WebSocketResponseMessageSchema)(
         txValidDecoded,
       );
       expect(txValidEncoded).toEqual(txValidExpected);
