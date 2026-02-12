@@ -18,7 +18,9 @@ export const statusHead = Effect.gen(function* () {
   yield* Effect.logInfo(`The status is: [${hydraStateMachine.getStatus()}]`);
 });
 
-export const statusHeadForever = statusHead.pipe(Effect.repeat(Schedule.linear("1 second")));
+export const statusHeadForever = statusHead.pipe(
+  Effect.repeat(Schedule.linear("1 second")),
+);
 
 const command = Command.make("hydra-manager");
 
@@ -41,4 +43,4 @@ runCommands(process.argv).pipe(
 );
 
 // Export and reimport since the lsp doesn't like to import @no-witness-labs/hydra-sdk-cli in tests
-export { Head, Protocol, Socket }
+export { Head, Protocol, Socket };

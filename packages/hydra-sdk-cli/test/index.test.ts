@@ -35,7 +35,9 @@ describe("core", () => {
         yield* statusHead;
       }).pipe(
         Effect.provide(Head.HydraStateMachine.DefaultWithoutDependencies),
-        Effect.provide(Socket.SocketController.DefaultWithoutDependencies({ url })),
+        Effect.provide(
+          Socket.SocketController.DefaultWithoutDependencies({ url }),
+        ),
         Effect.provide(MockWebSocketLayer),
         Effect.provide(Logger.pretty),
       ),
