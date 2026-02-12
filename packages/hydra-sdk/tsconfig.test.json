@@ -5,10 +5,10 @@
     "tsBuildInfoFile": ".tsbuildinfo/test.tsbuildinfo",
     "outDir": ".tsbuildinfo/test",
     "types": ["node", "vitest/globals"],
-    "rootDir": "test",
     "noEmit": true,
     "paths": {
-      "@no-witness-labs/hydra-sdk": ["./src/index.ts"]
+      "@no-witness-labs/hydra-sdk": ["./src/index.ts"],
+      "@no-witness-labs/hydra-sdk/*": ["./src/*"]
     }
   },
   "references": [{ "path": "tsconfig.src.json" }]

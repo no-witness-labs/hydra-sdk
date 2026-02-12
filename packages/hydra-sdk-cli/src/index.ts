@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 
+import type { CliApp } from "@effect/cli/CliApp";
 import * as Command from "@effect/cli/Command";
+import type { ValidationError } from "@effect/cli/ValidationError";
 import * as NodeContext from "@effect/platform-node/NodeContext";
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
-import * as Effect from "effect/Effect";
 import { Head } from "@no-witness-labs/hydra-sdk";
-import { ValidationError } from "@effect/cli/ValidationError";
-import { CliApp } from "@effect/cli/CliApp";
 import { Schedule } from "effect";
+import * as Effect from "effect/Effect";
 
 export const statusCommand = Command.make("status", {}).pipe(
   Command.withHandler(() => statusHeadForever),
@@ -23,7 +23,7 @@ export const statusHeadForever = statusHead.pipe(Effect.repeat(Schedule.linear("
 const command = Command.make("hydra-manager");
 
 export const runCommands: (
-  args: readonly string[],
+  args: ReadonlyArray<string>,
 ) => Effect.Effect<
   void,
   ValidationError,

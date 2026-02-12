@@ -1,5 +1,5 @@
+import { Protocol,Socket } from "@no-witness-labs/hydra-sdk";
 import { Effect, Option, Schema } from "effect";
-import { Socket, Protocol } from "@no-witness-labs/hydra-sdk";
 
 const url = "ws://localhost:4001";
 

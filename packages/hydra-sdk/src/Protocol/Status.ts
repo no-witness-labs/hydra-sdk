@@ -1,5 +1,5 @@
-import { Option, Schema } from "effect";
 import { Protocol } from "@no-witness-labs/hydra-sdk";
+import { Option, Schema } from "effect";
 
 export type Status =
   | "DISCONNECTED"
