@@ -58,6 +58,8 @@ describe("Socket", () => {
     Effect.gen(function* () {
       const server = yield* makeServer;
       const socketController = yield* Socket.SocketController;
+      const messageQueue = yield* socketController.messageQueue.subscribe;
+
       // Check that server is connected
       yield* Effect.promise(() => server.connected);
 
@@ -67,7 +69,7 @@ describe("Socket", () => {
       // No need to encode since `server` does it by default:
       server.send(message);
 
-      const receivedRawMessage = yield* socketController.messageQueue.take;
+      const receivedRawMessage = yield* messageQueue.take;
       const receivedMessage = new TextDecoder().decode(receivedRawMessage);
       yield* Effect.logInfo(`Client received message: ${receivedMessage}`);
 

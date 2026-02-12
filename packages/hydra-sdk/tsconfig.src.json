@@ -5,6 +5,10 @@
     "tsBuildInfoFile": ".tsbuildinfo/src.tsbuildinfo",
     "outDir": ".tsbuildinfo/src",
     "types": ["node"],
-    "rootDir": "src"
+    "rootDir": "src",
+    "paths": {
+      "@no-witness-labs/hydra-sdk": ["./src/index.ts"],
+      "@no-witness-labs/hydra-sdk/*": ["./src/*"]
+    }
   }
 }

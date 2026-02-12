@@ -19,6 +19,7 @@
   ],
   "scripts": {
     "build": "tsc -b tsconfig.build.json && babel dist --plugins annotate-pure-calls --out-dir dist --source-maps",
+    "start": "pnpm build && node dist/index.js",
     "dev": "tsc -b tsconfig.build.json --watch",
     "type-check": "tsc --noEmit",
     "lint": "eslint src test",
@@ -31,11 +32,13 @@
   "dependencies": {
     "@effect/cli": "^0.73.2",
     "@effect/platform": "^0.94.4",
-    "@effect/platform-node": "^0.104.1"
+    "@effect/platform-node": "^0.104.1",
+    "@no-witness-labs/hydra-sdk": "workspace:*"
   },
   "devDependencies": {
     "@babel/cli": "^7.28.6",
     "@types/node": "^25.2.2",
-    "babel-plugin-annotate-pure-calls": "^0.5.0"
+    "babel-plugin-annotate-pure-calls": "^0.5.0",
+    "vitest-websocket-mock": "^0.5.0"
   }
 }

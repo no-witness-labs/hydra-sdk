@@ -1,6 +1,6 @@
 import { Socket } from "@effect/platform";
 import { WebSocketConstructor } from "@effect/platform/Socket";
-import { Effect, Layer, Queue, Schedule } from "effect";
+import { Effect, Layer, PubSub, Schedule } from "effect";
 import type { RuntimeFiber } from "effect/Fiber";
 import { WebSocket } from "ws";
 
@@ -45,7 +45,7 @@ type SocketConfig = {
  * const program = Effect.gen(function* () {
  *   const socket = yield* SocketController;
  *   yield* socket.sendMessage("Hello, Hydra!");
- *   const message = yield* Queue.take(socket.messageQueue);
+ *   const message = yield* PubSub.take(socket.messageQueue);
  *   // Process message...
  * });
  *
@@ -66,8 +66,8 @@ export class SocketController extends Effect.Service<SocketController>()(
         yield* Effect.log(`SocketController was created at: ${url}`);
 
         const socket: Socket.Socket = yield* Socket.makeWebSocket(url);
-        const messageQueue: Queue.Queue<Uint8Array> =
-          yield* Queue.unbounded<Uint8Array>();
+        const messageQueue: PubSub.PubSub<Uint8Array> =
+          yield* PubSub.unbounded<Uint8Array>();
 
         const retryPolicy = Schedule.intersect(
           Schedule.exponential("100 millis"),
@@ -77,10 +77,13 @@ export class SocketController extends Effect.Service<SocketController>()(
         const socketConnection = socket
           .run(
             (data) => {
-              return Queue.offer(messageQueue, data);
+              return PubSub.publish(messageQueue, data);
             },
             {
-              onOpen: Effect.logInfo("Socket connected successfully"),
+              onOpen: Effect.gen(function* () {
+                yield* Effect.logInfo("Socket connected successfully");
+                yield* Effect.sleep("50 millis"); // Small delay to ensure handler is ready
+              }),
             },
           )
           .pipe(
@@ -125,8 +128,8 @@ export class SocketController extends Effect.Service<SocketController>()(
 
         return {
           /**
-           * Queue containing incoming WebSocket messages.
-           * Messages are enqueued as they arrive and can be consumed using Queue operations.
+           * PubSub containing incoming WebSocket messages.
+           * Messages are published as they arrive and can be consumed using PubSub operations.
            *
            * @since 0.2.0
            */

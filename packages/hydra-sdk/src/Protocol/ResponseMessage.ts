@@ -13,7 +13,7 @@ import * as Common from "./CommonMessage.js";
  * @category schemas
  */
 export const GreetingsMessageSchema = Schema.Struct({
-  tag: Schema.Literal("Greetings"),
+  tag: Schema.optional(Schema.Literal("Greetings")),
   me: Schema.Struct({
     vkey: Schema.String,
   }),
@@ -25,9 +25,9 @@ export const GreetingsMessageSchema = Schema.Struct({
     "FanoutPossible",
     "Final",
   ),
-  hydraHeadId: Schema.String,
-  snapshotUtxo: Schema.String, // TODO: make a better match
-  timestamp: Schema.DateTimeUtc,
+  hydraHeadId: Schema.optional(Schema.String),
+  snapshotUtxo: Schema.optional(Schema.String), // TODO: make a better match
+  timestamp: Schema.optional(Schema.String),
   hydraNodeVersion: Schema.String,
 });
 export type GreetingsMessage = typeof GreetingsMessageSchema.Type;
@@ -586,7 +586,7 @@ export type EventLogRotatedMessage = typeof EventLogRotatedMessageSchema.Type;
  * @since 0.1.0
  * @category schemas
  */
-export const RootResponseMessageSchema = Schema.Union(
+export const WebSocketResponseMessageSchema = Schema.Union(
   GreetingsMessageSchema,
   CommandFailedMessageSchema,
   PostTxOnChainFailedMessageSchema,
@@ -620,7 +620,8 @@ export const RootResponseMessageSchema = Schema.Union(
   SnapshotSideLoadedMessageSchema,
   EventLogRotatedMessageSchema,
 );
-export type RootResponseMessage = typeof RootResponseMessageSchema.Type;
+export type WebSocketResponseMessage =
+  typeof WebSocketResponseMessageSchema.Type;
 
 // =============================================================================
 // HTTP API Response Schemas
