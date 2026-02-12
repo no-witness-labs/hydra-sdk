@@ -5,7 +5,7 @@ import * as Command from "@effect/cli/Command";
 import type { ValidationError } from "@effect/cli/ValidationError";
 import * as NodeContext from "@effect/platform-node/NodeContext";
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
-import { Head } from "@no-witness-labs/hydra-sdk";
+import { Head, Protocol, Socket } from "@no-witness-labs/hydra-sdk";
 import { Schedule } from "effect";
 import * as Effect from "effect/Effect";
 
@@ -39,3 +39,6 @@ runCommands(process.argv).pipe(
   Effect.scoped,
   NodeRuntime.runMain(),
 );
+
+// Export and reimport since the lsp doesn't like to import @no-witness-labs/hydra-sdk-cli in tests
+export { Head, Protocol, Socket }
