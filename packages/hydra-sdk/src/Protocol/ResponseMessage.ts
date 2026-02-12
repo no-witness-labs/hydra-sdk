@@ -1,4 +1,4 @@
-import { Option, Schema } from "effect";
+import { Schema } from "effect";
 
 import * as Common from "./CommonMessage.js";
 

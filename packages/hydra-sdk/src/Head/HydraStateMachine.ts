@@ -1,5 +1,5 @@
-import { Effect, pipe, Option, Schema } from "effect";
-import { Socket, Head, Protocol } from "@no-witness-labs/hydra-sdk";
+import { Effect, Option, Schema } from "effect";
+import { Socket, Protocol } from "@no-witness-labs/hydra-sdk";
 
 const url = "ws://localhost:4001";
 
@@ -18,13 +18,6 @@ export class HydraStateMachine extends Effect.Service<HydraStateMachine>()(
           let rawMessage: Uint8Array;
           while ((rawMessage = yield* messageQueue.take)) {
             const messageText: string = new TextDecoder().decode(rawMessage);
-            yield* Effect.logInfo(`DEBUG: caught messageText: ${messageText}`);
-            const mbDebugStatus = Effect.option(
-              Schema.decode(
-                Schema.parseJson(Protocol.WebSocketResponseMessageSchema),
-              )(messageText),
-            );
-            // yield* Effect.logInfo(`DEBUG: mbDebugStatus: ${JSON.stringify(mbDebugStatus)}`)
 
             const maybeStatus: Option.Option<Protocol.Status> =
               yield* Effect.option(
@@ -34,10 +27,6 @@ export class HydraStateMachine extends Effect.Service<HydraStateMachine>()(
               ).pipe(
                 Effect.map(Option.flatMap(Protocol.socketMessageToStatus)),
               );
-
-            yield* Effect.logInfo(
-              `DEBUG: maybeStatus: ${JSON.stringify(maybeStatus)}`,
-            );
 
             if (Option.isSome(maybeStatus)) {
               const newStatus = yield* maybeStatus;
