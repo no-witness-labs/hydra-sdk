@@ -1,7 +1,5 @@
 import { Effect, pipe, Option, Schema } from "effect";
 import { Socket, Head, Protocol } from "@no-witness-labs/hydra-sdk";
-import {} from "@no-witness-labs/hydra-sdk";
-import { FetchHttpClient } from "@effect/platform";
 
 const url = "ws://localhost:4001";
 
@@ -24,7 +22,7 @@ export class HydraStateMachine extends Effect.Service<HydraStateMachine>()(
             const mbDebugStatus = Effect.option(Schema.decode(
                   Schema.parseJson(Protocol.WebSocketResponseMessageSchema),
                 )(messageText))
-            yield* Effect.logInfo(`DEBUG: mbDebugStatus: ${JSON.stringify(mbDebugStatus)}`)
+            // yield* Effect.logInfo(`DEBUG: mbDebugStatus: ${JSON.stringify(mbDebugStatus)}`)
 
             const maybeStatus: Option.Option<Protocol.Status> =
               yield* Effect.option(
@@ -39,11 +37,11 @@ export class HydraStateMachine extends Effect.Service<HydraStateMachine>()(
 
 
             if (Option.isSome(maybeStatus)) {
-              const statusRaw = yield* maybeStatus;
+              const newStatus = yield* maybeStatus;
               yield* Effect.log(
-                `Valid status received [${statusRaw}] from message: ${messageText}`,
+                `Valid status received [${newStatus}] from message: ${messageText}`,
               );
-              status = statusRaw;
+              status = newStatus;
             }
           }
         }),
@@ -57,7 +55,6 @@ export class HydraStateMachine extends Effect.Service<HydraStateMachine>()(
 
     dependencies: [
       Socket.SocketController.Default({ url }),
-      FetchHttpClient.layer,
     ],
   },
 ) {}
