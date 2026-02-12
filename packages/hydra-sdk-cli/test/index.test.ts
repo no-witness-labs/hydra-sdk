@@ -29,6 +29,9 @@ describe("core", () => {
   describe("statusHead", () => {
     it.scoped("does not throw errors", () =>
       Effect.gen(function* () {
+        const server = yield* makeServer;
+        yield* Effect.promise(() => server.connected);
+
         yield* statusHead;
       }).pipe(
         Effect.provide(Head.HydraStateMachine.DefaultWithoutDependencies),

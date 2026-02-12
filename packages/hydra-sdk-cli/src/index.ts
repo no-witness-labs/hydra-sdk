@@ -7,16 +7,18 @@ import * as Effect from "effect/Effect";
 import { Head } from "@no-witness-labs/hydra-sdk";
 import { ValidationError } from "@effect/cli/ValidationError";
 import { CliApp } from "@effect/cli/CliApp";
+import { Schedule } from "effect";
 
 export const statusCommand = Command.make("status", {}).pipe(
-  Command.withHandler(() => statusHead),
+  Command.withHandler(() => statusHeadForever),
 );
 
 export const statusHead = Effect.gen(function* () {
   const hydraStateMachine = yield* Head.HydraStateMachine;
   yield* Effect.logInfo(`The status is: [${hydraStateMachine.getStatus()}]`);
-  yield* Effect.sleep("2 second");
-}).pipe(Effect.forever);
+});
+
+export const statusHeadForever = statusHead.pipe(Effect.repeat(Schedule.linear("1 second")));
 
 const command = Command.make("hydra-manager");
 
