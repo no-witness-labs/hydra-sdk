@@ -7,6 +7,31 @@ import { WS } from "vitest-websocket-mock";
 
 const url = `ws://localhost:1234`;
 
+const greetingsMessage = {
+  tag: "Greetings",
+  me: {
+    vkey: "d0b8f28427aa7b640c636075905cbd6574a431aeaca5b3dbafd47cfe66c35043",
+  },
+  headStatus: "Idle",
+  hydraHeadId: "820082582089ff4f3ff4a6052ec9d073",
+  snapshotUtxo:
+    '{\n    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {\n        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",\n        "value": {\n            "lovelace": 7620669\n        }\n    }\n}\n',
+  timestamp: "2019-08-24T14:15:22.000Z",
+  hydraNodeVersion: "1.0.0",
+};
+
+const headIsInitializingMessage = {
+  tag: "HeadIsInitializing",
+  headId: "820082582089ff4f3ff4a6052ec9d073",
+  parties: [
+    {
+      vkey: "d0b8f28427aa7b640c636075905cbd6574a431aeaca5b3dbafd47cfe66c35043",
+    },
+  ],
+  seq: 1,
+  timestamp: "2019-08-24T14:15:22.000Z",
+};
+
 const makeServer: Effect.Effect<WS, never, Scope> = Effect.acquireRelease(
   Effect.sync(() => new WS(url)), // acquire
   // release
@@ -51,13 +76,7 @@ describe("Head.HydraStateMachine", () => {
 
       const stateMachine = yield* Head.HydraStateMachine;
 
-      const statusMessage = JSON.stringify({
-        me: {
-          vkey: "41c3b71ac178ba33e59506a792679d5cdd6efe9a1f474a53f13f7dde16b35eb6",
-        },
-        headStatus: "Idle",
-        hydraNodeVersion: "1.0.0",
-      });
+      const statusMessage = JSON.stringify(greetingsMessage);
 
       yield* Effect.logInfo(`Server sending status message: ${statusMessage}`);
       server.send(statusMessage);
@@ -121,13 +140,7 @@ describe("Head.HydraStateMachine", () => {
       const stateMachine = yield* Head.HydraStateMachine;
 
       // Send first status message
-      const message1 = JSON.stringify({
-        me: {
-          vkey: "41c3b71ac178ba33e59506a792679d5cdd6efe9a1f474a53f13f7dde16b35eb6",
-        },
-        headStatus: "Idle",
-        hydraNodeVersion: "1.0.0",
-      });
+      const message1 = JSON.stringify(greetingsMessage);
       server.send(message1);
 
       // Await for the eventual change of the status (sleep is not reliable)
@@ -142,17 +155,7 @@ describe("Head.HydraStateMachine", () => {
       yield* Effect.logInfo(`Status after first message: ${status1}`);
 
       // Send second status message
-      const message2 = JSON.stringify({
-        tag: "HeadIsInitializing",
-        headId: "820082582089ff4f3ff4a6052ec9d073",
-        parties: [
-          {
-            vkey: "d0b8f28427aa7b640c636075905cbd6574a431aeaca5b3dbafd47cfe66c35043",
-          },
-        ],
-        seq: 1,
-        timestamp: "2019-08-24T14:15:22.000Z",
-      });
+      const message2 = JSON.stringify(headIsInitializingMessage);
       server.send(message2);
 
       yield* Effect.yieldNow();
@@ -190,7 +193,7 @@ describe("Head.HydraStateMachine", () => {
       expect(fiberStatus).toBeNull(); // Fiber is still running (not completed)
 
       // Send multiple messages and verify they're all processed
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 10; i++) {
         const message = JSON.stringify({
           me: {
             vkey: "41c3b71ac178ba33e59506a792679d5cdd6efe9a1f474a53f13f7dde16b35eb6",
