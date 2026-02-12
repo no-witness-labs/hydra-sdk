@@ -3,25 +3,27 @@ import { Protocol } from "@no-witness-labs/hydra-sdk";
 import { Effect, Schema } from "effect";
 
 describe("GreetingsMessageSchema", () => {
-  it.effect("encodes reduced GreetingsMessageSchema to correct JSON object", () =>
-    Effect.gen(function* () {
-      const expected = {
-        me: {
-          vkey: "41c3b71ac178ba33e59506a792679d5cdd6efe9a1f474a53f13f7dde16b35eb6",
-        },
-        headStatus: "Idle",
-        hydraNodeVersion: "1.0.0",
-      };
+  it.effect(
+    "encodes reduced GreetingsMessageSchema to correct JSON object",
+    () =>
+      Effect.gen(function* () {
+        const expected = {
+          me: {
+            vkey: "41c3b71ac178ba33e59506a792679d5cdd6efe9a1f474a53f13f7dde16b35eb6",
+          },
+          headStatus: "Idle",
+          hydraNodeVersion: "1.0.0",
+        };
 
-      const decoded = yield* Schema.decodeUnknown(
-        Protocol.GreetingsMessageSchema,
-      )(expected);
-      const encoded = yield* Schema.encode(Protocol.GreetingsMessageSchema)(
-        decoded,
-      );
+        const decoded = yield* Schema.decodeUnknown(
+          Protocol.GreetingsMessageSchema,
+        )(expected);
+        const encoded = yield* Schema.encode(Protocol.GreetingsMessageSchema)(
+          decoded,
+        );
 
-      expect(encoded).toEqual(expected);
-    }),
+        expect(encoded).toEqual(expected);
+      }),
   );
   it.effect("encodes GreetingsMessageSchema to correct JSON object", () =>
     Effect.gen(function* () {

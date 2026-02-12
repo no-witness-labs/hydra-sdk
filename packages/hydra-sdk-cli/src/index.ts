@@ -15,7 +15,7 @@ export const statusCommand = Command.make("status", {}).pipe(
 export const statusHead = Effect.gen(function* () {
   const hydraStateMachine = yield* Head.HydraStateMachine;
   yield* Effect.logInfo(`The status is: [${hydraStateMachine.getStatus()}]`);
-  yield* Effect.sleep("2 second")
+  yield* Effect.sleep("2 second");
 }).pipe(Effect.forever);
 
 const command = Command.make("hydra-manager");

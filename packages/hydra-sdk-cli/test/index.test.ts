@@ -25,21 +25,18 @@ const MockWebSocketLayer = Layer.succeed(
   },
 );
 
-
-
 describe("core", () => {
   describe("statusHead", () => {
     it.effect("does not throw errors", () =>
       Effect.gen(function* () {
         // yield* statusHead;
-        yield* Effect.logInfo("TOD: FIX ME!")
-
+        yield* Effect.logInfo("TOD: FIX ME!");
       }).pipe(
         // Effect.provide(Head.HydraStateMachine.DefaultWithoutDependencies),
         // Effect.provide(Socket.SocketController.DefaultWithoutDependencies({ url })),
         Effect.provide(MockWebSocketLayer),
         Effect.provide(Logger.pretty),
-      )
+      ),
     );
   });
 });

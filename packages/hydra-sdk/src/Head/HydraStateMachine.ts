@@ -18,10 +18,12 @@ export class HydraStateMachine extends Effect.Service<HydraStateMachine>()(
           let rawMessage: Uint8Array;
           while ((rawMessage = yield* messageQueue.take)) {
             const messageText: string = new TextDecoder().decode(rawMessage);
-            yield* Effect.logInfo(`DEBUG: caught messageText: ${messageText}`)
-            const mbDebugStatus = Effect.option(Schema.decode(
-                  Schema.parseJson(Protocol.WebSocketResponseMessageSchema),
-                )(messageText))
+            yield* Effect.logInfo(`DEBUG: caught messageText: ${messageText}`);
+            const mbDebugStatus = Effect.option(
+              Schema.decode(
+                Schema.parseJson(Protocol.WebSocketResponseMessageSchema),
+              )(messageText),
+            );
             // yield* Effect.logInfo(`DEBUG: mbDebugStatus: ${JSON.stringify(mbDebugStatus)}`)
 
             const maybeStatus: Option.Option<Protocol.Status> =
@@ -33,8 +35,9 @@ export class HydraStateMachine extends Effect.Service<HydraStateMachine>()(
                 Effect.map(Option.flatMap(Protocol.socketMessageToStatus)),
               );
 
-            yield* Effect.logInfo(`DEBUG: maybeStatus: ${JSON.stringify(maybeStatus)}`)
-
+            yield* Effect.logInfo(
+              `DEBUG: maybeStatus: ${JSON.stringify(maybeStatus)}`,
+            );
 
             if (Option.isSome(maybeStatus)) {
               const newStatus = yield* maybeStatus;
@@ -53,8 +56,6 @@ export class HydraStateMachine extends Effect.Service<HydraStateMachine>()(
       };
     }),
 
-    dependencies: [
-      Socket.SocketController.Default({ url }),
-    ],
+    dependencies: [Socket.SocketController.Default({ url })],
   },
 ) {}
