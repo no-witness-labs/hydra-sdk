@@ -28,6 +28,7 @@ export default [
       "**/temp",
       "**/.next",
       "**/.source",
+      "**/packages/hydra-sdk/src/index.ts",
       "**/out",
     ],
   },
