@@ -4,7 +4,7 @@ import * as Command from "@effect/cli/Command";
 import * as NodeContext from "@effect/platform-node/NodeContext";
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as Effect from "effect/Effect";
-import { Head, Protocol, Socket } from "@no-witness-labs/hydra-sdk";
+import { Head } from "@no-witness-labs/hydra-sdk";
 import { ValidationError } from "@effect/cli/ValidationError";
 import { CliApp } from "@effect/cli/CliApp";
 

@@ -1,7 +1,7 @@
 import { statusHead } from "@no-witness-labs/hydra-sdk-cli";
 import { WebSocketConstructor } from "@effect/platform/Socket";
 import { describe, it, expect } from "@effect/vitest";
-// import { Socket, Protocol, Head } from "@no-witness-labs/hydra-sdk";
+import { Socket, Protocol, Head } from "@no-witness-labs/hydra-sdk";
 import { Effect, Layer, Logger } from "effect";
 import type { Scope } from "effect/Scope";
 import { WS } from "vitest-websocket-mock";
@@ -27,13 +27,12 @@ const MockWebSocketLayer = Layer.succeed(
 
 describe("core", () => {
   describe("statusHead", () => {
-    it.effect("does not throw errors", () =>
+    it.scoped("does not throw errors", () =>
       Effect.gen(function* () {
-        // yield* statusHead;
-        yield* Effect.logInfo("TOD: FIX ME!");
+        yield* statusHead;
       }).pipe(
-        // Effect.provide(Head.HydraStateMachine.DefaultWithoutDependencies),
-        // Effect.provide(Socket.SocketController.DefaultWithoutDependencies({ url })),
+        Effect.provide(Head.HydraStateMachine.DefaultWithoutDependencies),
+        Effect.provide(Socket.SocketController.DefaultWithoutDependencies({ url })),
         Effect.provide(MockWebSocketLayer),
         Effect.provide(Logger.pretty),
       ),
