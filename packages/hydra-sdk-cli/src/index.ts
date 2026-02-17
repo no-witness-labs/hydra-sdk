@@ -10,16 +10,10 @@ import { Schedule } from "effect";
 import * as Effect from "effect/Effect";
 
 export const statusCommand = Command.make("status", {}).pipe(
-  Command.withHandler(() => statusHeadForever),
-);
-
-export const statusHead = Effect.gen(function* () {
-  const hydraStateMachine = yield* Head.HydraStateMachine;
-  yield* Effect.logInfo(`The status is: [${hydraStateMachine.getStatus()}]`);
-});
-
-export const statusHeadForever = statusHead.pipe(
-  Effect.repeat(Schedule.linear("1 second")),
+  Command.withHandler(() => Effect.gen(function* () {
+    const HydraHeadController = yield* Head.HydraHeadController
+    yield* HydraHeadController.logStatusHeadForewer
+  })),
 );
 
 const command = Command.make("hydra-manager");
@@ -29,13 +23,14 @@ export const runCommands: (
 ) => Effect.Effect<
   void,
   ValidationError,
-  CliApp.Environment | Head.HydraStateMachine
+  CliApp.Environment | Head.HydraStateMachine | Head.HydraHeadController
 > = Command.run(command.pipe(Command.withSubcommands([statusCommand])), {
   name: "Hydra Manager",
   version: "0.1.0",
 });
 
 runCommands(process.argv).pipe(
+  Effect.provide(Head.HydraHeadController.Default),
   Effect.provide(Head.HydraStateMachine.Default),
   Effect.provide(NodeContext.layer),
   Effect.scoped,

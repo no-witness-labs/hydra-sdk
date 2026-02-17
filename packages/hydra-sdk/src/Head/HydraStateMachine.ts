@@ -1,7 +1,21 @@
 import { Protocol, Socket } from "@no-witness-labs/hydra-sdk";
-import { Effect, Option, Schema } from "effect";
+import { Duration, Effect, Option, Schedule, Schema } from "effect";
 
 const url = "ws://localhost:4001";
+
+/**
+ * Error thrown when awaiting a status times out.
+ *
+ * @since 0.3.0
+ * @category errors
+ */
+export class StatusTimeoutError {
+  readonly _tag = "StatusTimeoutError";
+  constructor(
+    readonly expectedStatus: Protocol.Status,
+    readonly currentStatus: Protocol.Status,
+  ) {}
+}
 
 // =============================================================================
 // Hydra State Machine Service
@@ -14,7 +28,7 @@ const url = "ws://localhost:4001";
  * Provides real-time status tracking with automatic message parsing,
  * validation, and comprehensive logging for state transitions.
  *
- * @since 0.2.0
+ * @since 0.3.0
  * @category services
  * @example
  * ```typescript
@@ -70,20 +84,54 @@ export class HydraStateMachine extends Effect.Service<HydraStateMachine>()(
         }),
       );
 
+      const awaitStatus = (
+        expectedStatus: Protocol.Status,
+        attempts: number = 300,
+        sleepDuration: Duration.DurationInput = Duration.millis(100),
+      ): Effect.Effect<void, StatusTimeoutError> => {
+        const retry = (
+          attempts: number,
+        ): Effect.Effect<void, StatusTimeoutError> =>
+          Effect.suspend(() => {
+            if (status === expectedStatus) {
+              return Effect.void;
+            }
+
+            if (attempts <= 0) {
+              return Effect.fail(
+                new StatusTimeoutError(expectedStatus, status),
+              );
+            }
+
+            return Effect.sleep(sleepDuration).pipe(
+              Effect.flatMap(() => retry(attempts - 1)),
+            );
+          });
+
+        return retry(attempts);
+      };
+
       return {
         /**
          * Fiber managing the status monitoring lifecycle.
          *
-         * @since 0.2.0
+         * @since 0.3.0
          */
         statusFiber,
         /**
          * Retrieve the current Hydra head protocol status.
          *
-         * @since 0.2.0
+         * @since 0.3.0
          * @category methods
          */
         getStatus: () => status,
+        /**
+         * Wait for a specific status within a given duration.
+         *
+         * @since 0.3.0
+         * @category methods
+         */
+        awaitStatus
       };
     }),
 
