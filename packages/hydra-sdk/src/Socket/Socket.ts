@@ -14,7 +14,7 @@ import { WebSocket } from "ws";
  * @since 0.2.0
  * @category types
  */
-type SocketConfig = {
+export type SocketConfig = {
   /**
    * The WebSocket URL to connect to.
    */

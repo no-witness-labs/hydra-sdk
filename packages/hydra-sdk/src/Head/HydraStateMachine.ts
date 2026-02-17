@@ -3,6 +3,37 @@ import { Effect, Option, Schema } from "effect";
 
 const url = "ws://localhost:4001";
 
+// =============================================================================
+// Hydra State Machine Service
+// =============================================================================
+
+/**
+ * A service that manages the Hydra head protocol state machine by monitoring
+ * WebSocket messages and tracking status transitions.
+ *
+ * Provides real-time status tracking with automatic message parsing,
+ * validation, and comprehensive logging for state transitions.
+ *
+ * @since 0.2.0
+ * @category services
+ * @example
+ * ```typescript
+ * import { Effect } from "effect";
+ * import { Head } from "@no-witness-labs/hydra-sdk";
+ *
+ * const program = Effect.gen(function* () {
+ *   const stateMachine = yield* Head.HydraStateMachine;
+ *   const currentStatus = stateMachine.getStatus();
+ *   console.log(`Hydra head status: ${currentStatus}`);
+ * });
+ *
+ * Effect.runPromise(
+ *   program.pipe(
+ *     Effect.provide(Head.HydraStateMachine.Default)
+ *   )
+ * );
+ * ```
+ */
 export class HydraStateMachine extends Effect.Service<HydraStateMachine>()(
   "HydraStateMachine",
   {
@@ -40,7 +71,18 @@ export class HydraStateMachine extends Effect.Service<HydraStateMachine>()(
       );
 
       return {
+        /**
+         * Fiber managing the status monitoring lifecycle.
+         *
+         * @since 0.2.0
+         */
         statusFiber,
+        /**
+         * Retrieve the current Hydra head protocol status.
+         *
+         * @since 0.2.0
+         * @category methods
+         */
         getStatus: () => status,
       };
     }),
