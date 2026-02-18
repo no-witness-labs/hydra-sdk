@@ -36,6 +36,65 @@ export class HydraHeadController extends Effect.Service<HydraHeadController>()(
         yield* Effect.log(`Initialization complete, status is now ${[hydraStateMachine.getStatus()]}`);
       });
 
+      const commit = Effect.gen(function* () {
+        yield* Effect.log(`Called commit`);
+
+        yield* Effect.log(`Awaiting [IDLE] status`);
+        hydraStateMachine.awaitStatus("IDLE")
+
+        yield* Effect.log(`Sending "Init" message`);
+        yield* socketController.sendMessage(JSON.stringify({ tag: "Init" }))
+
+        yield* Effect.log(`Awaiting [INITIALIZING] status`);
+        hydraStateMachine.awaitStatus("INITIALIZING")
+
+        yield* Effect.log(`Initialization complete, status is now ${[hydraStateMachine.getStatus()]}`);
+      });
+
+      const close = Effect.gen(function* () {
+        yield* Effect.log(`Called close`);
+
+        yield* Effect.log(`Awaiting [IDLE] status`);
+        hydraStateMachine.awaitStatus("IDLE")
+
+        yield* Effect.log(`Sending "Init" message`);
+        yield* socketController.sendMessage(JSON.stringify({ tag: "Init" }))
+
+        yield* Effect.log(`Awaiting [INITIALIZING] status`);
+        hydraStateMachine.awaitStatus("INITIALIZING")
+
+        yield* Effect.log(`Initialization complete, status is now ${[hydraStateMachine.getStatus()]}`);
+      });
+
+      const fanout = Effect.gen(function* () {
+        yield* Effect.log(`Called fanout`);
+
+        yield* Effect.log(`Awaiting [IDLE] status`);
+        hydraStateMachine.awaitStatus("IDLE")
+
+        yield* Effect.log(`Sending "Init" message`);
+        yield* socketController.sendMessage(JSON.stringify({ tag: "Init" }))
+
+        yield* Effect.log(`Awaiting [INITIALIZING] status`);
+        hydraStateMachine.awaitStatus("INITIALIZING")
+
+        yield* Effect.log(`Initialization complete, status is now ${[hydraStateMachine.getStatus()]}`);
+      });
+
+      const abort = Effect.gen(function* () {
+        yield* Effect.log(`Called abort`);
+
+        yield* Effect.log(`Awaiting [IDLE] status`);
+        hydraStateMachine.awaitStatus("IDLE")
+
+        yield* Effect.log(`Sending "Init" message`);
+        yield* socketController.sendMessage(JSON.stringify({ tag: "Init" }))
+
+        yield* Effect.log(`Awaiting [INITIALIZING] status`);
+        hydraStateMachine.awaitStatus("INITIALIZING")
+
+        yield* Effect.log(`Initialization complete, status is now ${[hydraStateMachine.getStatus()]}`);
+      });
 
       return {
         logStatusHeadForewer,

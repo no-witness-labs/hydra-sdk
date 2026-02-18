@@ -12,7 +12,7 @@ import * as Common from "./CommonMessage.js";
  * @since 0.1.0
  * @category schemas
  */
-const InitMessageSchema = Schema.Struct({
+export const InitMessageSchema = Schema.Struct({
   tag: Schema.Literal("Init"),
 });
 export type InitMessage = typeof InitMessageSchema.Type;
@@ -23,7 +23,7 @@ export type InitMessage = typeof InitMessageSchema.Type;
  * @since 0.1.0
  * @category schemas
  */
-const AbortMessageSchema = Schema.Struct({
+export const AbortMessageSchema = Schema.Struct({
   tag: Schema.Literal("Abort"),
 });
 export type AbortMessage = typeof AbortMessageSchema.Type;
@@ -34,7 +34,7 @@ export type AbortMessage = typeof AbortMessageSchema.Type;
  * @since 0.1.0
  * @category schemas
  */
-const NewTxMessageSchema = Schema.Struct({
+export const NewTxMessageSchema = Schema.Struct({
   tag: Schema.Literal("NewTx"),
   transaction: Common.TransactionMessageSchema,
 });
@@ -46,7 +46,7 @@ export type NewTxMessage = typeof NewTxMessageSchema.Type;
  * @since 0.1.0
  * @category schemas
  */
-const RecoverMessageSchema = Schema.Struct({
+export const RecoverMessageSchema = Schema.Struct({
   tag: Schema.Literal("Recover"),
   recoverTxId: Schema.String,
 });
@@ -58,7 +58,7 @@ export type RecoverMessage = typeof RecoverMessageSchema.Type;
  * @since 0.1.0
  * @category schemas
  */
-const DecommitMessageSchema = Schema.Struct({
+export const DecommitMessageSchema = Schema.Struct({
   tag: Schema.Literal("Decommit"),
   decommitTx: Common.TransactionMessageSchema,
 });
@@ -70,7 +70,7 @@ export type DecommitMessage = typeof DecommitMessageSchema.Type;
  * @since 0.1.0
  * @category schemas
  */
-const CloseMessageSchema = Schema.Struct({
+export const CloseMessageSchema = Schema.Struct({
   tag: Schema.Literal("Close"),
 });
 export type CloseMessage = typeof CloseMessageSchema.Type;
@@ -81,7 +81,7 @@ export type CloseMessage = typeof CloseMessageSchema.Type;
  * @since 0.1.0
  * @category schemas
  */
-const ContestMessageSchema = Schema.Struct({
+export const ContestMessageSchema = Schema.Struct({
   tag: Schema.Literal("Contest"),
 });
 export type ContestMessage = typeof ContestMessageSchema.Type;
@@ -92,7 +92,7 @@ export type ContestMessage = typeof ContestMessageSchema.Type;
  * @since 0.1.0
  * @category schemas
  */
-const FanoutMessageSchema = Schema.Struct({
+export const FanoutMessageSchema = Schema.Struct({
   tag: Schema.Literal("Fanout"),
 });
 export type FanoutMessage = typeof FanoutMessageSchema.Type;
@@ -103,7 +103,7 @@ export type FanoutMessage = typeof FanoutMessageSchema.Type;
  * @since 0.1.0
  * @category schemas
  */
-const SideLoadSnapshotMessageSchema = Schema.Struct({
+export const SideLoadSnapshotMessageSchema = Schema.Struct({
   tag: Schema.Literal("SideLoadSnapshot"),
 });
 export type SideLoadSnapshotMessage = typeof SideLoadSnapshotMessageSchema.Type;
