@@ -16,7 +16,21 @@ export const statusCommand = Command.make("status", {}).pipe(
   })),
 );
 
-const command = Command.make("hydra-manager");
+export const initializeCommand = Command.make("initialize", {}).pipe(
+  Command.withHandler(() => Effect.gen(function* () {
+    const HydraHeadController = yield* Head.HydraHeadController
+    yield* HydraHeadController.initialize.pipe(
+      Effect.catchAll(e => Effect.logInfo(`Failed initialize with error: ${e}`))
+    )
+  })),
+);
+
+const command = Command.make("hydra-manager").pipe(
+  Command.withSubcommands([
+    statusCommand,
+    initializeCommand
+  ])
+);
 
 export const runCommands: (
   args: ReadonlyArray<string>,
@@ -24,7 +38,7 @@ export const runCommands: (
   void,
   ValidationError,
   CliApp.Environment | Head.HydraStateMachine | Head.HydraHeadController
-> = Command.run(command.pipe(Command.withSubcommands([statusCommand])), {
+> = Command.run(command, {
   name: "Hydra Manager",
   version: "0.1.0",
 });

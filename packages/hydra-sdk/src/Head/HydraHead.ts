@@ -2,7 +2,8 @@ import { FetchHttpClient, HttpClient } from "@effect/platform";
 import { Protocol, Socket, Head } from "@no-witness-labs/hydra-sdk";
 import { Effect, Option, Schedule, Schema } from "effect";
 
-const url = "ws://localhost:4001";
+// const url = "ws://localhost:4001";
+const url = "ws://172.16.238.10:4001";
 
 export class HydraHeadController extends Effect.Service<HydraHeadController>()(
   "HydraHeadController",
@@ -12,9 +13,7 @@ export class HydraHeadController extends Effect.Service<HydraHeadController>()(
 
       const httpClient = yield* HttpClient.HttpClient;
       const socketController = yield* Socket.SocketController;
-      const sockerMessageQueue = yield* socketController.messageQueue.subscribe;
       const hydraStateMachine = yield* Head.HydraStateMachine
-
 
       const logStatusHeadForewer = Effect.gen(function* () {
         yield* Effect.logInfo(`The status is: [${hydraStateMachine.getStatus()}]`);
@@ -34,7 +33,7 @@ export class HydraHeadController extends Effect.Service<HydraHeadController>()(
         yield* Effect.log(`Awaiting [INITIALIZING] status`);
         hydraStateMachine.awaitStatus("INITIALIZING")
 
-        yield* Effect.log(`Initialization complete, status is now ${hydraStateMachine.getStatus()}`);
+        yield* Effect.log(`Initialization complete, status is now ${[hydraStateMachine.getStatus()]}`);
       });
 
 
