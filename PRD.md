@@ -32,7 +32,7 @@ The SDK follows the **Hybrid Effect API pattern** — all logic is implemented i
 
 | KPI | Target |
 |---|---|
-| Full Hydra API message coverage | 100% of `ClientInput` (9 commands) + `ServerOutput` (32 events) typed and validated |
+| Full Hydra API message coverage | 100% of `ClientInput` (10 commands) + `ServerOutput` (32 events) typed and validated |
 | Head lifecycle integration tests pass | Connect → Init → Commit → Open → NewTx → Close → Fanout |
 | Resilience tests pass | Node drop/restart recovery, wallet reconnect |
 | Cross-platform test matrix | Chromium, Firefox, WebKit × Linux, Mac, Windows |
@@ -61,7 +61,7 @@ The SDK follows the **Hybrid Effect API pattern** — all logic is implemented i
 **Acceptance Criteria:**
 
 - `createHead({ url: 'ws://localhost:4001' })` establishes a WebSocket connection and returns a typed head instance
-- `head.init()`, `head.commit(utxos)`, `head.close()`, `head.fanout()`, `head.abort()` execute lifecycle commands
+- `head.init()`, `head.commit(utxos)`, `head.close()`, `head.safeClose()`, `head.fanout()`, `head.abort()` execute lifecycle commands
 - `head.subscribe(callback)` streams real-time state changes (`HeadIsInitializing`, `HeadIsOpen`, `HeadIsClosed`, etc.)
 - `head.getState()` returns the current `HeadStatus` synchronously
 - Both Promise and Effect APIs are available (`head.init()` and `head.effect.init()`)
@@ -96,9 +96,9 @@ The SDK follows the **Hybrid Effect API pattern** — all logic is implemented i
 
 **Acceptance Criteria:**
 
-- `HydraProvider` implements evolution-sdk's `Provider` interface
+- `HydraProvider` implements evolution-sdk's `Provider` interface (Promise API) and exposes `.Effect: ProviderEffect` (Effect API)
 - Swapping to `HydraProvider` allows existing evolution-sdk code to target L2 with no other changes
-- `getProtocolParameters()`, `getUtxos()`, `submitTx()` are implemented
+- All 10 Provider methods are implemented: 7 fully supported, `getDelegation()` and `evaluateTx()` throw `ProviderError` (not applicable on L2), `getDatum()` is best-effort
 - Provider swap workflow is documented (L1 → L2 → L1)
 
 #### Story 5: Manage heads from the CLI
@@ -189,13 +189,15 @@ The SDK follows the **Hybrid Effect API pattern** — all logic is implemented i
 
 **Purpose:** Type definitions and Effect Schema validators for all Hydra API messages.
 
-**Coverage (from Hydra API v0.22.0):**
+**Coverage (from Hydra API v1.2.0):**
 
 | Category | Messages |
 |---|---|
-| **ClientInput (commands)** | `Init`, `Abort`, `NewTx`, `Recover`, `Decommit`, `Close`, `SafeClose`, `Contest`, `Fanout`, `SideLoadSnapshot` |
-| **ServerOutput (events)** | `Greetings`, `HeadIsInitializing`, `Committed`, `HeadIsOpen`, `HeadIsClosed`, `HeadIsContested`, `ReadyToFanout`, `HeadIsAborted`, `HeadIsFinalized`, `TxValid`, `TxInvalid`, `SnapshotConfirmed`, `SnapshotSideLoaded`, `DecommitRequested`, `DecommitApproved`, `DecommitFinalized`, `DecommitInvalid`, `CommitRecorded`, `CommitApproved`, `CommitFinalized`, `CommitRecovered`, `DepositActivated`, `DepositExpired`, `EventLogRotated`, `NetworkConnected`, `NetworkDisconnected`, `NetworkVersionMismatch`, `NetworkClusterIDMismatch`, `PeerConnected`, `PeerDisconnected`, `IgnoredHeadInitializing` |
-| **ClientMessage (errors)** | `CommandFailed`, `PostTxOnChainFailed`, `RejectedInput`, `InvalidInput`, `SideLoadSnapshotRejected` |
+| **ClientInput (10 commands)** | `Init`, `Abort`, `NewTx`, `Recover`, `Decommit`, `Close`, `SafeClose`, `Contest`, `Fanout`, `SideLoadSnapshot` |
+| **ServerOutput (32 events)** | `HeadIsInitializing`, `Committed`, `HeadIsOpen`, `HeadIsClosed`, `HeadIsContested`, `ReadyToFanout`, `HeadIsAborted`, `HeadIsFinalized`, `TxValid`, `TxInvalid`, `SnapshotConfirmed`, `SnapshotSideLoaded`, `DecommitRequested`, `DecommitApproved`, `DecommitFinalized`, `DecommitInvalid`, `CommitRecorded`, `CommitApproved`, `CommitFinalized`, `CommitRecovered`, `DepositActivated`, `DepositExpired`, `EventLogRotated`, `NetworkConnected`, `NetworkDisconnected`, `NetworkVersionMismatch`, `NetworkClusterIDMismatch`, `PeerConnected`, `PeerDisconnected`, `IgnoredHeadInitializing`, `NodeUnsynced`, `NodeSynced` |
+| **Greetings (connection)** | `Greetings` — separate message type sent on WebSocket connect (contains `me`, `headStatus`, `hydraHeadId`, `snapshotUtxo`, `hydraNodeVersion`, `env`, `networkInfo`, `chainSyncedStatus`, `currentSlot`) |
+| **ClientMessage (errors)** | `CommandFailed`, `PostTxOnChainFailed`, `RejectedInputBecauseUnsynced`, `SideLoadSnapshotRejected` |
+| **InvalidInput (parse errors)** | `InvalidInput` — separate message type sent when WebSocket input cannot be decoded (contains `reason`, `input`) |
 | **Domain types** | `HeadId`, `HeadSeed`, `Party`, `Snapshot`, `SnapshotNumber`, `UTxO`, `TxIn`, `TxOut`, `Transaction`, `Value`, `Address`, `HeadStatus`, `HeadState`, `ContestationPeriod`, `ProtocolParameters` |
 
 **Remaining tasks (Issue #30):**
@@ -301,6 +303,7 @@ await client.l1.submitTx(signedTx)
 | `getProtocolParameters()` | `GET /protocol-parameters` | Cardano protocol params |
 | `getPendingDeposits()` | `GET /commits` | Pending deposit tx IDs |
 | `getSeenSnapshot()` | `GET /snapshot/last-seen` | Latest seen (unconfirmed) snapshot |
+| `getHeadInitialization()` | `GET /head-initialization` | Timestamp of last head initialization |
 | `subscribeUTxO()` | WebSocket `SnapshotConfirmed` | Stream UTxO changes |
 | `subscribeSnapshots()` | WebSocket `SnapshotConfirmed` | Stream confirmed snapshots |
 | `subscribeTransactions()` | WebSocket `TxValid` | Stream transaction confirmations |
@@ -310,15 +313,24 @@ await client.l1.submitTx(signedTx)
 
 #### HydraProvider (`packages/core/src/HydraProvider/`)
 
-**Purpose:** evolution-sdk `Provider` adapter targeting Hydra L2.
+**Purpose:** evolution-sdk `Provider` / `ProviderEffect` adapter targeting Hydra L2.
+
+evolution-sdk uses a dual API pattern: each provider class implements `Provider` (Promise-based) and exposes a `.Effect: ProviderEffect` property (Effect-based, 10 methods). HydraProvider follows this same pattern, aligning with the SDK's Hybrid Effect API architecture.
 
 Maps evolution-sdk Provider interface methods to Hydra APIs:
 
-| Provider Method | Hydra Implementation |
-|---|---|
-| `getProtocolParameters()` | `GET /protocol-parameters` |
-| `getUtxos(address)` | `GET /snapshot/utxo` (filtered by address) |
-| `submitTx(tx)` | WebSocket `NewTx` or `POST /transaction` |
+| Provider Method | Hydra Implementation | Notes |
+|---|---|---|
+| `getProtocolParameters()` | `GET /protocol-parameters` | Fully supported — returns Cardano protocol params used by L2 ledger |
+| `getUtxos(address)` | `GET /snapshot/utxo` (filtered by address) | Fully supported — filters confirmed snapshot UTxO |
+| `getUtxosWithUnit(address, unit)` | `GET /snapshot/utxo` (filtered by address + unit) | Fully supported — additional client-side asset filtering |
+| `getUtxoByUnit(unit)` | `GET /snapshot/utxo` (filtered by unit) | Fully supported — scan confirmed UTxO for specific asset |
+| `getUtxosByOutRef(outRefs)` | `GET /snapshot/utxo` (filtered by OutRef) | Fully supported — client-side OutRef matching |
+| `getDelegation(rewardAddress)` | N/A | **Not supported on L2** — delegation/staking is L1-only. Returns empty/throws `ProviderError` |
+| `getDatum(datumHash)` | `GET /snapshot/utxo` (scan for datum hash) | **Best-effort** — can scan UTxO for inline datums; datum-hash-only UTxOs may not be fully resolvable on L2 |
+| `awaitTx(txHash, checkInterval?)` | WebSocket `SnapshotConfirmed` | Fully supported — resolves when tx appears in a confirmed snapshot |
+| `submitTx(tx)` | WebSocket `NewTx` or `POST /transaction` | Fully supported — submits signed tx to head |
+| `evaluateTx(tx)` | N/A | **Not supported on L2** — Hydra has no tx evaluation endpoint. Returns estimated ex-units or throws `ProviderError` |
 
 #### CLI Package (`packages/cli/`)
 
@@ -339,7 +351,7 @@ Config precedence: CLI flags > `HYDRA_*` env vars > `~/.config/hydra-sdk/config.
 
 ### Hydra Node API Mapping
 
-The SDK wraps both WebSocket and HTTP interfaces of the `hydra-node` (API v0.22.0):
+The SDK wraps both WebSocket and HTTP interfaces of the `hydra-node` (API v1.2.0):
 
 **WebSocket (`ws://{host}:{port}/`):**
 
@@ -351,6 +363,7 @@ The SDK wraps both WebSocket and HTTP interfaces of the `hydra-node` (API v0.22.
 | PUB | `Recover` | `head.recover(txId)` |
 | PUB | `Decommit` | `head.decommit(tx)` |
 | PUB | `Close` | `head.close()` |
+| PUB | `SafeClose` | `head.safeClose()` |
 | PUB | `Contest` | `head.contest()` |
 | PUB | `Fanout` | `head.fanout()` |
 | PUB | `SideLoadSnapshot` | `head.sideLoadSnapshot(snapshot)` |
@@ -368,7 +381,8 @@ The SDK wraps both WebSocket and HTTP interfaces of the `hydra-node` (API v0.22.
 | SUB | `Decommit*` events | Decommit lifecycle |
 | SUB | `Commit*` events | Incremental commit lifecycle |
 | SUB | `Network*` / `Peer*` | Network health |
-| SUB | `CommandFailed` / `RejectedInput` | Error handling |
+| SUB | `NodeUnsynced` / `NodeSynced` | Node sync status |
+| SUB | `CommandFailed` / `RejectedInputBecauseUnsynced` | Error handling |
 
 **HTTP (`http://{host}:{port}/`):**
 
@@ -380,6 +394,7 @@ The SDK wraps both WebSocket and HTTP interfaces of the `hydra-node` (API v0.22.
 | `GET` | `/snapshot/last-seen` | `query.getSeenSnapshot()` |
 | `GET` | `/protocol-parameters` | `query.getProtocolParameters()` |
 | `GET` | `/commits` | `query.getPendingDeposits()` |
+| `GET` | `/head-initialization` | `query.getHeadInitialization()` |
 | `POST` | `/commit` | `head.commit(utxo)` (draft commit tx) |
 | `POST` | `/decommit` | `head.decommit(tx)` |
 | `POST` | `/transaction` | `client.l2.newTx(tx)` |
@@ -443,7 +458,7 @@ export async function init(): Promise<void> { ... }
 | Language | TypeScript 5.9+ (strict mode) | Type safety, ecosystem |
 | Runtime | ES2022, ESM-only | Modern targets, no CJS legacy |
 | Effect library | Effect | Composition, error handling, DI (per Hybrid API pattern) |
-| Schema validation | `@effect/schema` | Runtime type validation for protocol messages |
+| Schema validation | `effect/Schema` | Runtime type validation for protocol messages (part of main `effect` package since v3.10) |
 | WebSocket | Native `WebSocket` (browser) / `ws` (Node.js) | Cross-platform |
 | Cardano tooling | evolution-sdk | L1 providers, wallet integration, tx building |
 | CLI framework | `@effect/cli` | Declarative CLI with Effect integration |
@@ -534,11 +549,10 @@ export async function init(): Promise<void> { ... }
 
 | Dependency | Version | Purpose |
 |---|---|---|
-| `hydra-node` | >= 0.22.0 | Target node API version |
-| `effect` | >= 3.x | Core runtime (peer dependency) |
-| `@effect/schema` | >= 0.x | Runtime validation |
+| `hydra-node` | >= 1.0.0 (tested against 1.2.0) | Target node API version |
+| `effect` | >= 3.10 | Core runtime incl. `effect/Schema` (peer dependency) |
 | `@effect/cli` | >= 0.x | CLI framework |
-| evolution-sdk | TBD | L1 providers + wallet + tx building |
+| evolution-sdk (`@intersectmbo/evolution-sdk`) | TBD | L1 providers + wallet + tx building |
 
 ---
 
