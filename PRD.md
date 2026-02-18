@@ -21,9 +21,8 @@ A modular, type-safe TypeScript SDK (`@no-witness-labs/hydra-sdk`) that provides
 - A **Socket module** for resilient WebSocket communication with automatic reconnection
 - A **Head module** implementing the Hydra Head state machine
 - A **`createHead()` factory** as the primary public API for head lifecycle management
-- A **`createClient()` factory** for L1/L2 transaction building
 - A **Query module** for streaming UTxO, snapshot, and transaction data
-- A **HydraProvider** adapter for evolution-sdk interoperability
+- A **HydraProvider** implementing evolution-sdk's `Provider` / `ProviderEffect` interface, enabling existing evolution-sdk code to target Hydra L2 by swapping the provider — no new client API to learn
 - A **CLI package** for operators to manage Hydra heads from the terminal
 
 The SDK follows the **Hybrid Effect API pattern** — all logic is implemented in Effect (single source of truth), exposed via an `effect` namespace for composability, and wrapped in Promise-based convenience functions for simplicity.
@@ -67,17 +66,80 @@ The SDK follows the **Hybrid Effect API pattern** — all logic is implemented i
 - Both Promise and Effect APIs are available (`head.init()` and `head.effect.init()`)
 - Connection auto-reconnects with exponential backoff on disconnect
 
-#### Story 2: Submit L2 transactions
+**Usage:**
 
-> As a **DApp developer**, I want to build and submit transactions inside an open Hydra Head so that I get near-instant confirmation without L1 fees.
+```typescript
+// Promise API
+import * as Hydra from '@no-witness-labs/hydra-sdk'
+
+const head = await Hydra.Head.create({ url: 'ws://localhost:4001' })
+head.subscribe((event) => console.log(event.tag, event))
+await head.init({ contestationPeriod: 60 })
+await head.commit(utxos)
+// ... head is open, transact ...
+await head.close()
+await head.fanout()
+await head.dispose()
+
+// Effect API
+const program = Effect.gen(function* () {
+  const head = yield* Hydra.Head.effect.create({ url: 'ws://localhost:4001' })
+  yield* head.effect.init({ contestationPeriod: 60 })
+  yield* head.effect.commit(utxos)
+  // ... transact ...
+  yield* head.effect.close()
+  yield* head.effect.fanout()
+})
+await Hydra.Runtime.runEffectPromise(program)
+
+// Effect DI
+const HeadLayer = Hydra.Head.layer({ url: 'ws://localhost:4001' })
+const program = Effect.gen(function* () {
+  const head = yield* Hydra.Head.HydraHeadService
+  yield* head.effect.init({ contestationPeriod: 60 })
+})
+await Effect.runPromise(program.pipe(Effect.provide(HeadLayer)))
+```
+
+#### Story 2: Submit L2 transactions via evolution-sdk
+
+> As a **DApp developer**, I want to build and submit transactions inside an open Hydra Head using my existing evolution-sdk code so that I get near-instant confirmation without L1 fees and without learning a new API.
 
 **Acceptance Criteria:**
 
-- `createClient(head)` returns a client with `l1.*` and `l2.*` namespaces
-- `client.l2.newTx(transaction)` submits a transaction to the head via `NewTx` WebSocket message
+- `Hydra.Provider.create(head)` returns a `Provider` / `ProviderEffect` that targets L2
+- Plugging HydraProvider into `Evolution.createClient({ provider: hydraProvider, wallet })` gives a full tx builder targeting L2
+- `submitTx()` sends the transaction via WebSocket `NewTx` message
 - `TxValid` / `TxInvalid` responses are surfaced with typed error information
-- `SnapshotConfirmed` events confirm transaction finality
-- L1 transactions use evolution-sdk's existing providers (Blockfrost, Kupmios, Koios, Maestro)
+- `awaitTx(txHash)` resolves when the tx appears in a `SnapshotConfirmed` event
+- Existing evolution-sdk tx building, signing, and UTxO selection work unchanged
+
+**Usage:**
+
+```typescript
+// Create HydraProvider from an open head
+const hydraProvider = Hydra.Provider.create(head)
+
+// Plug into evolution-sdk — same API as L1
+const l2Client = Evolution.createClient({ provider: hydraProvider, wallet })
+const hash = await l2Client.newTx()
+  .payToAddress({ address, assets: Assets.fromLovelace(5_000_000n) })
+  .build()
+  .sign()
+  .submit()  // → HydraProvider → WebSocket NewTx
+
+// Wait for L2 confirmation (async iterator)
+for await (const snapshot of head.subscribeSnapshots()) {
+  if (snapshot.confirmedTransactions.includes(hash)) break
+}
+
+// Or via provider
+await hydraProvider.awaitTx(hash)
+
+// Effect API
+yield* hydraProvider.Effect.submitTx(signedTx)
+yield* hydraProvider.Effect.awaitTx(hash)
+```
 
 #### Story 3: Query head state and UTxOs
 
@@ -90,6 +152,32 @@ The SDK follows the **Hybrid Effect API pattern** — all logic is implemented i
 - `subscribeUTxO()`, `subscribeSnapshots()`, `subscribeTransactions()` provide real-time streaming via Effect PubSub (Effect API) or `AsyncIterableIterator` (Promise API)
 - UTxO filtering by address is supported
 
+**Usage:**
+
+```typescript
+// One-shot queries (Promise)
+const utxo = await Hydra.Query.getUTxO(head)
+const snapshot = await Hydra.Query.getSnapshot(head)
+const params = await Hydra.Query.getProtocolParameters(head)
+
+// One-shot queries (Effect)
+const utxo = yield* Hydra.Query.effect.getUTxO(head)
+
+// Streaming — callback (fire-and-forget)
+const unsub = head.subscribe((event) => {
+  if (event.tag === 'SnapshotConfirmed') updateUI(event.snapshot)
+})
+
+// Streaming — async iterator (control flow)
+for await (const utxo of Hydra.Query.subscribeUTxO(head)) {
+  updateBalance(utxo)
+}
+
+// Streaming — Effect Stream (composition)
+const snapshots: Stream.Stream<Snapshot, QueryError> =
+  Hydra.Query.effect.subscribeSnapshots(head)
+```
+
 #### Story 4: Use evolution-sdk against Hydra L2
 
 > As an **SDK integrator**, I want to use my existing evolution-sdk code against a Hydra head by simply swapping the provider.
@@ -100,6 +188,28 @@ The SDK follows the **Hybrid Effect API pattern** — all logic is implemented i
 - Swapping to `HydraProvider` allows existing evolution-sdk code to target L2 with no other changes
 - All 10 Provider methods are implemented: 7 fully supported, `getDelegation()` and `evaluateTx()` throw `ProviderError` (not applicable on L2), `getDatum()` is best-effort
 - Provider swap workflow is documented (L1 → L2 → L1)
+
+**Usage:**
+
+```typescript
+// L1 workflow — using Blockfrost
+const l1Provider = new Evolution.Blockfrost('preview', apiKey)
+const l1Client = Evolution.createClient({ provider: l1Provider, wallet })
+
+// L2 workflow — swap provider, everything else identical
+const hydraProvider = Hydra.Provider.create(head)
+const l2Client = Evolution.createClient({ provider: hydraProvider, wallet })
+
+// Same code works on both — only the provider changed
+const utxos = await l2Client.provider.getUtxos(address)
+const hash = await l2Client.newTx()
+  .payToAddress({ address, assets })
+  .build().sign().submit()
+
+// Effect API — same dual pattern as all evolution-sdk providers
+const utxos = yield* hydraProvider.Effect.getUtxos(address)
+const hash = yield* hydraProvider.Effect.submitTx(signedTx)
+```
 
 #### Story 5: Manage heads from the CLI
 
@@ -125,6 +235,28 @@ The SDK follows the **Hybrid Effect API pattern** — all logic is implemented i
 - Configurable retry policies (max retries, backoff factor, timeout)
 - Connection health metrics are available
 
+**Usage:**
+
+```typescript
+// Promise API — configure retry policy
+const head = await Hydra.Head.create({
+  url: 'ws://node:4001',
+  reconnect: {
+    maxRetries: 10,
+    backoffFactor: 1.5,
+    initialDelay: 1000,
+    maxDelay: 30_000,
+  },
+  historyOnReconnect: true,
+})
+
+// Effect API — compose with Effect retry/timeout
+const resilientHead = Hydra.Head.effect.createScoped(config).pipe(
+  Effect.retry({ times: 5 }),
+  Effect.timeout('30 seconds'),
+)
+```
+
 ### Non-Goals
 
 - **Running a `hydra-node`** — the SDK is a client, not a node implementation
@@ -140,47 +272,56 @@ The SDK follows the **Hybrid Effect API pattern** — all logic is implemented i
 
 ### Architecture Overview
 
-```
-┌─────────────────────────────────────────────────────┐
-│                    @no-witness-labs/cli              │
-│              (@effect/cli, operator tooling)         │
-└──────────────────────┬──────────────────────────────┘
-                       │ uses
-┌──────────────────────▼──────────────────────────────┐
-│                 @no-witness-labs/core                │
-│                                                     │
-│  ┌─────────────┐  ┌──────────────┐  ┌────────────┐ │
-│  │ createHead() │  │ createClient()│  │   Query    │ │
-│  │  (public)    │  │  (public)     │  │  (public)  │ │
-│  └──────┬───────┘  └──────┬───────┘  └─────┬──────┘ │
-│         │                 │                │        │
-│  ┌──────▼───────┐  ┌──────▼───────┐       │        │
-│  │ Head (state   │  │ HydraProvider│       │        │
-│  │  machine)     │  │ (evolution-  │       │        │
-│  │  (internal)   │  │  sdk adapter)│       │        │
-│  └──────┬───────┘  └──────────────┘       │        │
-│         │                                  │        │
-│  ┌──────▼──────────────────────────────────▼──────┐ │
-│  │              Socket (WebSocket layer)          │ │
-│  │       (connect, send, receive, reconnect)      │ │
-│  └──────────────────────┬─────────────────────────┘ │
-│                         │                           │
-│  ┌──────────────────────▼─────────────────────────┐ │
-│  │          Protocol (types + schemas)            │ │
-│  │  (ClientInput, ServerOutput, Effect Schema)    │ │
-│  └────────────────────────────────────────────────┘ │
-└──────────────────────┬──────────────────────────────┘
-                       │ WebSocket + HTTP
-              ┌────────▼────────┐
-              │   hydra-node    │
-              │  (WS :4001)     │
-              │  (HTTP :4001)   │
-              └────────┬────────┘
-                       │
-              ┌────────▼────────┐
-              │  cardano-node   │
-              │  (Layer 1)      │
-              └─────────────────┘
+```mermaid
+flowchart TD
+    subgraph USER["User Code"]
+        APP["DApp / Backend"]
+        CLI_USER["Operator"]
+    end
+
+    subgraph CLI["@no-witness-labs/cli"]
+        CLI_CMD["CLI Commands\nhydra init · close · status"]
+    end
+
+    subgraph EVOLUTION["evolution-sdk"]
+        EVO_CLIENT["createClient()\ntx building · signing · wallets"]
+        EVO_IFACE["Provider / ProviderEffect\ninterface — 10 methods"]
+    end
+
+    subgraph CORE["@no-witness-labs/core"]
+        subgraph PUBLIC["Public API"]
+            CREATE_HEAD["createHead()\nHead lifecycle factory"]
+            HYDRA_PROVIDER["HydraProvider\nimplements Provider"]
+            QUERY["Query\ngetUTxO · getSnapshot\nsubscribeUTxO · subscribeSnapshots"]
+        end
+        subgraph INTERNAL["Internal Modules"]
+            HEAD["Head\nState machine\nIdle → Init → Open → Closed → Final"]
+            SOCKET["Socket\nWebSocket · reconnect · resilience"]
+            PROTOCOL["Protocol\nTypes + Effect Schema\nClientInput · ServerOutput"]
+        end
+    end
+
+    subgraph INFRA["Infrastructure"]
+        HYDRA_NODE["hydra-node\nWS :4001 · HTTP :4001"]
+        CARDANO["cardano-node\nLayer 1"]
+    end
+
+    APP -->|"create + lifecycle"| CREATE_HEAD
+    APP -->|"tx building"| EVO_CLIENT
+    CLI_USER --> CLI_CMD
+    CLI_CMD --> CREATE_HEAD
+
+    EVO_CLIENT -->|"submitTx · getUtxos"| HYDRA_PROVIDER
+    HYDRA_PROVIDER -.->|"implements"| EVO_IFACE
+
+    CREATE_HEAD --> HEAD
+    HEAD --> SOCKET
+    HYDRA_PROVIDER --> SOCKET
+    QUERY --> SOCKET
+    QUERY -->|"HTTP GET"| HYDRA_NODE
+    SOCKET --> PROTOCOL
+    SOCKET -->|"WebSocket + HTTP"| HYDRA_NODE
+    HYDRA_NODE --> CARDANO
 ```
 
 ### Module Breakdown
@@ -222,19 +363,33 @@ The SDK follows the **Hybrid Effect API pattern** — all logic is implemented i
 - Browser (native `WebSocket`) and Node.js (`ws` or `undici`) compatibility
 - Connection state tracking and health monitoring
 
-**Hybrid API pattern:**
+**Four API surfaces:**
 
 ```typescript
-// Effect API (source of truth)
+// 1. Internal Effect (private, source of truth)
+function connectEffect(config: SocketConfig): Effect.Effect<HydraSocket, SocketError> { ... }
+
+// 2. effect namespace (public)
 export const effect = {
-  connect: (config: SocketConfig) => Effect.Effect<Socket, SocketError>,
-  send: (socket: Socket, msg: ClientInput) => Effect.Effect<void, SocketError>,
-  receive: (socket: Socket) => Stream.Stream<ServerOutput, SocketError>,
+  connect: connectEffect,
+  connectScoped: (config: SocketConfig) =>
+    Effect.acquireRelease(connectEffect(config), (s) => closeEffect(s).pipe(Effect.orDie)),
+  send: sendEffect,
+  receive: receiveStream,
 }
 
-// Promise API (convenience)
-export async function connect(config: SocketConfig): Promise<Socket> { ... }
-export async function send(socket: Socket, msg: ClientInput): Promise<void> { ... }
+// 3. Promise API (public)
+export async function connect(config: SocketConfig): Promise<HydraSocket> { ... }
+export async function send(socket: HydraSocket, msg: ClientInput): Promise<void> { ... }
+
+// 4. Effect DI (Layer)
+export class HydraSocketService extends Context.Tag('HydraSocketService')<
+  HydraSocketService, HydraSocket
+>() {}
+
+export function layer(config: SocketConfig): Layer.Layer<HydraSocketService, SocketError> {
+  return Layer.scoped(HydraSocketService, effect.connectScoped(config))
+}
 ```
 
 #### Head Module (`packages/core/src/Head/` — internal)
@@ -249,47 +404,61 @@ export async function send(socket: Socket, msg: ClientInput): Promise<void> { ..
 
 #### `createHead()` Factory (`packages/core/src/createHead/` — public API)
 
-**Purpose:** Primary entry point for head lifecycle management.
+**Purpose:** Primary entry point for head lifecycle management. Exposes all four API surfaces.
+
+**Promise API:**
 
 ```typescript
-// Promise API
-const head = await createHead({ url: 'ws://localhost:4001' })
-head.subscribe((event) => console.log(event))
+const head = await Hydra.Head.create({ url: 'ws://localhost:4001' })
 await head.init({ contestationPeriod: 60 })
-await head.commit(utxos)
-// ... head is open, transact ...
-await head.close()
-await head.fanout()
-await head.dispose() // cleanup
-
-// Effect API
-const program = Effect.gen(function* () {
-  const head = yield* createHead.effect({ url: 'ws://localhost:4001' })
-  yield* head.effect.init({ contestationPeriod: 60 })
-  yield* head.effect.commit(utxos)
-  // ...
-})
+await head.dispose() // manual cleanup
 ```
 
-**Resource management:** `createHead()` acquires a WebSocket connection. Cleanup via:
-
-- `head.dispose()` — manual close (long-lived)
-- `withHead(config, body)` — bracket pattern (scoped usage)
-- `createHead.effect.scoped(config)` — Effect Scope (Effect composition)
-
-#### `createClient()` Factory (`packages/core/src/createClient/` — public API)
-
-**Purpose:** Transaction building for L1 and L2.
+**Effect API (scoped — recommended):**
 
 ```typescript
-const client = createClient(head, { l1Provider: blockfrost })
-// L2 — via head WebSocket
-await client.l2.newTx(signedTx)
-const utxo = await client.l2.getUTxO()
-
-// L1 — via evolution-sdk provider
-await client.l1.submitTx(signedTx)
+const program = Effect.scoped(
+  Effect.gen(function* () {
+    const head = yield* Hydra.Head.effect.createScoped({ url: 'ws://localhost:4001' })
+    yield* head.effect.init({ contestationPeriod: 60 })
+    // connection auto-closes when scope ends
+  })
+)
 ```
+
+**Effect API (unscoped — escape hatch):**
+
+```typescript
+const head = yield* Hydra.Head.effect.create(config)
+// ... long-lived usage ...
+yield* head.effect.dispose()
+```
+
+**Effect DI (Layer — production):**
+
+```typescript
+export class HydraHeadService extends Context.Tag('HydraHeadService')<
+  HydraHeadService, HydraHead
+>() {}
+
+export function layer(config: HeadConfig): Layer.Layer<HydraHeadService, HeadError> {
+  return Layer.scoped(HydraHeadService, effect.createScoped(config))
+}
+
+// Usage:
+const program = Effect.gen(function* () {
+  const head = yield* HydraHeadService
+  yield* head.effect.init({ contestationPeriod: 60 })
+})
+await Effect.runPromise(program.pipe(Effect.provide(Head.layer(config))))
+```
+
+**Resource management:** `create()` acquires a WebSocket connection. Cleanup via:
+
+- `head.dispose()` / `Symbol.asyncDispose` — manual close (Promise API, long-lived)
+- `withHead(config, body)` — bracket pattern (Promise API, scoped)
+- `effect.createScoped(config)` — `acquireRelease` (Effect API, **recommended**)
+- `layer(config)` — Layer lifecycle (Effect DI, **recommended for production**)
 
 #### Query Module (`packages/core/src/Query/` — public API)
 
@@ -359,7 +528,7 @@ The SDK wraps both WebSocket and HTTP interfaces of the `hydra-node` (API v1.2.0
 |---|---|---|
 | PUB (send) | `Init` | `head.init()` |
 | PUB | `Abort` | `head.abort()` |
-| PUB | `NewTx` | `client.l2.newTx()` |
+| PUB | `NewTx` | `head.submitTx()` / `provider.submitTx()` |
 | PUB | `Recover` | `head.recover(txId)` |
 | PUB | `Decommit` | `head.decommit(tx)` |
 | PUB | `Close` | `head.close()` |
@@ -397,8 +566,8 @@ The SDK wraps both WebSocket and HTTP interfaces of the `hydra-node` (API v1.2.0
 | `GET` | `/head-initialization` | `query.getHeadInitialization()` |
 | `POST` | `/commit` | `head.commit(utxo)` (draft commit tx) |
 | `POST` | `/decommit` | `head.decommit(tx)` |
-| `POST` | `/transaction` | `client.l2.newTx(tx)` |
-| `POST` | `/cardano-transaction` | `client.l1.submitTx(tx)` |
+| `POST` | `/transaction` | `head.submitTx(tx)` / `provider.submitTx(tx)` |
+| `POST` | `/cardano-transaction` | internal (`head.commit()` flow) |
 | `POST` | `/snapshot` | `head.sideLoadSnapshot(req)` |
 | `DELETE` | `/commits/{tx-id}` | `head.recover(txId)` |
 
@@ -502,7 +671,7 @@ export async function init(): Promise<void> { ... }
 | Deliverable | Issue |
 |---|---|
 | Query module — head state & UTxO queries with streaming | #8 |
-| `createClient()` factory — L1/L2 transaction API | #9 |
+| HydraProvider — evolution-sdk Provider implementation | #9 |
 | Example projects (transfer, mint/burn, state update) | #10 |
 | CLI package setup with @effect/cli | #11 |
 | Complete head lifecycle integration tests | #12 |
@@ -563,7 +732,7 @@ export async function init(): Promise<void> { ... }
 - Protocol schema validation (positive + negative cases)
 - Head state machine transitions (all valid/invalid paths)
 - Socket reconnection logic
-- `createHead()` / `createClient()` with mocked WebSocket
+- `createHead()` / HydraProvider with mocked WebSocket
 
 ### Integration Tests (Vitest + Docker)
 
@@ -589,16 +758,91 @@ export async function init(): Promise<void> { ... }
 
 ---
 
-## Appendix: Hybrid API Pattern Summary
+## Appendix: Hybrid API Pattern — Four Surfaces
 
-Per the project's architectural decision ([hybrid-effect-api.instructions.md](/.github/instructions/hybrid-effect-api.instructions.md)):
+Per the project's architectural decision ([hybrid-effect-api.instructions.md](/.github/instructions/hybrid-effect-api.instructions.md)) and aligned with the [midday-sdk](https://github.com/no-witness-labs/midday-sdk) pattern (ADR-001: Dual API Pattern):
 
-| Rule | Key Point |
-|---|---|
-| 1. Implementation in Effect | Single source of truth. Exception for pure hot-path functions |
-| 2. `effect` namespace | Direct access: `Module.effect.operation()` |
-| 3. Promise runs the Effect | Sync → `runEffect()`, Async → `runEffectPromise()` |
-| 4. Same world | Effect→Effect, Promise→Promise. Never mix |
-| 5. Error handling | Effect: typed values. Promise: `@throws` + `Data.TaggedError` |
-| 6. Resource management | Bracket > close() > asyncDispose > Scope |
-| 7. Dependencies internal | Never leak Effect services to Promise API |
+### Architecture Decisions
+
+**Decision 1: Four API surfaces per module**
+
+Every module exposes the same operation through four complementary surfaces. Rationale: the SDK manages stateful WebSocket connections — DI/Layers provide testable lifecycle management without leaking Effect concepts to Promise users.
+
+- **Internal Effect** — private `*Effect()` functions, single source of truth
+- **`effect` namespace** — public, zero-overhead re-export for Effect users
+- **Promise API** — public, `async function` wrappers for most users
+- **Effect DI** — `Context.Tag` + `Layer.scoped` for production apps and testing
+
+**Decision 2: Instance handles with `.effect` sub-namespace**
+
+Stateful objects (Head, Socket) carry both Promise methods and an `effect` property with Effect methods. Rationale: discoverable via autocomplete, consistent with midday-sdk, avoids separate module-level functions for instance operations.
+
+**Decision 3: Scoped by default, three streaming patterns**
+
+Effect API uses `acquireRelease` — connection auto-closes when Scope ends. Promise API uses manual `dispose()` or bracket `withHead()`. Streaming uses callbacks (fire-and-forget), `AsyncIterableIterator` (control flow), and `Stream.Stream` (Effect composition).
+
+### Implementation Rules
+
+| # | Rule | Key Point |
+|---|---|---|
+| 1 | **Implementation lives in Effect** | Single source of truth. Every operation is a private Effect function. Exception: pure hot-path functions |
+| 2 | **`effect` namespace re-exports directly** | Zero-overhead: `export const effect = { create: createEffect }`. No wrapping |
+| 3 | **Promise API runs the Effect** | Sync → `runEffect()`, Async → `runEffectPromise()` |
+| 4 | **Instance handles have `.effect` sub-namespace** | `head.init()` (Promise) and `head.effect.init()` (Effect) share the same implementation |
+| 5 | **Same-world rule** | Effect→Effect, Promise→Promise. Never mix |
+| 6 | **Typed errors via `Data.TaggedError`** | Effect: errors in type signature. Promise: thrown, documented with `@throws` |
+| 7 | **Resource management** | `acquireRelease` for scoped resources. `Layer.scoped` for DI |
+| 8 | **Dependencies stay internal** | Never leak Effect services to Promise API. Promise users never see `Context.Tag` or `Layer` |
+| 9 | **Layers for DI** | `Context.Tag` → `layer(config)` → `Layer.scoped` for automatic lifecycle |
+
+### Resource Management Priority
+
+```
+layer(config)           — Effect DI, production (recommended)
+    ↓
+effect.createScoped()   — Effect, auto-cleanup via Scope (recommended)
+    ↓
+withHead(config, body)  — Promise, bracket pattern
+    ↓
+head.dispose()          — Promise, manual cleanup (long-lived)
+    ↓
+Symbol.asyncDispose     — Promise, await using syntax
+```
+
+### Streaming Convention
+
+| Pattern | API | Use Case | Example |
+|---|---|---|---|
+| Callback `subscribe(cb)` | Promise | Fire-and-forget, logging, monitoring | `head.subscribe((e) => console.log(e))` |
+| `AsyncIterableIterator` | Promise | Control flow, wait-for-event, break | `for await (const e of head.subscribeEvents()) { ... }` |
+| `Stream.Stream<T, E>` | Effect | Composition, filter, map, merge, retry | `head.effect.events().pipe(Stream.filter(...))` |
+
+### Handle Pattern
+
+Modules that return stateful instances use the handle pattern:
+
+```typescript
+interface HydraHead {
+  // Data
+  readonly state: HeadStatus
+  readonly headId: string | null
+
+  // Promise methods
+  init(params?: InitParams): Promise<void>
+  commit(utxos: UTxO): Promise<void>
+  submitTx(signedTx: Transaction): Promise<void>
+  close(): Promise<void>
+  dispose(): Promise<void>
+  subscribe(callback: (event: ServerOutput) => void): Unsubscribe
+
+  // Effect sub-namespace
+  readonly effect: {
+    init(params?: InitParams): Effect.Effect<void, HeadError>
+    commit(utxos: UTxO): Effect.Effect<void, HeadError>
+    submitTx(signedTx: Transaction): Effect.Effect<void, HeadError>
+    close(): Effect.Effect<void, HeadError>
+    events(): Stream.Stream<ServerOutput, HeadError>
+    dispose(): Effect.Effect<void, HeadError>
+  }
+}
+```
