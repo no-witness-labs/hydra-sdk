@@ -32,11 +32,15 @@ export function socketMessageToStatus(
   }
 
   switch (socketMessage.tag) {
+    case "HeadIsAborted":
+      return Option.some("IDLE");
     case "HeadIsInitializing":
       return Option.some("INITIALIZING");
     case "HeadIsOpen":
       return Option.some("OPEN");
-    case "HeadIsClosed":
+    case "HeadIsContested":
+      return Option.some("CLOSED");
+      case "HeadIsClosed":
       return Option.some("CLOSED");
     case "ReadyToFanout":
       return Option.some("FANOUT_POSSIBLE");

@@ -83,6 +83,7 @@ export type CloseMessage = typeof CloseMessageSchema.Type;
  */
 export const ContestMessageSchema = Schema.Struct({
   tag: Schema.Literal("Contest"),
+  // TODO: Check that there is no way to provide the snapshot?
 });
 export type ContestMessage = typeof ContestMessageSchema.Type;
 
