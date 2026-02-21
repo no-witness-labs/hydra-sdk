@@ -21,6 +21,8 @@ describe("Head module", () => {
   it("rejects invalid lifecycle transitions from FSM", async () => {
     const head = await Head.create({ url: "mock://localhost:4001" });
 
+    await expect.poll(() => head.getState()).toBe("Idle");
+
     await expect(head.close()).rejects.toThrow(
       "Command Close is not allowed while head is Idle",
     );

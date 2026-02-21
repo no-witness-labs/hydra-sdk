@@ -153,6 +153,9 @@ const parseHeadStatus = (value: unknown): HeadStatus | null => {
 };
 
 const parseClientInputTag = (value: unknown): ClientInputTag | undefined => {
+  // TODO(protocol-schema): Commit and SafeClose are scaffold-only tags.
+  // Keep parsing them for backward-compatible mock/error plumbing until
+  // REST commit integration and websocket command alignment are completed.
   switch (value) {
     case "Init":
     case "Commit":

@@ -91,6 +91,8 @@ export interface HydraHead {
   getState(): HeadStatus;
 
   init(params?: InitParams): Promise<void>;
+  // TODO(protocol-schema): replace unknown with protocol Transaction type.
+  // Commit is REST-driven in Hydra and this scaffold signature is temporary.
   commit(utxos: unknown): Promise<void>;
   close(): Promise<void>;
   safeClose(): Promise<void>;
@@ -102,6 +104,8 @@ export interface HydraHead {
 
   readonly effect: {
     init(params?: InitParams): Effect.Effect<void, HeadError>;
+    // TODO(protocol-schema): replace unknown with protocol Transaction type.
+    // Commit is REST-driven in Hydra and this scaffold signature is temporary.
     commit(utxos: unknown): Effect.Effect<void, HeadError>;
     close(): Effect.Effect<void, HeadError>;
     safeClose(): Effect.Effect<void, HeadError>;
@@ -115,6 +119,8 @@ export interface HydraHead {
 
 interface HydraHeadEffectApi {
   readonly init: (params?: InitParams) => Effect.Effect<void, HeadError>;
+  // TODO(protocol-schema): replace unknown with protocol Transaction type.
+  // Commit is REST-driven in Hydra and this scaffold signature is temporary.
   readonly commit: (utxos: unknown) => Effect.Effect<void, HeadError>;
   readonly close: () => Effect.Effect<void, HeadError>;
   readonly safeClose: () => Effect.Effect<void, HeadError>;
@@ -231,6 +237,12 @@ const createEffect = (
 
             return Effect.void;
           }),
+          Effect.catchAll((error) =>
+            Effect.logError("Head projector loop failed").pipe(
+              Effect.zipRight(Effect.logError(error)),
+              Effect.asVoid,
+            ),
+          ),
         ),
       ),
     );
@@ -266,6 +278,7 @@ const createEffect = (
       );
 
     const commitEffect = (utxos: unknown): Effect.Effect<void, HeadError> =>
+      // TODO(protocol-schema): Commit should be routed through REST integration.
       execute(
         "Commit",
         utxos,
