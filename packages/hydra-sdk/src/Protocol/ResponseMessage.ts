@@ -26,7 +26,7 @@ export const GreetingsMessageSchema = Schema.Struct({
   ),
   hydraHeadId: Schema.optional(Schema.String),
   snapshotUtxo: Schema.optional(UTxOSchema),
-  timestamp: Schema.optional(Schema.String),
+  timestamp: Schema.optional(Schema.DateTimeUtc),
   hydraNodeVersion: Schema.String,
   env: Schema.optional(Schema.String),
   networkInfo: Schema.optional(Schema.Unknown),
