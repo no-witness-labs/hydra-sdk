@@ -1,5 +1,5 @@
 import { Socket } from "@effect/platform";
-import { Effect, Fiber, Layer, Queue, Ref } from "effect";
+import { Effect, Fiber, Layer, Queue, Ref, Schedule } from "effect";
 
 import {
   type ApiEvent,
@@ -34,6 +34,8 @@ interface NormalizedReconnect {
   readonly factor: number;
   readonly jitter: number;
 }
+
+const clampAtLeastZero = (value: number): number => Math.max(0, value);
 
 const makeWebSocketConstructorLayer: Effect.Effect<
   Layer.Layer<Socket.WebSocketConstructor>,
@@ -107,19 +109,24 @@ const normalizeReconnect = (config: HeadConfig): NormalizedReconnect => ({
   initialDelayMs: config.reconnect?.initialDelayMs ?? 500,
   maxDelayMs: config.reconnect?.maxDelayMs ?? 30_000,
   factor: config.reconnect?.factor ?? 1.7,
-  jitter: config.reconnect?.jitter ?? 0.2,
+  jitter: clampAtLeastZero(config.reconnect?.jitter ?? 0.2),
 });
 
-const computeBackoffMs = (
-  attempt: number,
+const makeReconnectPolicy = (
   reconnect: NormalizedReconnect,
-): number => {
-  const exponential =
-    reconnect.initialDelayMs * reconnect.factor ** Math.max(0, attempt - 1);
-  const capped = Math.min(exponential, reconnect.maxDelayMs);
-  const jitterRange = capped * reconnect.jitter;
-  const jitterOffset = (Math.random() * 2 - 1) * jitterRange;
-  return Math.max(0, Math.floor(capped + jitterOffset));
+): Schedule.Schedule<unknown, HeadError> => {
+  const boundedExponential = Schedule.exponential(
+    `${reconnect.initialDelayMs} millis`,
+    reconnect.factor,
+  ).pipe(Schedule.union(Schedule.spaced(`${reconnect.maxDelayMs} millis`)));
+
+  const minJitter = clampAtLeastZero(1 - reconnect.jitter);
+  const maxJitter = clampAtLeastZero(1 + reconnect.jitter);
+
+  return boundedExponential.pipe(
+    Schedule.jitteredWith({ min: minJitter, max: maxJitter }),
+    Schedule.intersect(Schedule.recurs(reconnect.maxRetries)),
+  );
 };
 
 const withHistoryQuery = (url: string, history: boolean): string => {
@@ -329,6 +336,7 @@ export const makeHeadTransport = (
     }
 
     const reconnect = normalizeReconnect(config);
+  const reconnectPolicy = makeReconnectPolicy(reconnect);
     const outbound = yield* Queue.unbounded<string>();
     const isDisposed = yield* Ref.make(false);
     const webSocketConstructorLayer = yield* makeWebSocketConstructorLayer;
@@ -401,7 +409,6 @@ export const makeHeadTransport = (
 
     const reconnectFiber = yield* Effect.forkDaemon(
       Effect.gen(function* () {
-        let attempt = 0;
         let firstConnection = true;
 
         while (!(yield* Ref.get(isDisposed))) {
@@ -410,27 +417,22 @@ export const makeHeadTransport = (
             : (config.historyOnReconnect ?? true);
           const socketUrl = withHistoryQuery(url, useHistory);
 
-          const result = yield* Effect.exit(socketSession(socketUrl));
+          const result = yield* Effect.exit(
+            socketSession(socketUrl).pipe(Effect.retry(reconnectPolicy)),
+          );
           if (result._tag === "Success") {
-            attempt = 0;
             firstConnection = false;
             continue;
           }
 
-          attempt += 1;
-          if (attempt > reconnect.maxRetries) {
-            yield* events.publish({
-              _tag: "InvalidInput",
-              invalidInput: {
-                reason: `Websocket reconnect attempts exhausted after ${reconnect.maxRetries} retries`,
-              },
-            });
-            break;
-          }
-
-          const delayMs = computeBackoffMs(attempt, reconnect);
-          yield* Effect.sleep(`${delayMs} millis`);
+          yield* events.publish({
+            _tag: "InvalidInput",
+            invalidInput: {
+              reason: `Websocket reconnect attempts exhausted after ${reconnect.maxRetries} retries`,
+            },
+          });
           firstConnection = false;
+          break;
         }
       }),
     );
