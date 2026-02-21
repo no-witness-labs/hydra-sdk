@@ -33,6 +33,8 @@ export interface HeadConfig {
 }
 
 export interface InitParams {
+  // TODO(protocol-schema): Hydra websocket Init currently has no payload.
+  // Keep this reserved field scaffold-only until protocol schema integration.
   readonly contestationPeriod?: number;
 }
 
@@ -43,8 +45,10 @@ export interface ServerOutput {
 
 export type ClientInputTag =
   | "Init"
+  // TODO(protocol-schema): Commit is REST-based in Hydra; retained here as scaffold API surface.
   | "Commit"
   | "Close"
+  // TODO(protocol-schema): SafeClose is scaffold-only and not part of Hydra websocket commands.
   | "SafeClose"
   | "Fanout"
   | "Abort";
@@ -255,6 +259,7 @@ const createEffect = (
       ).pipe(
         Effect.tap(() =>
           Effect.sync(() => {
+            // TODO(protocol-schema): extract headId from HeadIsInitializing payload.
             headId = "dummy-head-id";
           }),
         ),
@@ -286,7 +291,15 @@ const createEffect = (
 
     const awaitReadyToFanoutEffect = (): Effect.Effect<void, HeadError> =>
       Effect.gen(function* () {
-        if (state === "FanoutPossible" || state === "Final") {
+        if (state === "Final") {
+          return yield* Effect.fail(
+            new HeadError({
+              message: "Fanout is not allowed when head is already Final",
+            }),
+          );
+        }
+
+        if (state === "FanoutPossible") {
           return;
         }
 

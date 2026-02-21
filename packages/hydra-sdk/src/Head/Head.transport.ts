@@ -82,6 +82,9 @@ const commandToEvents = (
     case "Init":
       return [toServerOutput("HeadIsInitializing")];
     case "Commit":
+      // TODO(protocol-schema): Commit is a Hydra REST operation, not a websocket command.
+      // This mock-only event path exists to keep scaffold tests deterministic until
+      // REST integration is implemented in the Head module.
       return [toServerOutput("HeadIsOpen", payload)];
     case "Close":
       return [toServerOutput("HeadIsClosed"), toServerOutput("ReadyToFanout")];
@@ -238,7 +241,7 @@ const parseApiEvent = (raw: string): Effect.Effect<ApiEvent, HeadError> =>
 
 const encodeClientInput = (
   tag: ClientInputTag,
-  payload?: unknown,
+  _payload?: unknown,
 ): Effect.Effect<string, HeadError> =>
   Effect.try({
     try: () => {
@@ -248,12 +251,21 @@ const encodeClientInput = (
       switch (tag) {
         case "Init":
         case "Close":
-        case "SafeClose":
         case "Fanout":
         case "Abort":
           return JSON.stringify({ tag });
+        case "SafeClose":
+          throw new Error(
+            'Unsupported client input "SafeClose": not part of Hydra websocket protocol',
+          );
         case "Commit":
-          return JSON.stringify({ tag: "Commit", payload });
+          throw new Error(
+            'Unsupported client input "Commit": must be sent via REST API, not websocket',
+          );
+        default: {
+          const _exhaustive: never = tag;
+          throw new Error(`Unsupported client input ${_exhaustive}`);
+        }
       }
     },
     catch: (cause) =>
@@ -272,6 +284,19 @@ export const makeHeadTransport = (
       return yield* Effect.fail(
         new HeadError({ message: "Head config url is required" }),
       );
+    }
+
+    if (!url.startsWith("mock://")) {
+      yield* Effect.try({
+        try: () => {
+          new URL(url);
+        },
+        catch: (cause) =>
+          new HeadError({
+            message: `Invalid Head transport url: ${url}`,
+            cause,
+          }),
+      });
     }
 
     const subscriberQueues = new Set<Queue.Enqueue<ApiEvent>>();
@@ -443,10 +468,21 @@ export const makeHeadTransport = (
     ): Effect.Effect<void, HeadError> =>
       Effect.gen(function* () {
         if (tag === "Commit") {
-          yield* Effect.forEach(commandToEvents(tag, payload), (event) =>
-            events.publish(event),
-          ).pipe(Effect.asVoid);
-          return;
+          return yield* Effect.fail(
+            new HeadError({
+              message:
+                'Commit is scaffold-only in mock transport and must use REST API in real transport',
+            }),
+          );
+        }
+
+        if (tag === "SafeClose") {
+          return yield* Effect.fail(
+            new HeadError({
+              message:
+                'SafeClose is scaffold-only and not part of Hydra websocket protocol',
+            }),
+          );
         }
 
         const encoded = yield* encodeClientInput(tag, payload);

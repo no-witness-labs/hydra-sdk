@@ -29,9 +29,11 @@ const canRunCommand = (
     case "Init":
       return status === "Idle";
     case "Commit":
-      return status === "Initializing" || status === "Open";
+      return status === "Initializing";
     case "Close":
+      return status === "Open";
     case "SafeClose":
+      // TODO(protocol-schema): SafeClose is scaffold-only until protocol integration.
       return status === "Open";
     case "Fanout":
       return status === "FanoutPossible";
