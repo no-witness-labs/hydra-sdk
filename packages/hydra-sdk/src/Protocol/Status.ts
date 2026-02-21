@@ -3,7 +3,6 @@ import { Option, Schema } from "effect";
 
 export type Status =
   | "DISCONNECTED"
-  | "CONNECTING"
   | "IDLE"
   | "INITIALIZING"
   | "OPEN"
@@ -50,3 +49,19 @@ export function socketMessageToStatus(
       return Option.none(); // TODO: check that error responses don't alter the head status
   }
 }
+
+export function headResponseToStatus(
+  headResponse: Protocol.HeadResponse,
+): Status {
+  switch (headResponse.tag) {
+    case "Idle":
+      return "IDLE";
+    case "Initial":
+      return "INITIALIZING";
+    case "Open":
+      return "OPEN";
+    case "Closed":
+      return "CLOSED";
+  }
+}
+

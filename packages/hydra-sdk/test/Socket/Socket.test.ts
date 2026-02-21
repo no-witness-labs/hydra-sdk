@@ -1,11 +1,12 @@
 import { WebSocketConstructor } from "@effect/platform/Socket";
 import { describe, it } from "@effect/vitest";
-import { Socket } from "@no-witness-labs/hydra-sdk";
+import { Config, Socket } from "@no-witness-labs/hydra-sdk";
 import { Effect, Layer, Logger } from "effect";
 import type { Scope } from "effect/Scope";
 import { WS } from "vitest-websocket-mock";
 
-const url = `ws://localhost:1234`;
+const urlNoAppends = "localhost:1234"
+const url = "ws://" + urlNoAppends
 
 const makeServer: Effect.Effect<WS, never, Scope> = Effect.acquireRelease(
   Effect.sync(() => new WS(url)), // acquire
@@ -22,6 +23,12 @@ const MockWebSocketLayer = Layer.succeed(
   (url, options) => {
     return new WebSocket(url, options) as unknown as globalThis.WebSocket;
   },
+);
+
+const TestLayer = Socket.SocketController.DefaultWithoutDependencies.pipe(
+  Layer.provide(Config.Config.Default(urlNoAppends)),
+  Layer.provide(MockWebSocketLayer),
+  Layer.provide(Logger.pretty),
 );
 
 describe("Socket", () => {
@@ -45,13 +52,7 @@ describe("Socket", () => {
       yield* Effect.logInfo(`Server received message: ${receivedMessage}`);
 
       expect(message).toEqual(receivedMessage);
-    }).pipe(
-      Effect.provide(
-        Socket.SocketController.DefaultWithoutDependencies({ url }),
-      ),
-      Effect.provide(MockWebSocketLayer),
-      Effect.provide(Logger.pretty),
-    ),
+    }).pipe(Effect.provide(TestLayer)),
   );
 
   it.scoped("SocketController can receive messages", () =>
@@ -74,12 +75,6 @@ describe("Socket", () => {
       yield* Effect.logInfo(`Client received message: ${receivedMessage}`);
 
       expect(message).toEqual(receivedMessage);
-    }).pipe(
-      Effect.provide(
-        Socket.SocketController.DefaultWithoutDependencies({ url }),
-      ),
-      Effect.provide(MockWebSocketLayer),
-      Effect.provide(Logger.pretty),
-    ),
+    }).pipe(Effect.provide(TestLayer)),
   );
 });

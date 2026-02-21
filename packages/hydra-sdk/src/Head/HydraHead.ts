@@ -1,10 +1,7 @@
 import { FetchHttpClient, HttpClient } from "@effect/platform";
 import { Protocol, Socket, Head } from "@no-witness-labs/hydra-sdk";
-import { Effect, Option, Schedule, Schema, Queue, PubSub, Scope, Duration } from "effect";
+import { Effect, Schedule, Schema, Queue, PubSub, Scope, Duration } from "effect";
 import { TimeoutException } from "effect/Cause";
-
-// const url = "ws://localhost:4001";
-const url = "ws://172.16.238.10:4001";
 
 const awaitMessageWithSchema = <A, I>(
   socketController: Socket.SocketController,
@@ -81,7 +78,6 @@ export class HydraHeadController extends Effect.Service<HydraHeadController>()(
 
         yield* Effect.log(`Abort action complete, status is now is ${[hydraStateMachine.getStatus()]}`);
       });
-
 
       const recover = (recoverTxId: string) => Effect.gen(function* () {
         yield* Effect.log(`Called recover with recoverTxId: ${recoverTxId}`);
@@ -245,8 +241,6 @@ export class HydraHeadController extends Effect.Service<HydraHeadController>()(
 
     dependencies: [
       FetchHttpClient.layer,
-      Head.HydraStateMachine.Default,
-      Socket.SocketController.Default({ url })
     ],
   },
 ) {}

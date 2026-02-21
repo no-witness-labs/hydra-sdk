@@ -25,6 +25,42 @@ describe("GreetingsMessageSchema", () => {
         expect(encoded).toEqual(expected);
       }),
   );
+  it.effect(
+    "encodes GreetingsMessageSchema with peers to correct JSON object",
+    () =>
+      Effect.gen(function* () {
+        const expected = {
+          "env":{
+            "configuredPeers":"172.16.238.10:5001=http://172.16.238.10:5001,172.16.238.20:5001=http://172.16.238.20:5001",
+            "contestationPeriod":3,
+            "depositPeriod":3600,
+            "otherParties": [{"vkey":"b37aabd81024c043f53a069c91e51a5b52e4ea399ae17ee1fe3cb9c44db707eb"},{"vkey":"f68e5624f885d521d2f43c3959a0de70496d5464bd3171aba8248f50d5d72b41"}],
+            "participants": ["3aaa2e3de913b0f5aa7e7f076e122d737db5329df1aa905192284fea","f8a68cd18e59a6ace848155a0e967af64f4d00cf8acee8adc95a6b0d","1052386136b347f3bb7c67fe3f2ee4ef120e1836e5d2707bb068afa6"],
+            "party": {"vkey":"7abcda7de6d883e7570118c1ccc8ee2e911f2e628a41ab0685ffee15f39bba96"},
+            "signingKey": "0e3f3546a93bd1295eb9dce216941eefbce99ca9323df258d9beeee335920cce"
+          },
+          "headStatus": "Open",
+          "hydraHeadId": "564a742e347cc0d9db8aa6c083dfd1d2807186f3ea56e4536cefadc7",
+          "hydraNodeVersion": "1.2.0-d967d641c0ccad884aff6187b4d1d6c8d92380dc",
+          "me" :{"vkey":"7abcda7de6d883e7570118c1ccc8ee2e911f2e628a41ab0685ffee15f39bba96"},
+          "networkInfo": {
+            "networkConnected":true,
+            "peersInfo": {"172.16.238.10:5001":true,"172.16.238.20:5001":true}
+          },
+            "snapshotUtxo":{},
+            "tag":"Greetings"
+        };
+
+        const decoded = yield* Schema.decodeUnknown(
+          Protocol.GreetingsMessageSchema,
+        )(expected);
+        const encoded = yield* Schema.encode(Protocol.GreetingsMessageSchema)(
+          decoded,
+        );
+
+        expect(encoded).toEqual(expected);
+      }),
+  );
   it.effect("encodes GreetingsMessageSchema to correct JSON object", () =>
     Effect.gen(function* () {
       const expected = {
@@ -34,8 +70,14 @@ describe("GreetingsMessageSchema", () => {
         },
         headStatus: "Idle",
         hydraHeadId: "820082582089ff4f3ff4a6052ec9d073",
-        snapshotUtxo:
-          '{\n    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {\n        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",\n        "value": {\n            "lovelace": 7620669\n        }\n    }\n}\n',
+        snapshotUtxo: {
+          "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {
+            "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",
+            "value": {
+              "lovelace": 7620669
+            }
+          }
+        },
         timestamp: "2019-08-24T14:15:22.000Z",
         hydraNodeVersion: "1.0.0",
       };
@@ -309,7 +351,7 @@ describe("CommittedMessageSchema", () => {
             vkey: "d0b8f28427aa7b640c636075905cbd6574a431aeaca5b3dbafd47cfe66c35043",
           },
         ],
-        utxo: '{\n    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {\n        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",\n        "value": {\n            "lovelace": 7620669\n        }\n    }\n}\n',
+        utxo: '{    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",        "value": {            "lovelace": 7620669        }    }}',
         seq: 1,
         timestamp: "2019-08-24T14:15:22.000Z",
       };
@@ -332,7 +374,7 @@ describe("HeadIsOpenMessageSchema", () => {
       const expected = {
         tag: "HeadIsOpen",
         headId: "820082582089ff4f3ff4a6052ec9d073",
-        utxo: '{\n    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {\n        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",\n        "value": {\n            "lovelace": 7620669\n        }\n    }\n}\n',
+        utxo: '{    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",        "value": {            "lovelace": 7620669        }    }}',
         seq: 1,
         timestamp: "2019-08-24T14:15:22.000Z",
       };
@@ -357,7 +399,7 @@ describe("HeadIsClosedMessageSchema", () => {
         headId: "820082582089ff4f3ff4a6052ec9d073",
         snapshotNumber: 5,
         contestationDeadline: "2019-08-24T14:15:22.000Z",
-        utxo: '{\n    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {\n        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",\n        "value": {\n            "lovelace": 7620669\n        }\n    }\n}\n',
+        utxo: '{    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",        "value": {            "lovelace": 7620669        }    }}',
         seq: 1,
         timestamp: "2019-08-24T14:15:22.000Z",
       };
@@ -382,7 +424,7 @@ describe("HeadIsContestedMessageSchema", () => {
         headId: "820082582089ff4f3ff4a6052ec9d073",
         snapshotNumber: 5,
         contestationDeadline: "2019-08-24T14:15:22.000Z",
-        utxo: '{\n    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {\n        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",\n        "value": {\n            "lovelace": 7620669\n        }\n    }\n}\n',
+        utxo: '{    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",        "value": {            "lovelace": 7620669        }    }}',
         seq: 1,
         timestamp: "2019-08-24T14:15:22.000Z",
       };
@@ -427,7 +469,7 @@ describe("HeadIsAbortedMessageSchema", () => {
       const expected = {
         tag: "HeadIsAborted",
         headId: "820082582089ff4f3ff4a6052ec9d073",
-        utxo: '{\n    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {\n        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",\n        "value": {\n            "lovelace": 7620669\n        }\n    }\n}\n',
+        utxo: '{    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",        "value": {            "lovelace": 7620669        }    }}',
         seq: 1,
         timestamp: "2019-08-24T14:15:22.000Z",
       };
@@ -450,7 +492,7 @@ describe("HeadIsFinalizedMessageSchema", () => {
       const expected = {
         tag: "HeadIsFinalized",
         headId: "820082582089ff4f3ff4a6052ec9d073",
-        utxo: '{\n    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {\n        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",\n        "value": {\n            "lovelace": 7620669\n        }\n    }\n}\n',
+        utxo: '{    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",        "value": {            "lovelace": 7620669        }    }}',
         seq: 1,
         timestamp: "2019-08-24T14:15:22.000Z",
       };
@@ -496,7 +538,7 @@ describe("TxInvalidMessageSchema", () => {
       const expected = {
         tag: "TxInvalid",
         headId: "820082582089ff4f3ff4a6052ec9d073",
-        utxo: '{\n    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {\n        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",\n        "value": {\n            "lovelace": 7620669\n        }\n    }\n}\n',
+        utxo: '{    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",        "value": {            "lovelace": 7620669        }    }}',
         transaction: {
           txId: "8df1616d4337ede40bbad2914f12977815234b83951bcce3bfcd735aed3f63e4",
           type: "Tx ConwayEra",
@@ -534,7 +576,7 @@ describe("SnapshotConfirmedMessageSchema", () => {
             version: 1,
             number: 5,
             confirmed: [],
-            utxo: '{\n    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {\n        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",\n        "value": {\n            "lovelace": 7620669\n        }\n    }\n}\n',
+            utxo: '{    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",        "value": {            "lovelace": 7620669        }    }}',
           },
           seq: 1,
           timestamp: "2019-08-24T14:15:22.000Z",
@@ -620,7 +662,7 @@ describe("DecommitInvalidMessageSchema", () => {
         decommitInvalidReason: {
           tag: "DecommitTxInvalid",
           localUTxO:
-            '{\n    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {\n        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",\n        "value": {\n            "lovelace": 7620669\n        }\n    }\n}\n',
+            '{    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",        "value": {            "lovelace": 7620669        }    }}',
           validationError: { reason: "Invalid" },
         },
         seq: 1,
@@ -687,7 +729,7 @@ describe("DecommitRequestedMessageSchema", () => {
               "820082582089ff4f3ff4a6052ec9d073b3be68b5e7596bd74a04e7b74504a8302fb2278cd95840f66eb3cd160372d617411408792c0ebd9791968e9948112894e2706697a55c10296b04019ed2f146f4d81e8ab17b9d14cf99569a2f85cbfa32320127831db202",
           },
           utxoToDecommit:
-            '{\n    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {\n        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",\n        "value": {\n            "lovelace": 7620669\n        }\n    }\n}\n',
+            '{    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",        "value": {            "lovelace": 7620669        }    }}',
           seq: 1,
           timestamp: "2019-08-24T14:15:22.000Z",
         };
@@ -715,7 +757,7 @@ describe("DecommitApprovedMessageSchema", () => {
           decommitTxId:
             "8df1616d4337ede40bbad2914f12977815234b83951bcce3bfcd735aed3f63e4",
           utxoToDecommit:
-            '{\n    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {\n        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",\n        "value": {\n            "lovelace": 7620669\n        }\n    }\n}\n',
+            '{    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",        "value": {            "lovelace": 7620669        }    }}',
           seq: 1,
           timestamp: "2019-08-24T14:15:22.000Z",
         };
@@ -741,7 +783,7 @@ describe("DecommitFinalizedMessageSchema", () => {
           tag: "DecommitFinalized",
           headId: "820082582089ff4f3ff4a6052ec9d073",
           distributedUTxO:
-            '{\n    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {\n        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",\n        "value": {\n            "lovelace": 7620669\n        }\n    }\n}\n',
+            '{    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",        "value": {            "lovelace": 7620669        }    }}',
           seq: 1,
           timestamp: "2019-08-24T14:15:22.000Z",
         };
@@ -765,7 +807,7 @@ describe("CommitRecordedMessageSchema", () => {
         tag: "CommitRecorded",
         headId: "820082582089ff4f3ff4a6052ec9d073",
         utxoToCommit:
-          '{\n    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {\n        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",\n        "value": {\n            "lovelace": 7620669\n        }\n    }\n}\n',
+          '{    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",        "value": {            "lovelace": 7620669        }    }}',
         pendingDeposit: "deposit1",
         deadline: "2019-08-24T14:15:22.000Z",
         seq: 1,
@@ -791,7 +833,7 @@ describe("CommitApprovedMessageSchema", () => {
         tag: "CommitApproved",
         headId: "820082582089ff4f3ff4a6052ec9d073",
         utxoToCommit:
-          '{\n    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {\n        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",\n        "value": {\n            "lovelace": 7620669\n        }\n    }\n}\n',
+          '{    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",        "value": {            "lovelace": 7620669        }    }}',
         seq: 1,
         timestamp: "2019-08-24T14:15:22.000Z",
       };
@@ -839,7 +881,7 @@ describe("CommitRecoveredMessageSchema", () => {
         tag: "CommitRecovered",
         headId: "820082582089ff4f3ff4a6052ec9d073",
         recoveredUTxO:
-          '{\n    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {\n        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",\n        "value": {\n            "lovelace": 7620669\n        }\n    }\n}\n',
+          '{    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",        "value": {            "lovelace": 7620669        }    }}',
         recoveredTxId:
           "8df1616d4337ede40bbad2914f12977815234b83951bcce3bfcd735aed3f63e4",
         seq: 1,
@@ -914,8 +956,14 @@ describe("WebSocketResponseMessageSchema", () => {
         },
         headStatus: "Idle",
         hydraHeadId: "820082582089ff4f3ff4a6052ec9d073",
-        snapshotUtxo:
-          '{\n    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {\n        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",\n        "value": {\n            "lovelace": 7620669\n        }\n    }\n}\n',
+        snapshotUtxo: {
+          "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {
+            "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",
+            "value": {
+              "lovelace": 7620669
+            }
+          }
+        },
         timestamp: "2019-08-24T14:15:22.000Z",
         hydraNodeVersion: "1.0.0",
       };

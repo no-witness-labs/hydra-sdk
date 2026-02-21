@@ -1,25 +1,9 @@
 import { Socket } from "@effect/platform";
 import { WebSocketConstructor } from "@effect/platform/Socket";
+import { Config } from "@no-witness-labs/hydra-sdk";
 import { Effect, Layer, PubSub, Schedule } from "effect";
 import type { RuntimeFiber } from "effect/Fiber";
 import { WebSocket } from "ws";
-
-// =============================================================================
-// Socket Configuration
-// =============================================================================
-
-/**
- * Configuration for establishing a WebSocket connection.
- *
- * @since 0.2.0
- * @category types
- */
-export type SocketConfig = {
-  /**
-   * The WebSocket URL to connect to.
-   */
-  url: string;
-};
 
 // =============================================================================
 // Socket Controller Service
@@ -61,11 +45,11 @@ export type SocketConfig = {
 export class SocketController extends Effect.Service<SocketController>()(
   "SocketController",
   {
-    effect: ({ url }: SocketConfig) =>
-      Effect.gen(function* () {
-        yield* Effect.log(`SocketController was created at: ${url}`);
+    effect: Effect.gen(function* () {
+        const { wsUrl } = yield* Config.Config
+        yield* Effect.log(`SocketController was created at: ${wsUrl}`);
 
-        const socket: Socket.Socket = yield* Socket.makeWebSocket(url);
+        const socket: Socket.Socket = yield* Socket.makeWebSocket(wsUrl);
         const messageQueue: PubSub.PubSub<Uint8Array> =
           yield* PubSub.unbounded<Uint8Array>();
 
@@ -161,8 +145,8 @@ export class SocketController extends Effect.Service<SocketController>()(
        *
        * @since 0.2.0
        */
-      Layer.succeed(WebSocketConstructor, (url, options) => {
-        return new WebSocket(url, options) as unknown as globalThis.WebSocket;
+      Layer.succeed(WebSocketConstructor, (wsUrl, options) => {
+        return new WebSocket(wsUrl, options) as unknown as globalThis.WebSocket;
       }),
     ],
   },

@@ -1,7 +1,6 @@
-import { Protocol, Socket } from "@no-witness-labs/hydra-sdk";
+import { FetchHttpClient, HttpClient, HttpClientResponse } from "@effect/platform";
+import { Protocol, Socket, Config } from "@no-witness-labs/hydra-sdk";
 import { Duration, Effect, Option, Schedule, Schema } from "effect";
-
-const url = "ws://localhost:4001";
 
 /**
  * Error thrown when awaiting a status times out.
@@ -53,10 +52,58 @@ export class HydraStateMachine extends Effect.Service<HydraStateMachine>()(
   {
     effect: Effect.gen(function* () {
       yield* Effect.log("HydraStateMachine was created");
+      const config = yield* Config.Config
 
+      const httpClient = yield* HttpClient.HttpClient;
       const socketController = yield* Socket.SocketController;
       const messageQueue = yield* socketController.messageQueue.subscribe;
+
+      const getMaybeStatusByHttp: Effect.Effect<Option.Option<Protocol.Status>> =
+        Effect.gen(function* () {
+          const responseOpt = yield* httpClient.get(
+            `${config.httpUrl}/head`,
+          ).pipe(Effect.option);
+
+          if (Option.isNone(responseOpt)) {
+            return Option.none();
+          }
+
+          const headResponseOpt = yield* Effect.option(
+            HttpClientResponse.schemaBodyJson(
+              Protocol.HeadResponseSchema
+            )(responseOpt.value)
+          );
+
+          return Option.map(headResponseOpt, Protocol.headResponseToStatus);
+      });
+
+      const setStatus = (
+        maybeStatusByWs:  Option.Option<Protocol.Status>,
+        maybeStatusByHttp:  Option.Option<Protocol.Status>,
+      ) => Effect.gen(function* () {
+            if (Option.isSome(maybeStatusByWs) && Option.isSome(maybeStatusByHttp)) {
+              const wsStatus = maybeStatusByWs.value
+              const httpStatus = maybeStatusByHttp.value
+
+              if (wsStatus !== httpStatus) {
+                yield* Effect.log(
+                  `Status mismatch from websocket: [${wsStatus}] and http: [${httpStatus}]. Using websocket.`
+                );
+                status = wsStatus
+              }
+            } else {
+              const maybeStatus = Option.firstSomeOf([maybeStatusByWs, maybeStatusByHttp]);
+              if (Option.isSome(maybeStatus)) {
+                status = maybeStatus.value
+              }
+            }
+      })
+
       let status: Protocol.Status = "DISCONNECTED";
+      const maybeStatusByHttp = yield* getMaybeStatusByHttp
+      if (Option.isSome(maybeStatusByHttp)) {
+        status = maybeStatusByHttp.value
+      }
 
       const statusFiber = yield* Effect.fork(
         Effect.gen(function* () {
@@ -64,7 +111,7 @@ export class HydraStateMachine extends Effect.Service<HydraStateMachine>()(
           while ((rawMessage = yield* messageQueue.take)) {
             const messageText: string = new TextDecoder().decode(rawMessage);
 
-            const maybeStatus: Option.Option<Protocol.Status> =
+            const maybeStatusByWs: Option.Option<Protocol.Status> =
               yield* Effect.option(
                 Schema.decode(
                   Schema.parseJson(Protocol.WebSocketResponseMessageSchema),
@@ -73,13 +120,12 @@ export class HydraStateMachine extends Effect.Service<HydraStateMachine>()(
                 Effect.map(Option.flatMap(Protocol.socketMessageToStatus)),
               );
 
-            if (Option.isSome(maybeStatus)) {
-              const newStatus = yield* maybeStatus;
-              yield* Effect.log(
-                `Valid status received [${newStatus}] from message: ${messageText}`,
-              );
-              status = newStatus;
+            if (Option.isNone(maybeStatusByWs)) {
+              yield* Effect.logError(`Failed to parse message: ${messageText}`);
             }
+
+            const maybeStatusByHttp = yield* getMaybeStatusByHttp
+            yield* setStatus(maybeStatusByWs, maybeStatusByHttp)
           }
         }),
       );
@@ -135,6 +181,8 @@ export class HydraStateMachine extends Effect.Service<HydraStateMachine>()(
       };
     }),
 
-    dependencies: [Socket.SocketController.Default({ url })],
+    dependencies: [
+      FetchHttpClient.layer,
+    ],
   },
 ) {}

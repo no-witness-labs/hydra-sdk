@@ -1,24 +1,20 @@
 import { WebSocketConstructor } from "@effect/platform/Socket";
 import { describe, expect, it } from "@effect/vitest";
 import type { Protocol } from "@no-witness-labs/hydra-sdk";
-import { Head, Socket } from "@no-witness-labs/hydra-sdk";
+import { Head, Socket, Config } from "@no-witness-labs/hydra-sdk";
 import { Effect, Layer, Logger } from "effect";
 import type { Scope } from "effect/Scope";
 import { WS } from "vitest-websocket-mock";
 
-const url = `ws://localhost:1234`;
+const urlNoAppends = "localhost:1234";
+const url = "ws://" + urlNoAppends
 
 const greetingsMessage = {
-  tag: "Greetings",
-  me: {
-    vkey: "d0b8f28427aa7b640c636075905cbd6574a431aeaca5b3dbafd47cfe66c35043",
-  },
-  headStatus: "Idle",
-  hydraHeadId: "820082582089ff4f3ff4a6052ec9d073",
-  snapshotUtxo:
-    '{\n    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {\n        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",\n        "value": {\n            "lovelace": 7620669\n        }\n    }\n}\n',
-  timestamp: "2019-08-24T14:15:22.000Z",
-  hydraNodeVersion: "1.0.0",
+    me: {
+      vkey: "41c3b71ac178ba33e59506a792679d5cdd6efe9a1f474a53f13f7dde16b35eb6",
+    },
+    headStatus: "Idle",
+    hydraNodeVersion: "1.0.0",
 };
 
 const headIsInitializingMessage = {
@@ -50,6 +46,13 @@ const MockWebSocketLayer = Layer.succeed(
   },
 );
 
+const TestLayer = Head.HydraStateMachine.Default.pipe(
+      Layer.provide(Socket.SocketController.DefaultWithoutDependencies),
+      Layer.provide(Config.Config.Default(urlNoAppends)),
+      Layer.provide(MockWebSocketLayer),
+      Layer.provide(Logger.pretty),
+);
+
 describe("Head.HydraStateMachine", () => {
   it.scoped("initializes with DISCONNECTED status", () =>
     Effect.gen(function* () {
@@ -60,13 +63,8 @@ describe("Head.HydraStateMachine", () => {
 
       const status: Protocol.Status = stateMachine.getStatus();
       expect(status).toEqual("DISCONNECTED");
-    }).pipe(
-      Effect.provide(Head.HydraStateMachine.DefaultWithoutDependencies),
-      Effect.provide(
-        Socket.SocketController.DefaultWithoutDependencies({ url }),
-      ),
-      Effect.provide(MockWebSocketLayer),
-      Effect.provide(Logger.pretty),
+    }).pipe(      
+      Effect.provide(TestLayer)
     ),
   );
 
@@ -94,12 +92,7 @@ describe("Head.HydraStateMachine", () => {
       yield* Effect.logInfo(`Status after message: ${status}`);
       expect(status).toEqual("IDLE");
     }).pipe(
-      Effect.provide(Head.HydraStateMachine.DefaultWithoutDependencies),
-      Effect.provide(
-        Socket.SocketController.DefaultWithoutDependencies({ url }),
-      ),
-      Effect.provide(MockWebSocketLayer),
-      Effect.provide(Logger.pretty),
+      Effect.provide(TestLayer)
     ),
   );
 
@@ -124,12 +117,7 @@ describe("Head.HydraStateMachine", () => {
       // Status should remain unchanged
       expect(statusAfter).toEqual(initialStatus);
     }).pipe(
-      Effect.provide(Head.HydraStateMachine.DefaultWithoutDependencies),
-      Effect.provide(
-        Socket.SocketController.DefaultWithoutDependencies({ url }),
-      ),
-      Effect.provide(MockWebSocketLayer),
-      Effect.provide(Logger.pretty),
+      Effect.provide(TestLayer)
     ),
   );
 
@@ -171,12 +159,7 @@ describe("Head.HydraStateMachine", () => {
       // Verify status changed
       expect(status2).not.toEqual(status1);
     }).pipe(
-      Effect.provide(Head.HydraStateMachine.DefaultWithoutDependencies),
-      Effect.provide(
-        Socket.SocketController.DefaultWithoutDependencies({ url }),
-      ),
-      Effect.provide(MockWebSocketLayer),
-      Effect.provide(Logger.pretty),
+      Effect.provide(TestLayer)
     ),
   );
 
@@ -212,12 +195,7 @@ describe("Head.HydraStateMachine", () => {
       );
       expect(fiberStatusAfter).toBeNull();
     }).pipe(
-      Effect.provide(Head.HydraStateMachine.DefaultWithoutDependencies),
-      Effect.provide(
-        Socket.SocketController.DefaultWithoutDependencies({ url }),
-      ),
-      Effect.provide(MockWebSocketLayer),
-      Effect.provide(Logger.pretty),
+      Effect.provide(TestLayer)
     ),
   );
 
@@ -240,12 +218,7 @@ describe("Head.HydraStateMachine", () => {
       // Status should remain unchanged
       expect(statusAfter).toEqual(initialStatus);
     }).pipe(
-      Effect.provide(Head.HydraStateMachine.DefaultWithoutDependencies),
-      Effect.provide(
-        Socket.SocketController.DefaultWithoutDependencies({ url }),
-      ),
-      Effect.provide(MockWebSocketLayer),
-      Effect.provide(Logger.pretty),
+      Effect.provide(TestLayer)
     ),
   );
 });

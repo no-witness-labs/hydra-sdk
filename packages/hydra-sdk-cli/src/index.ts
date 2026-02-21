@@ -5,8 +5,7 @@ import * as Command from "@effect/cli/Command";
 import type { ValidationError } from "@effect/cli/ValidationError";
 import * as NodeContext from "@effect/platform-node/NodeContext";
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
-import { Head, Protocol, Socket } from "@no-witness-labs/hydra-sdk";
-import { Schedule } from "effect";
+import { Head, Protocol, Socket, Config } from "@no-witness-labs/hydra-sdk";
 import * as Effect from "effect/Effect";
 
 export const statusCommand = Command.make("status", {}).pipe(
@@ -43,9 +42,13 @@ export const runCommands: (
   version: "0.1.0",
 });
 
+const urlNoAppends = "172.16.238.30:4001"
+
 runCommands(process.argv).pipe(
   Effect.provide(Head.HydraHeadController.Default),
   Effect.provide(Head.HydraStateMachine.Default),
+  Effect.provide(Socket.SocketController.Default),
+  Effect.provide(Config.Config.Default(urlNoAppends)),
   Effect.provide(NodeContext.layer),
   Effect.scoped,
   NodeRuntime.runMain(),
