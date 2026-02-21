@@ -42,6 +42,8 @@ export function socketMessageToStatus(
       return Option.some("FANOUT_POSSIBLE");
     case "HeadIsFinalized":
       return Option.some("FINAL");
+    case "HeadIsAborted":
+      return Option.some("IDLE");
     default:
       return Option.none(); // TODO: check that error responses don't alter the head status
   }
