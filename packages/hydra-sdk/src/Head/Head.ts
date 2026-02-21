@@ -235,14 +235,14 @@ const createEffect = (
       command: ClientInputTag,
       payload: unknown,
       matcher: (event: ApiEvent) => MatchResult<void>,
-      timeout: string,
+      timeoutMs: number,
     ): Effect.Effect<void, HeadError> =>
       Effect.gen(function* () {
         yield* fsm.assertCommandAllowed(command);
         yield* router.sendAndAwait(
           transport.send(command, payload),
           matcher,
-          timeout,
+          timeoutMs,
         );
       });
 
@@ -251,7 +251,7 @@ const createEffect = (
         "Init",
         params,
         (event) => matchServerTag(event, "HeadIsInitializing", "Init"),
-        "30 seconds",
+        30_000,
       ).pipe(
         Effect.tap(() =>
           Effect.sync(() => {
@@ -265,7 +265,7 @@ const createEffect = (
         "Commit",
         utxos,
         (event) => matchServerTag(event, "HeadIsOpen", "Commit"),
-        "30 seconds",
+        30_000,
       );
 
     const closeEffect = (): Effect.Effect<void, HeadError> =>
@@ -273,7 +273,7 @@ const createEffect = (
         "Close",
         undefined,
         (event) => matchServerTag(event, "HeadIsClosed", "Close"),
-        "60 seconds",
+        60_000,
       );
 
     const safeCloseEffect = (): Effect.Effect<void, HeadError> =>
@@ -281,7 +281,7 @@ const createEffect = (
         "SafeClose",
         undefined,
         (event) => matchServerTag(event, "HeadIsClosed", "SafeClose"),
-        "60 seconds",
+        60_000,
       );
 
     const awaitReadyToFanoutEffect = (): Effect.Effect<void, HeadError> =>
@@ -299,7 +299,7 @@ const createEffect = (
           }
 
           return matchContinue();
-        }, "60 seconds");
+        }, 60_000);
       });
 
     const fanoutEffect = (): Effect.Effect<void, HeadError> =>
@@ -309,7 +309,7 @@ const createEffect = (
           "Fanout",
           undefined,
           (event) => matchServerTag(event, "HeadIsFinalized", "Fanout"),
-          "90 seconds",
+          90_000,
         ),
       );
 
@@ -318,7 +318,7 @@ const createEffect = (
         "Abort",
         undefined,
         (event) => matchServerTag(event, "HeadIsAborted", "Abort"),
-        "30 seconds",
+        30_000,
       );
 
     const disposeEffect = (): Effect.Effect<void, HeadError> =>

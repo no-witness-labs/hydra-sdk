@@ -13,11 +13,11 @@ export interface CommandRouter {
   readonly sendAndAwait: <A>(
     start: Effect.Effect<void, HeadError>,
     matcher: (event: ApiEvent) => MatchResult<A>,
-    timeout: string,
+    timeoutMs: number,
   ) => Effect.Effect<A, HeadError>;
   readonly awaitMatch: <A>(
     matcher: (event: ApiEvent) => MatchResult<A>,
-    timeout: string,
+    timeoutMs: number,
   ) => Effect.Effect<A, HeadError>;
 }
 
@@ -42,7 +42,7 @@ export const makeCommandRouter = (
     const runAwait = <A>(
       start: Effect.Effect<void, HeadError>,
       matcher: (event: ApiEvent) => MatchResult<A>,
-      timeout: string,
+      timeoutMs: number,
     ): Effect.Effect<A, HeadError> =>
       Effect.gen(function* () {
         const queue = yield* Queue.unbounded<ApiEvent>();
@@ -80,9 +80,11 @@ export const makeCommandRouter = (
 
         const awaitResult = Deferred.await(done).pipe(
           Effect.timeoutFail({
-            duration: timeout,
+            duration: timeoutMs,
             onTimeout: () =>
-              new HeadError({ message: `Command timed out after ${timeout}` }),
+              new HeadError({
+                message: `Command timed out after ${timeoutMs}ms`,
+              }),
           }),
         );
 
@@ -103,14 +105,15 @@ export const makeCommandRouter = (
 
     const awaitMatch = <A>(
       matcher: (event: ApiEvent) => MatchResult<A>,
-      timeout: string,
-    ): Effect.Effect<A, HeadError> => runAwait(Effect.void, matcher, timeout);
+      timeoutMs: number,
+    ): Effect.Effect<A, HeadError> =>
+      runAwait(Effect.void, matcher, timeoutMs);
 
     const sendAndAwait = <A>(
       start: Effect.Effect<void, HeadError>,
       matcher: (event: ApiEvent) => MatchResult<A>,
-      timeout: string,
-    ): Effect.Effect<A, HeadError> => runAwait(start, matcher, timeout);
+      timeoutMs: number,
+    ): Effect.Effect<A, HeadError> => runAwait(start, matcher, timeoutMs);
 
     return {
       sendAndAwait,
