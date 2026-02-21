@@ -459,7 +459,6 @@ export const makeHeadTransport = (
               reason: `Websocket reconnect attempts exhausted after ${reconnect.maxRetries} retries`,
             },
           });
-          firstConnection = false;
           break;
         }
       }),
