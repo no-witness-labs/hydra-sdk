@@ -49,7 +49,7 @@ export class SocketController extends Effect.Service<SocketController>()(
         const { wsUrl } = yield* Config.Config
         yield* Effect.log(`SocketController was created at: ${wsUrl}`);
 
-        const socket: Socket.Socket = yield* Socket.makeWebSocket(wsUrl);
+        const socket: Socket.Socket = yield* Socket.makeWebSocket(wsUrl); // TODO: Add retry on the connection
         const messageQueue: PubSub.PubSub<Uint8Array> =
           yield* PubSub.unbounded<Uint8Array>();
 

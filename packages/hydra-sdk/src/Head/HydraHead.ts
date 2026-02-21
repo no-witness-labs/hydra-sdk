@@ -226,6 +226,7 @@ export class HydraHeadController extends Effect.Service<HydraHeadController>()(
       });
 
       return {
+        logStatus: Effect.logInfo(`The status is: [${hydraStateMachine.getStatus()}]`),
         logStatusHeadForewer,
         initialize,
         abort,

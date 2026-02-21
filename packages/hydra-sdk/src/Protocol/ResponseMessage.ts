@@ -31,7 +31,6 @@ export const GreetingsMessageSchema = Schema.Struct({
   timestamp: Schema.optional(Schema.String),
   env: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.Any })), // Undocumented field of the Hydra Head response
   networkInfo: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.Any })), // Undocumented field of the Hydra Head response
-
 });
 export type GreetingsMessage = typeof GreetingsMessageSchema.Type;
 

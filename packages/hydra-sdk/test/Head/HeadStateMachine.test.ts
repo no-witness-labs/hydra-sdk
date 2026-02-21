@@ -6,7 +6,7 @@ import { Effect, Layer, Logger } from "effect";
 import type { Scope } from "effect/Scope";
 import { WS } from "vitest-websocket-mock";
 
-const urlNoAppends = "localhost:1234";
+const urlNoAppends = "localhost:1234"
 const url = "ws://" + urlNoAppends
 
 const greetingsMessage = {
@@ -29,15 +29,15 @@ const headIsInitializingMessage = {
   timestamp: "2019-08-24T14:15:22.000Z",
 };
 
-const makeServer: Effect.Effect<WS, never, Scope> = Effect.acquireRelease(
-  Effect.sync(() => new WS(url)), // acquire
-  // release
-  (ws) =>
-    Effect.sync(() => {
+class MockServer extends Effect.Service<MockServer>()("MockServer", {
+  scoped: Effect.acquireRelease(
+    Effect.sync(() => new WS(url)),
+    (ws) => Effect.sync(() => {
       ws.close();
       WS.clean();
     }),
-);
+  ),
+}) {}
 
 const MockWebSocketLayer = Layer.succeed(
   WebSocketConstructor,
@@ -46,17 +46,20 @@ const MockWebSocketLayer = Layer.succeed(
   },
 );
 
-const TestLayer = Head.HydraStateMachine.Default.pipe(
-      Layer.provide(Socket.SocketController.DefaultWithoutDependencies),
-      Layer.provide(Config.Config.Default(urlNoAppends)),
-      Layer.provide(MockWebSocketLayer),
-      Layer.provide(Logger.pretty),
+const TestLayer = Layer.merge(
+  MockServer.Default,
+  Head.HydraStateMachine.Default.pipe(
+    Layer.provide(Socket.SocketController.DefaultWithoutDependencies),
+    Layer.provide(Config.Config.Default(urlNoAppends)),
+    Layer.provide(MockWebSocketLayer),
+    Layer.provide(Logger.pretty),
+  ),
 );
 
 describe("Head.HydraStateMachine", () => {
   it.scoped("initializes with DISCONNECTED status", () =>
     Effect.gen(function* () {
-      const server = yield* makeServer;
+      const server = yield* MockServer;
       yield* Effect.promise(() => server.connected);
 
       const stateMachine = yield* Head.HydraStateMachine;
@@ -70,7 +73,7 @@ describe("Head.HydraStateMachine", () => {
 
   it.scoped("updates status when receiving valid status messages", () =>
     Effect.gen(function* () {
-      const server = yield* makeServer;
+      const server = yield* MockServer;
       yield* Effect.promise(() => server.connected);
 
       const stateMachine = yield* Head.HydraStateMachine;
@@ -98,7 +101,7 @@ describe("Head.HydraStateMachine", () => {
 
   it.scoped("ignores invalid messages", () =>
     Effect.gen(function* () {
-      const server = yield* makeServer;
+      const server = yield* MockServer;
       yield* Effect.promise(() => server.connected);
 
       const stateMachine = yield* Head.HydraStateMachine;
@@ -123,7 +126,7 @@ describe("Head.HydraStateMachine", () => {
 
   it.scoped("processes multiple status updates in sequence", () =>
     Effect.gen(function* () {
-      const server = yield* makeServer;
+      const server = yield* MockServer;
       yield* Effect.promise(() => server.connected);
 
       const stateMachine = yield* Head.HydraStateMachine;
@@ -165,7 +168,7 @@ describe("Head.HydraStateMachine", () => {
 
   it.scoped("statusFiber continues processing messages", () =>
     Effect.gen(function* () {
-      const server = yield* makeServer;
+      const server = yield* MockServer;
       yield* Effect.promise(() => server.connected);
 
       const stateMachine = yield* Head.HydraStateMachine;
@@ -201,7 +204,7 @@ describe("Head.HydraStateMachine", () => {
 
   it.scoped("handles non-JSON messages gracefully", () =>
     Effect.gen(function* () {
-      const server = yield* makeServer;
+      const server = yield* MockServer;
       yield* Effect.promise(() => server.connected);
 
       const stateMachine = yield* Head.HydraStateMachine;

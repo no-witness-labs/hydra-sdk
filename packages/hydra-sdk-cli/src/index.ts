@@ -55,4 +55,4 @@ runCommands(process.argv).pipe(
 );
 
 // Export and reimport since the lsp doesn't like to import @no-witness-labs/hydra-sdk-cli in tests
-export { Head, Protocol, Socket };
+export { Head, Protocol, Socket, Config };
