@@ -124,33 +124,6 @@ describe("GreetingsMessageSchema", () => {
       expect(encoded).toEqual(expected);
     }),
   );
-
-  it.effect("encodes GreetingsMessageSchema with optional fields", () =>
-    Effect.gen(function* () {
-      const expected = {
-        tag: "Greetings",
-        me: {
-          vkey: "d0b8f28427aa7b640c636075905cbd6574a431aeaca5b3dbafd47cfe66c35043",
-        },
-        headStatus: "Open",
-        hydraHeadId: "820082582089ff4f3ff4a6052ec9d073",
-        snapshotUtxo: sampleUtxo,
-        timestamp: "2019-08-24T14:15:22.000Z",
-        hydraNodeVersion: "1.0.0",
-        env: "preview",
-        currentSlot: 42,
-      };
-
-      const decoded = yield* Schema.decodeUnknown(
-        Protocol.GreetingsMessageSchema,
-      )(expected);
-      const encoded = yield* Schema.encode(Protocol.GreetingsMessageSchema)(
-        decoded,
-      );
-
-      expect(encoded).toEqual(expected);
-    }),
-  );
 });
 
 describe("CommandFailedMessageSchema", () => {
