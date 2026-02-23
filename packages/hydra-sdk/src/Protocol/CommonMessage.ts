@@ -1,5 +1,7 @@
 import { Schema } from "effect";
 
+import { UTxOSchema } from "./Types.js";
+
 // =============================================================================
 // Common Message Schemas
 // =============================================================================
@@ -48,9 +50,9 @@ export const SeenSnapshotSchema = Schema.Union(
       version: Schema.Int,
       number: Schema.Int,
       confirmed: Schema.Array(TransactionMessageSchema),
-      utxo: Schema.String,
-      utxoToCommit: Schema.optional(Schema.String),
-      utxoToDecommit: Schema.optional(Schema.String),
+      utxo: UTxOSchema,
+      utxoToCommit: Schema.optional(UTxOSchema),
+      utxoToDecommit: Schema.optional(UTxOSchema),
     }),
     signatories: Schema.Record({ key: Schema.String, value: Schema.Any }),
   }),
@@ -67,7 +69,7 @@ export const ConfirmedSnapshotSchema = Schema.Union(
   Schema.Struct({
     tag: Schema.Literal("InitialSnapshot"),
     headId: Schema.String,
-    initialUTxO: Schema.String,
+    initialUTxO: UTxOSchema,
   }),
   Schema.Struct({
     tag: Schema.Literal("ConfirmedSnapshot"),
@@ -76,13 +78,13 @@ export const ConfirmedSnapshotSchema = Schema.Union(
       version: Schema.Int,
       number: Schema.Int,
       confirmed: Schema.Array(TransactionMessageSchema),
-      utxo: Schema.String,
-      utxoToCommit: Schema.optional(Schema.String),
-      utxoToDecommit: Schema.optional(Schema.String),
+      utxo: UTxOSchema,
+      utxoToCommit: Schema.optional(UTxOSchema),
+      utxoToDecommit: Schema.optional(UTxOSchema),
     }),
     signatures: Schema.Struct({
       multiSignature: Schema.String,
     }),
   }),
 );
-export type ConirmedSnapshot = typeof ConfirmedSnapshotSchema.Type;
+export type ConfirmedSnapshot = typeof ConfirmedSnapshotSchema.Type;

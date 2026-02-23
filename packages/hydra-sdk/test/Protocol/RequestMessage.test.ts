@@ -126,6 +126,18 @@ describe("SideLoadSnapshotMessageSchema", () => {
   );
 });
 
+describe("SafeCloseMessageSchema", () => {
+  it.effect("validates a correct SafeClose message", () =>
+    Effect.gen(function* () {
+      const input = {
+        tag: "SafeClose",
+      };
+
+      yield* Schema.decodeUnknown(Protocol.RequestMessageSchema)(input);
+    }),
+  );
+});
+
 describe("Protocol.RequestMessageSchema", () => {
   it.effect("validates a union of different request message types", () =>
     Effect.gen(function* () {
