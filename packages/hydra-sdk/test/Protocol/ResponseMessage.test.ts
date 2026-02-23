@@ -2,6 +2,15 @@ import { describe, expect, it } from "@effect/vitest";
 import { Protocol } from "@no-witness-labs/hydra-sdk";
 import { Effect, Schema } from "effect";
 
+const sampleUtxo = {
+  "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687":
+    {
+      address:
+        "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",
+      value: { lovelace: 7620669 },
+    },
+};
+
 describe("GreetingsMessageSchema", () => {
   it.effect(
     "encodes reduced GreetingsMessageSchema to correct JSON object",
@@ -115,6 +124,33 @@ describe("GreetingsMessageSchema", () => {
       expect(encoded).toEqual(expected);
     }),
   );
+
+  it.effect("encodes GreetingsMessageSchema with optional fields", () =>
+    Effect.gen(function* () {
+      const expected = {
+        tag: "Greetings",
+        me: {
+          vkey: "d0b8f28427aa7b640c636075905cbd6574a431aeaca5b3dbafd47cfe66c35043",
+        },
+        headStatus: "Open",
+        hydraHeadId: "820082582089ff4f3ff4a6052ec9d073",
+        snapshotUtxo: sampleUtxo,
+        timestamp: "2019-08-24T14:15:22.000Z",
+        hydraNodeVersion: "1.0.0",
+        env: "preview",
+        currentSlot: 42,
+      };
+
+      const decoded = yield* Schema.decodeUnknown(
+        Protocol.GreetingsMessageSchema,
+      )(expected);
+      const encoded = yield* Schema.encode(Protocol.GreetingsMessageSchema)(
+        decoded,
+      );
+
+      expect(encoded).toEqual(expected);
+    }),
+  );
 });
 
 describe("CommandFailedMessageSchema", () => {
@@ -123,6 +159,24 @@ describe("CommandFailedMessageSchema", () => {
       const expected = {
         tag: "CommandFailed",
         clientInput: { tag: "Init" },
+      };
+
+      const decoded = yield* Schema.decodeUnknown(
+        Protocol.CommandFailedMessageSchema,
+      )(expected);
+      const encoded = yield* Schema.encode(Protocol.CommandFailedMessageSchema)(
+        decoded,
+      );
+
+      expect(encoded).toEqual(expected);
+    }),
+  );
+
+  it.effect("accepts SafeClose as clientInput tag", () =>
+    Effect.gen(function* () {
+      const expected = {
+        tag: "CommandFailed",
+        clientInput: { tag: "SafeClose" },
       };
 
       const decoded = yield* Schema.decodeUnknown(
@@ -374,7 +428,7 @@ describe("CommittedMessageSchema", () => {
             vkey: "d0b8f28427aa7b640c636075905cbd6574a431aeaca5b3dbafd47cfe66c35043",
           },
         ],
-        utxo: '{    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",        "value": {            "lovelace": 7620669        }    }}',
+        utxo: sampleUtxo,
         seq: 1,
         timestamp: "2019-08-24T14:15:22.000Z",
       };
@@ -397,7 +451,7 @@ describe("HeadIsOpenMessageSchema", () => {
       const expected = {
         tag: "HeadIsOpen",
         headId: "820082582089ff4f3ff4a6052ec9d073",
-        utxo: '{    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",        "value": {            "lovelace": 7620669        }    }}',
+        utxo: sampleUtxo,
         seq: 1,
         timestamp: "2019-08-24T14:15:22.000Z",
       };
@@ -422,7 +476,7 @@ describe("HeadIsClosedMessageSchema", () => {
         headId: "820082582089ff4f3ff4a6052ec9d073",
         snapshotNumber: 5,
         contestationDeadline: "2019-08-24T14:15:22.000Z",
-        utxo: '{    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",        "value": {            "lovelace": 7620669        }    }}',
+        utxo: sampleUtxo,
         seq: 1,
         timestamp: "2019-08-24T14:15:22.000Z",
       };
@@ -447,7 +501,7 @@ describe("HeadIsContestedMessageSchema", () => {
         headId: "820082582089ff4f3ff4a6052ec9d073",
         snapshotNumber: 5,
         contestationDeadline: "2019-08-24T14:15:22.000Z",
-        utxo: '{    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",        "value": {            "lovelace": 7620669        }    }}',
+        utxo: sampleUtxo,
         seq: 1,
         timestamp: "2019-08-24T14:15:22.000Z",
       };
@@ -492,7 +546,7 @@ describe("HeadIsAbortedMessageSchema", () => {
       const expected = {
         tag: "HeadIsAborted",
         headId: "820082582089ff4f3ff4a6052ec9d073",
-        utxo: '{    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",        "value": {            "lovelace": 7620669        }    }}',
+        utxo: sampleUtxo,
         seq: 1,
         timestamp: "2019-08-24T14:15:22.000Z",
       };
@@ -515,7 +569,7 @@ describe("HeadIsFinalizedMessageSchema", () => {
       const expected = {
         tag: "HeadIsFinalized",
         headId: "820082582089ff4f3ff4a6052ec9d073",
-        utxo: '{    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",        "value": {            "lovelace": 7620669        }    }}',
+        utxo: sampleUtxo,
         seq: 1,
         timestamp: "2019-08-24T14:15:22.000Z",
       };
@@ -561,7 +615,7 @@ describe("TxInvalidMessageSchema", () => {
       const expected = {
         tag: "TxInvalid",
         headId: "820082582089ff4f3ff4a6052ec9d073",
-        utxo: '{    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",        "value": {            "lovelace": 7620669        }    }}',
+        utxo: sampleUtxo,
         transaction: {
           txId: "8df1616d4337ede40bbad2914f12977815234b83951bcce3bfcd735aed3f63e4",
           type: "Tx ConwayEra",
@@ -599,7 +653,7 @@ describe("SnapshotConfirmedMessageSchema", () => {
             version: 1,
             number: 5,
             confirmed: [],
-            utxo: '{    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",        "value": {            "lovelace": 7620669        }    }}',
+            utxo: sampleUtxo,
           },
           seq: 1,
           timestamp: "2019-08-24T14:15:22.000Z",
@@ -684,8 +738,7 @@ describe("DecommitInvalidMessageSchema", () => {
         },
         decommitInvalidReason: {
           tag: "DecommitTxInvalid",
-          localUTxO:
-            '{    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",        "value": {            "lovelace": 7620669        }    }}',
+          localUTxO: sampleUtxo,
           validationError: { reason: "Invalid" },
         },
         seq: 1,
@@ -751,8 +804,7 @@ describe("DecommitRequestedMessageSchema", () => {
             cborHex:
               "820082582089ff4f3ff4a6052ec9d073b3be68b5e7596bd74a04e7b74504a8302fb2278cd95840f66eb3cd160372d617411408792c0ebd9791968e9948112894e2706697a55c10296b04019ed2f146f4d81e8ab17b9d14cf99569a2f85cbfa32320127831db202",
           },
-          utxoToDecommit:
-            '{    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",        "value": {            "lovelace": 7620669        }    }}',
+          utxoToDecommit: sampleUtxo,
           seq: 1,
           timestamp: "2019-08-24T14:15:22.000Z",
         };
@@ -779,8 +831,7 @@ describe("DecommitApprovedMessageSchema", () => {
           headId: "820082582089ff4f3ff4a6052ec9d073",
           decommitTxId:
             "8df1616d4337ede40bbad2914f12977815234b83951bcce3bfcd735aed3f63e4",
-          utxoToDecommit:
-            '{    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",        "value": {            "lovelace": 7620669        }    }}',
+          utxoToDecommit: sampleUtxo,
           seq: 1,
           timestamp: "2019-08-24T14:15:22.000Z",
         };
@@ -805,8 +856,7 @@ describe("DecommitFinalizedMessageSchema", () => {
         const expected = {
           tag: "DecommitFinalized",
           headId: "820082582089ff4f3ff4a6052ec9d073",
-          distributedUTxO:
-            '{    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",        "value": {            "lovelace": 7620669        }    }}',
+          distributedUTxO: sampleUtxo,
           seq: 1,
           timestamp: "2019-08-24T14:15:22.000Z",
         };
@@ -829,8 +879,7 @@ describe("CommitRecordedMessageSchema", () => {
       const expected = {
         tag: "CommitRecorded",
         headId: "820082582089ff4f3ff4a6052ec9d073",
-        utxoToCommit:
-          '{    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",        "value": {            "lovelace": 7620669        }    }}',
+        utxoToCommit: sampleUtxo,
         pendingDeposit: "deposit1",
         deadline: "2019-08-24T14:15:22.000Z",
         seq: 1,
@@ -855,8 +904,7 @@ describe("CommitApprovedMessageSchema", () => {
       const expected = {
         tag: "CommitApproved",
         headId: "820082582089ff4f3ff4a6052ec9d073",
-        utxoToCommit:
-          '{    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",        "value": {            "lovelace": 7620669        }    }}',
+        utxoToCommit: sampleUtxo,
         seq: 1,
         timestamp: "2019-08-24T14:15:22.000Z",
       };
@@ -903,8 +951,7 @@ describe("CommitRecoveredMessageSchema", () => {
       const expected = {
         tag: "CommitRecovered",
         headId: "820082582089ff4f3ff4a6052ec9d073",
-        recoveredUTxO:
-          '{    "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {        "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",        "value": {            "lovelace": 7620669        }    }}',
+        recoveredUTxO: sampleUtxo,
         recoveredTxId:
           "8df1616d4337ede40bbad2914f12977815234b83951bcce3bfcd735aed3f63e4",
         seq: 1,
@@ -969,6 +1016,147 @@ describe("EventLogRotatedMessageSchema", () => {
   );
 });
 
+describe("DepositActivatedMessageSchema", () => {
+  it.effect(
+    "encodes DepositActivatedMessageSchema to correct JSON object",
+    () =>
+      Effect.gen(function* () {
+        const expected = {
+          tag: "DepositActivated",
+          headId: "820082582089ff4f3ff4a6052ec9d073",
+          depositTxId:
+            "8df1616d4337ede40bbad2914f12977815234b83951bcce3bfcd735aed3f63e4",
+          deadline: "2019-08-24T14:15:22.000Z",
+          seq: 1,
+          timestamp: "2019-08-24T14:15:22.000Z",
+        };
+
+        const decoded = yield* Schema.decodeUnknown(
+          Protocol.DepositActivatedMessageSchema,
+        )(expected);
+        const encoded = yield* Schema.encode(
+          Protocol.DepositActivatedMessageSchema,
+        )(decoded);
+
+        expect(encoded).toEqual(expected);
+      }),
+  );
+});
+
+describe("DepositExpiredMessageSchema", () => {
+  it.effect("encodes DepositExpiredMessageSchema to correct JSON object", () =>
+    Effect.gen(function* () {
+      const expected = {
+        tag: "DepositExpired",
+        headId: "820082582089ff4f3ff4a6052ec9d073",
+        depositTxId:
+          "8df1616d4337ede40bbad2914f12977815234b83951bcce3bfcd735aed3f63e4",
+        seq: 1,
+        timestamp: "2019-08-24T14:15:22.000Z",
+      };
+
+      const decoded = yield* Schema.decodeUnknown(
+        Protocol.DepositExpiredMessageSchema,
+      )(expected);
+      const encoded = yield* Schema.encode(
+        Protocol.DepositExpiredMessageSchema,
+      )(decoded);
+
+      expect(encoded).toEqual(expected);
+    }),
+  );
+});
+
+describe("NodeUnsyncedMessageSchema", () => {
+  it.effect("encodes NodeUnsyncedMessageSchema to correct JSON object", () =>
+    Effect.gen(function* () {
+      const expected = {
+        tag: "NodeUnsynced",
+        seq: 1,
+        timestamp: "2019-08-24T14:15:22.000Z",
+      };
+
+      const decoded = yield* Schema.decodeUnknown(
+        Protocol.NodeUnsyncedMessageSchema,
+      )(expected);
+      const encoded = yield* Schema.encode(
+        Protocol.NodeUnsyncedMessageSchema,
+      )(decoded);
+
+      expect(encoded).toEqual(expected);
+    }),
+  );
+});
+
+describe("NodeSyncedMessageSchema", () => {
+  it.effect("encodes NodeSyncedMessageSchema to correct JSON object", () =>
+    Effect.gen(function* () {
+      const expected = {
+        tag: "NodeSynced",
+        seq: 1,
+        timestamp: "2019-08-24T14:15:22.000Z",
+      };
+
+      const decoded = yield* Schema.decodeUnknown(
+        Protocol.NodeSyncedMessageSchema,
+      )(expected);
+      const encoded = yield* Schema.encode(Protocol.NodeSyncedMessageSchema)(
+        decoded,
+      );
+
+      expect(encoded).toEqual(expected);
+    }),
+  );
+});
+
+describe("RejectedInputBecauseUnsyncedMessageSchema", () => {
+  it.effect(
+    "encodes RejectedInputBecauseUnsyncedMessageSchema to correct JSON object",
+    () =>
+      Effect.gen(function* () {
+        const expected = {
+          tag: "RejectedInputBecauseUnsynced",
+          clientInput: { tag: "Init" },
+          seq: 1,
+          timestamp: "2019-08-24T14:15:22.000Z",
+        };
+
+        const decoded = yield* Schema.decodeUnknown(
+          Protocol.RejectedInputBecauseUnsyncedMessageSchema,
+        )(expected);
+        const encoded = yield* Schema.encode(
+          Protocol.RejectedInputBecauseUnsyncedMessageSchema,
+        )(decoded);
+
+        expect(encoded).toEqual(expected);
+      }),
+  );
+});
+
+describe("SideLoadSnapshotRejectedMessageSchema", () => {
+  it.effect(
+    "encodes SideLoadSnapshotRejectedMessageSchema to correct JSON object",
+    () =>
+      Effect.gen(function* () {
+        const expected = {
+          tag: "SideLoadSnapshotRejected",
+          headId: "820082582089ff4f3ff4a6052ec9d073",
+          seq: 1,
+          timestamp: "2019-08-24T14:15:22.000Z",
+        };
+
+        const decoded = yield* Schema.decodeUnknown(
+          Protocol.SideLoadSnapshotRejectedMessageSchema,
+        )(expected);
+        const encoded = yield* Schema.encode(
+          Protocol.SideLoadSnapshotRejectedMessageSchema,
+        )(decoded);
+
+        expect(encoded).toEqual(expected);
+      }),
+  );
+});
+
 describe("WebSocketResponseMessageSchema", () => {
   it.effect("encodes different message types", () =>
     Effect.gen(function* () {
@@ -979,16 +1167,7 @@ describe("WebSocketResponseMessageSchema", () => {
         },
         headStatus: "Idle",
         hydraHeadId: "820082582089ff4f3ff4a6052ec9d073",
-        snapshotUtxo: {
-          "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687":
-            {
-              address:
-                "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",
-              value: {
-                lovelace: 7620669,
-              },
-            },
-        },
+        snapshotUtxo: sampleUtxo,
         timestamp: "2019-08-24T14:15:22.000Z",
         hydraNodeVersion: "1.0.0",
       };

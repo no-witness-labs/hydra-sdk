@@ -1,6 +1,7 @@
 import { Schema } from "effect";
 
 import * as Common from "./CommonMessage.js";
+import { PartySchema, UTxOSchema } from "./Types.js";
 
 // =============================================================================
 // Response Message Schemas
@@ -14,9 +15,7 @@ import * as Common from "./CommonMessage.js";
  */
 export const GreetingsMessageSchema = Schema.Struct({
   tag: Schema.optional(Schema.Literal("Greetings")),
-  me: Schema.Struct({
-    vkey: Schema.String,
-  }),
+  me: PartySchema,
   headStatus: Schema.Literal(
     "Idle",
     "Initializing",
@@ -59,6 +58,7 @@ export const CommandFailedMessageSchema = Schema.Struct({
       "Contest",
       "Fanout",
       "SideLoadSnapshot",
+      "SafeClose",
     ),
     transaction: Schema.optional(Common.TransactionMessageSchema),
   }),
@@ -88,11 +88,7 @@ export const PostTxOnChainFailedMessageSchema = Schema.Struct({
     participants: Schema.Array(Schema.String),
     headParameters: Schema.Struct({
       contestationPeriod: Schema.Int,
-      parties: Schema.Array(
-        Schema.Struct({
-          vkey: Schema.String,
-        }),
-      ),
+      parties: Schema.Array(PartySchema),
     }),
   }),
   postTxError: Schema.Record({ key: Schema.String, value: Schema.Any }), // Not meant to be machine-processed
@@ -202,11 +198,7 @@ export type NetworkClusterIDMismatchMessage =
 export const HeadIsInitializingMessageSchema = Schema.Struct({
   tag: Schema.Literal("HeadIsInitializing"),
   headId: Schema.String,
-  parties: Schema.Array(
-    Schema.Struct({
-      vkey: Schema.String,
-    }),
-  ),
+  parties: Schema.Array(PartySchema),
   seq: Schema.Int,
   timestamp: Schema.DateTimeUtc,
 });
@@ -222,12 +214,8 @@ export type HeadIsInitializingMessage =
 export const CommittedMessageSchema = Schema.Struct({
   tag: Schema.Literal("Committed"),
   headId: Schema.String,
-  parties: Schema.Array(
-    Schema.Struct({
-      vkey: Schema.String,
-    }),
-  ),
-  utxo: Schema.String, // TODO: make a better match
+  parties: Schema.Array(PartySchema),
+  utxo: UTxOSchema,
   seq: Schema.Int,
   timestamp: Schema.DateTimeUtc,
 });
@@ -242,7 +230,7 @@ export type CommittedMessage = typeof CommittedMessageSchema.Type;
 export const HeadIsOpenMessageSchema = Schema.Struct({
   tag: Schema.Literal("HeadIsOpen"),
   headId: Schema.String,
-  utxo: Schema.String, // TODO: make a better match
+  utxo: UTxOSchema,
   seq: Schema.Int,
   timestamp: Schema.DateTimeUtc,
 });
@@ -259,7 +247,7 @@ export const HeadIsClosedMessageSchema = Schema.Struct({
   headId: Schema.String,
   snapshotNumber: Schema.Int,
   contestationDeadline: Schema.DateTimeUtc,
-  utxo: Schema.String, // TODO: make a better match
+  utxo: UTxOSchema,
   seq: Schema.Int,
   timestamp: Schema.DateTimeUtc,
 });
@@ -276,7 +264,7 @@ export const HeadIsContestedMessageSchema = Schema.Struct({
   headId: Schema.String,
   snapshotNumber: Schema.Int,
   contestationDeadline: Schema.DateTimeUtc,
-  utxo: Schema.String, // TODO: make a better match
+  utxo: UTxOSchema,
   seq: Schema.Int,
   timestamp: Schema.DateTimeUtc,
 });
@@ -305,7 +293,7 @@ export type ReadyToFanoutMessage = typeof ReadyToFanoutMessageSchema.Type;
 export const HeadIsAbortedMessageSchema = Schema.Struct({
   tag: Schema.Literal("HeadIsAborted"),
   headId: Schema.String,
-  utxo: Schema.String, // TODO: make a better match
+  utxo: UTxOSchema,
   seq: Schema.Int,
   timestamp: Schema.DateTimeUtc,
 });
@@ -320,7 +308,7 @@ export type HeadIsAbortedMessage = typeof HeadIsAbortedMessageSchema.Type;
 export const HeadIsFinalizedMessageSchema = Schema.Struct({
   tag: Schema.Literal("HeadIsFinalized"),
   headId: Schema.String,
-  utxo: Schema.String, // TODO: make a better match
+  utxo: UTxOSchema,
   seq: Schema.Int,
   timestamp: Schema.DateTimeUtc,
 });
@@ -350,7 +338,7 @@ export type TxValidMessage = typeof TxValidMessageSchema.Type;
 export const TxInvalidMessageSchema = Schema.Struct({
   tag: Schema.Literal("TxInvalid"),
   headId: Schema.String,
-  utxo: Schema.String, // TODO: make a better match
+  utxo: UTxOSchema,
   transaction: Common.TransactionMessageSchema,
   validationError: Schema.Struct({
     reason: Schema.String,
@@ -374,9 +362,9 @@ export const SnapshotConfirmedMessageSchema = Schema.Struct({
     version: Schema.Int,
     number: Schema.Int,
     confirmed: Schema.Array(Common.TransactionMessageSchema),
-    utxo: Schema.String,
-    utxoToCommit: Schema.optional(Schema.String),
-    utxoToDecommit: Schema.optional(Schema.String),
+    utxo: UTxOSchema,
+    utxoToCommit: Schema.optional(UTxOSchema),
+    utxoToDecommit: Schema.optional(UTxOSchema),
   }),
   seq: Schema.Int,
   timestamp: Schema.DateTimeUtc,
@@ -407,11 +395,7 @@ export const IgnoredHeadInitializingMessageSchema = Schema.Struct({
   tag: Schema.Literal("IgnoredHeadInitializing"),
   headId: Schema.String,
   contestationPeriod: Schema.Int,
-  parties: Schema.Array(
-    Schema.Struct({
-      vkey: Schema.String,
-    }),
-  ),
+  parties: Schema.Array(PartySchema),
   participants: Schema.Array(Schema.String),
   seq: Schema.Int,
   timestamp: Schema.DateTimeUtc,
@@ -432,7 +416,7 @@ export const DecommitInvalidMessageSchema = Schema.Struct({
   decommitInvalidReason: Schema.Union(
     Schema.Struct({
       tag: Schema.Literal("DecommitTxInvalid"),
-      localUTxO: Schema.String,
+      localUTxO: UTxOSchema,
       validationError: Schema.Struct({
         reason: Schema.String,
       }),
@@ -457,7 +441,7 @@ export const DecommitRequestedMessageSchema = Schema.Struct({
   tag: Schema.Literal("DecommitRequested"),
   headId: Schema.String,
   decommitTx: Common.TransactionMessageSchema,
-  utxoToDecommit: Schema.String, // TODO: make a better match
+  utxoToDecommit: UTxOSchema,
   seq: Schema.Int,
   timestamp: Schema.DateTimeUtc,
 });
@@ -474,7 +458,7 @@ export const DecommitApprovedMessageSchema = Schema.Struct({
   tag: Schema.Literal("DecommitApproved"),
   headId: Schema.String,
   decommitTxId: Schema.String,
-  utxoToDecommit: Schema.String, // TODO: make a better match
+  utxoToDecommit: UTxOSchema,
   seq: Schema.Int,
   timestamp: Schema.DateTimeUtc,
 });
@@ -489,7 +473,7 @@ export type DecommitApprovedMessage = typeof DecommitApprovedMessageSchema.Type;
 export const DecommitFinalizedMessageSchema = Schema.Struct({
   tag: Schema.Literal("DecommitFinalized"),
   headId: Schema.String,
-  distributedUTxO: Schema.String, // TODO: make a better match
+  distributedUTxO: UTxOSchema,
   seq: Schema.Int,
   timestamp: Schema.DateTimeUtc,
 });
@@ -505,7 +489,7 @@ export type DecommitFinalizedMessage =
 export const CommitRecordedMessageSchema = Schema.Struct({
   tag: Schema.Literal("CommitRecorded"),
   headId: Schema.String,
-  utxoToCommit: Schema.String, // TODO: make a better match
+  utxoToCommit: UTxOSchema,
   pendingDeposit: Schema.String,
   deadline: Schema.DateTimeUtc,
   seq: Schema.Int,
@@ -522,7 +506,7 @@ export type CommitRecordedMessage = typeof CommitRecordedMessageSchema.Type;
 export const CommitApprovedMessageSchema = Schema.Struct({
   tag: Schema.Literal("CommitApproved"),
   headId: Schema.String,
-  utxoToCommit: Schema.String, // TODO: make a better match
+  utxoToCommit: UTxOSchema,
   seq: Schema.Int,
   timestamp: Schema.DateTimeUtc,
 });
@@ -552,7 +536,7 @@ export type CommitFinalizedMessage = typeof CommitFinalizedMessageSchema.Type;
 export const CommitRecoveredMessageSchema = Schema.Struct({
   tag: Schema.Literal("CommitRecovered"),
   headId: Schema.String,
-  recoveredUTxO: Schema.String, // TODO: make a better match
+  recoveredUTxO: UTxOSchema,
   recoveredTxId: Schema.String,
   seq: Schema.Int,
   timestamp: Schema.DateTimeUtc,
@@ -587,6 +571,94 @@ export const EventLogRotatedMessageSchema = Schema.Struct({
   timestamp: Schema.DateTimeUtc,
 });
 export type EventLogRotatedMessage = typeof EventLogRotatedMessageSchema.Type;
+
+/**
+ * Deposit activated event (incremental commit).
+ *
+ * @since 0.2.0
+ * @category schemas
+ */
+export const DepositActivatedMessageSchema = Schema.Struct({
+  tag: Schema.Literal("DepositActivated"),
+  headId: Schema.String,
+  depositTxId: Schema.String,
+  deadline: Schema.DateTimeUtc,
+  seq: Schema.Int,
+  timestamp: Schema.DateTimeUtc,
+});
+export type DepositActivatedMessage =
+  typeof DepositActivatedMessageSchema.Type;
+
+/**
+ * Deposit expired event (incremental commit).
+ *
+ * @since 0.2.0
+ * @category schemas
+ */
+export const DepositExpiredMessageSchema = Schema.Struct({
+  tag: Schema.Literal("DepositExpired"),
+  headId: Schema.String,
+  depositTxId: Schema.String,
+  seq: Schema.Int,
+  timestamp: Schema.DateTimeUtc,
+});
+export type DepositExpiredMessage = typeof DepositExpiredMessageSchema.Type;
+
+/**
+ * Node unsynced event.
+ *
+ * @since 0.2.0
+ * @category schemas
+ */
+export const NodeUnsyncedMessageSchema = Schema.Struct({
+  tag: Schema.Literal("NodeUnsynced"),
+  seq: Schema.Int,
+  timestamp: Schema.DateTimeUtc,
+});
+export type NodeUnsyncedMessage = typeof NodeUnsyncedMessageSchema.Type;
+
+/**
+ * Node synced event.
+ *
+ * @since 0.2.0
+ * @category schemas
+ */
+export const NodeSyncedMessageSchema = Schema.Struct({
+  tag: Schema.Literal("NodeSynced"),
+  seq: Schema.Int,
+  timestamp: Schema.DateTimeUtc,
+});
+export type NodeSyncedMessage = typeof NodeSyncedMessageSchema.Type;
+
+/**
+ * Rejected input because node is unsynced event.
+ *
+ * @since 0.2.0
+ * @category schemas
+ */
+export const RejectedInputBecauseUnsyncedMessageSchema = Schema.Struct({
+  tag: Schema.Literal("RejectedInputBecauseUnsynced"),
+  clientInput: Schema.Unknown,
+  seq: Schema.Int,
+  timestamp: Schema.DateTimeUtc,
+});
+export type RejectedInputBecauseUnsyncedMessage =
+  typeof RejectedInputBecauseUnsyncedMessageSchema.Type;
+
+/**
+ * Snapshot side-load rejected event.
+ *
+ * @since 0.2.0
+ * @category schemas
+ */
+export const SideLoadSnapshotRejectedMessageSchema = Schema.Struct({
+  tag: Schema.Literal("SideLoadSnapshotRejected"),
+  headId: Schema.String,
+  seq: Schema.Int,
+  timestamp: Schema.DateTimeUtc,
+});
+export type SideLoadSnapshotRejectedMessage =
+  typeof SideLoadSnapshotRejectedMessageSchema.Type;
 
 /**
  * Union of all possible WebSocket response message types from a Hydra node.
@@ -627,6 +699,12 @@ export const WebSocketResponseMessageSchema = Schema.Union(
   CommitRecoveredMessageSchema,
   SnapshotSideLoadedMessageSchema,
   EventLogRotatedMessageSchema,
+  DepositActivatedMessageSchema,
+  DepositExpiredMessageSchema,
+  NodeUnsyncedMessageSchema,
+  NodeSyncedMessageSchema,
+  RejectedInputBecauseUnsyncedMessageSchema,
+  SideLoadSnapshotRejectedMessageSchema,
 );
 export type WebSocketResponseMessage =
   typeof WebSocketResponseMessageSchema.Type;
@@ -653,20 +731,10 @@ export const HeadResponseSchema = Schema.Union(
     contents: Schema.Struct({
       parameters: Schema.Struct({
         contestationPeriod: Schema.Int,
-        parties: Schema.Array(
-          Schema.Struct({
-            vkey: Schema.String,
-          }),
-        ),
+        parties: Schema.Array(PartySchema),
       }),
-      pendingCommits: Schema.Array(
-        Schema.Struct({
-          vkey: Schema.String,
-        }),
-      ),
-      commited: Schema.Struct({
-        vkey: Schema.String,
-      }),
+      pendingCommits: Schema.Array(PartySchema),
+      commited: PartySchema,
       chainState: Schema.String,
       headId: Schema.String,
       headSeed: Schema.String,
@@ -677,14 +745,10 @@ export const HeadResponseSchema = Schema.Union(
     contents: Schema.Struct({
       parameters: Schema.Struct({
         contestationPeriod: Schema.Int,
-        parties: Schema.Array(
-          Schema.Struct({
-            vkey: Schema.String,
-          }),
-        ),
+        parties: Schema.Array(PartySchema),
       }),
       coordinatedHeadState: Schema.Struct({
-        localUTxO: Schema.String, // TODO: make a better match
+        localUTxO: UTxOSchema,
         localTxs: Common.TransactionMessageSchema,
         allTxs: Schema.Record({ key: Schema.String, value: Schema.Any }),
         confirmedSnapshot: Common.ConfirmedSnapshotSchema,
@@ -711,11 +775,7 @@ export const HeadResponseSchema = Schema.Union(
     contents: Schema.Struct({
       parameters: Schema.Struct({
         contestationPeriod: Schema.Int,
-        parties: Schema.Array(
-          Schema.Struct({
-            vkey: Schema.String,
-          }),
-        ),
+        parties: Schema.Array(PartySchema),
       }),
       confirmedSnapshot: Common.ConfirmedSnapshotSchema,
       contestationDeadline: Schema.DateTimeUtc,
@@ -764,7 +824,7 @@ export type SnapshotLastSeen = typeof SnapshotLastSeenSchema.Type;
  * @since 0.1.0
  * @category schemas
  */
-export const SnapshotUTxOSchema = Schema.String; // TODO: make a better match
+export const SnapshotUTxOSchema = UTxOSchema;
 export type SnapshotUTxO = typeof SnapshotUTxOSchema.Type;
 
 /**

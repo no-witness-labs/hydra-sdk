@@ -109,6 +109,17 @@ export const SideLoadSnapshotMessageSchema = Schema.Struct({
 export type SideLoadSnapshotMessage = typeof SideLoadSnapshotMessageSchema.Type;
 
 /**
+ * Safely close the Hydra Head (waits for pending transactions).
+ *
+ * @since 0.2.0
+ * @category schemas
+ */
+const SafeCloseMessageSchema = Schema.Struct({
+  tag: Schema.Literal("SafeClose"),
+});
+export type SafeCloseMessage = typeof SafeCloseMessageSchema.Type;
+
+/**
  * Union of all possible request message types to send to a Hydra node.
  *
  * @since 0.1.0
@@ -124,5 +135,6 @@ export const RequestMessageSchema = Schema.Union(
   ContestMessageSchema,
   FanoutMessageSchema,
   SideLoadSnapshotMessageSchema,
+  SafeCloseMessageSchema,
 );
 export type RequestMessage = typeof RequestMessageSchema.Type;
