@@ -86,14 +86,28 @@ const commandToEvents = (
       // This mock-only event path exists to keep scaffold tests deterministic until
       // REST integration is implemented in the Head module.
       return [toServerOutput("HeadIsOpen", payload)];
+    case "NewTx":
+      // Mock: assume transaction is valid; real node emits TxValid or TxInvalid.
+      return [toServerOutput("TxValid", payload)];
     case "Close":
       return [toServerOutput("HeadIsClosed"), toServerOutput("ReadyToFanout")];
     case "SafeClose":
       return [toServerOutput("HeadIsClosed"), toServerOutput("ReadyToFanout")];
+    case "Contest":
+      return [toServerOutput("HeadIsContested")];
     case "Fanout":
       return [toServerOutput("HeadIsFinalized")];
     case "Abort":
       return [toServerOutput("HeadIsAborted")];
+    case "Decommit":
+      // Mock: simulate the full decommit lifecycle.
+      return [
+        toServerOutput("DecommitRequested", payload),
+        toServerOutput("DecommitApproved", payload),
+        toServerOutput("DecommitFinalized"),
+      ];
+    case "Recover":
+      return [toServerOutput("CommitRecovered", payload)];
     default:
       return [
         {
@@ -159,10 +173,14 @@ const parseClientInputTag = (value: unknown): ClientInputTag | undefined => {
   switch (value) {
     case "Init":
     case "Commit":
+    case "NewTx":
     case "Close":
     case "SafeClose":
+    case "Contest":
     case "Fanout":
     case "Abort":
+    case "Decommit":
+    case "Recover":
       return value;
     default:
       return undefined;
@@ -244,19 +262,36 @@ const parseApiEvent = (raw: string): Effect.Effect<ApiEvent, HeadError> =>
 
 const encodeClientInput = (
   tag: ClientInputTag,
-  _payload?: unknown,
+  payload?: unknown,
 ): Effect.Effect<string, HeadError> =>
   Effect.try({
     try: () => {
       // TODO(protocol-schema): Replace this ad-hoc encoder with request schemas
       // from `origin/protocol-module`:
       // - packages/hydra-sdk/src/Protocol/RequestMessage.ts
+      // TODO(protocol-schema): Replace this ad-hoc encoder with request schemas
+      // from Protocol/RequestMessage.ts once integrated.
       switch (tag) {
         case "Init":
         case "Close":
+        case "Contest":
         case "Fanout":
         case "Abort":
           return JSON.stringify({ tag });
+        case "NewTx": {
+          // TODO(protocol-schema): Encode via NewTx schema from Protocol/RequestMessage.ts.
+          // The payload should contain the full Cardano transaction (CBOR or JSON).
+          const txPayload = payload as { transaction?: unknown } | undefined;
+          return JSON.stringify({ tag, transaction: txPayload?.transaction ?? payload });
+        }
+        case "Decommit": {
+          // TODO(protocol-schema): Encode via Decommit schema from Protocol/RequestMessage.ts.
+          return JSON.stringify({ tag, decommitTx: payload });
+        }
+        case "Recover": {
+          // TODO(protocol-schema): Encode via Recover schema from Protocol/RequestMessage.ts.
+          return JSON.stringify({ tag, recoverTxId: payload });
+        }
         case "SafeClose":
           throw new Error(
             'Unsupported client input "SafeClose": not part of Hydra websocket protocol',
@@ -473,7 +508,7 @@ export const makeHeadTransport = (
           return yield* Effect.fail(
             new HeadError({
               message:
-                'Commit is scaffold-only in mock transport and must use REST API in real transport',
+                'Commit must be sent via REST API (POST /commit), not websocket',
             }),
           );
         }
@@ -482,7 +517,7 @@ export const makeHeadTransport = (
           return yield* Effect.fail(
             new HeadError({
               message:
-                'SafeClose is scaffold-only and not part of Hydra websocket protocol',
+                'SafeClose is not part of the Hydra websocket protocol; use Close instead',
             }),
           );
         }
