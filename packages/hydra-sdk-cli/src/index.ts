@@ -24,10 +24,60 @@ export const initializeCommand = Command.make("initialize", {}).pipe(
   })),
 );
 
+export const abortCommand = Command.make("abort", {}).pipe(
+  Command.withHandler(() => Effect.gen(function* () {
+    const HydraHeadController = yield* Head.HydraHeadController
+    yield* HydraHeadController.abort.pipe(
+      Effect.catchAll(e => Effect.logInfo(`Failed abort with error: ${e}`))
+    )
+  })),
+);
+
+export const closeCommand = Command.make("close", {}).pipe(
+  Command.withHandler(() => Effect.gen(function* () {
+    const HydraHeadController = yield* Head.HydraHeadController
+    yield* HydraHeadController.close.pipe(
+      Effect.catchAll(e => Effect.logInfo(`Failed close with error: ${e}`))
+    )
+  })),
+);
+
+export const commitCommand = Command.make("commit", {}).pipe(
+  Command.withHandler(() => Effect.gen(function* () {
+    const HydraHeadController = yield* Head.HydraHeadController
+    yield* HydraHeadController.commit.pipe(
+      Effect.catchAll(e => Effect.logInfo(`Failed commit with error: ${e}`))
+    )
+  })),
+);
+
+export const contestCommand = Command.make("contest", {}).pipe(
+  Command.withHandler(() => Effect.gen(function* () {
+    const HydraHeadController = yield* Head.HydraHeadController
+    yield* HydraHeadController.contest.pipe(
+      Effect.catchAll(e => Effect.logInfo(`Failed contest with error: ${e}`))
+    )
+  })),
+);
+
+export const fanoutCommand = Command.make("fanout", {}).pipe(
+  Command.withHandler(() => Effect.gen(function* () {
+    const HydraHeadController = yield* Head.HydraHeadController
+    yield* HydraHeadController.fanout.pipe(
+      Effect.catchAll(e => Effect.logInfo(`Failed fanout with error: ${e}`))
+    )
+  })),
+);
+
 const command = Command.make("hydra-manager").pipe(
   Command.withSubcommands([
     statusCommand,
-    initializeCommand
+    initializeCommand,
+    abortCommand,
+    closeCommand,
+    commitCommand,
+    contestCommand,
+    fanoutCommand,
   ])
 );
 
