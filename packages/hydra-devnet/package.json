@@ -1,0 +1,45 @@
+{
+  "name": "@no-witness-labs/hydra-devnet",
+  "version": "0.0.1",
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "src/**/*.ts",
+    "dist/**/*.js",
+    "dist/**/*.js.map",
+    "dist/**/*.d.ts",
+    "dist/**/*.d.ts.map"
+  ],
+  "scripts": {
+    "build": "tsc -b tsconfig.build.json && babel dist --plugins annotate-pure-calls --out-dir dist --source-maps",
+    "dev": "tsc -b tsconfig.build.json --watch",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src test",
+    "test": "vitest run",
+    "clean": "rm -rf dist .turbo .tsbuildinfo"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.28.0",
+    "@types/dockerode": "^3.3.38",
+    "@types/node": "^22.19.7",
+    "@types/ws": "^8.18.1",
+    "babel-plugin-annotate-pure-calls": "^0.4.0"
+  },
+  "dependencies": {
+    "@effect/platform-node": "^0.104.1",
+    "dockerode": "^4.0.8",
+    "ws": "^8.19.0"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "include": ["src"],
+  "compilerOptions": {
+    "tsBuildInfoFile": ".tsbuildinfo/src.tsbuildinfo",
+    "outDir": ".tsbuildinfo/src",
+    "types": ["node"],
+    "rootDir": "src",
+    "paths": {
+      "@no-witness-labs/hydra-devnet": ["./src/index.ts"],
+      "@no-witness-labs/hydra-devnet/*": ["./src/*"]
+    }
+  }
+}

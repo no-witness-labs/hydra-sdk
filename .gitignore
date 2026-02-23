@@ -40,6 +40,10 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Copilot / AI Toolkit
+.github/instructions/
+.github/skills/
+
 # Misc
 .DS_Store
 *.pem

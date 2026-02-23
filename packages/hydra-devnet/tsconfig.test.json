@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "include": ["test"],
+  "compilerOptions": {
+    "tsBuildInfoFile": ".tsbuildinfo/test.tsbuildinfo",
+    "outDir": ".tsbuildinfo/test",
+    "types": ["node", "vitest/globals"],
+    "noEmit": true,
+    "paths": {
+      "@no-witness-labs/hydra-devnet": ["./src/index.ts"],
+      "@no-witness-labs/hydra-devnet/*": ["./src/*"]
+    }
+  },
+  "references": [{ "path": "tsconfig.src.json" }]
+}
