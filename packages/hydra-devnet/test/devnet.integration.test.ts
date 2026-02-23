@@ -83,7 +83,7 @@ describe('Devnet Integration Tests', () => {
     it('should start cluster and all containers become running', { timeout: 300_000 }, async () => {
       const cluster = Cluster.make({
         clusterName: 'test-start-cluster',
-        cardanoNode: { port: 23001 },
+        cardanoNode: { port: 23001, submitPort: 28090 },
         hydraNode: { apiPort: 24001, peerPort: 25001, monitoringPort: 26001 },
         shelleyGenesisOverrides: FAST_SHELLEY_GENESIS,
       });
@@ -115,7 +115,7 @@ describe('Devnet Integration Tests', () => {
     it('should stop running cluster', { timeout: 300_000 }, async () => {
       const cluster = Cluster.make({
         clusterName: 'test-stop-cluster',
-        cardanoNode: { port: 33001 },
+        cardanoNode: { port: 33001, submitPort: 38090 },
         hydraNode: { apiPort: 34001, peerPort: 35001, monitoringPort: 36001 },
         shelleyGenesisOverrides: FAST_SHELLEY_GENESIS,
       });
@@ -134,7 +134,7 @@ describe('Devnet Integration Tests', () => {
     it('should report cluster running status', { timeout: 300_000 }, async () => {
       const cluster = Cluster.make({
         clusterName: 'test-running-status',
-        cardanoNode: { port: 43001 },
+        cardanoNode: { port: 43001, submitPort: 48090 },
         hydraNode: { apiPort: 44001, peerPort: 45001, monitoringPort: 46001 },
         shelleyGenesisOverrides: FAST_SHELLEY_GENESIS,
       });
@@ -154,7 +154,7 @@ describe('Devnet Integration Tests', () => {
     it('should get container status after start', { timeout: 300_000 }, async () => {
       const cluster = Cluster.make({
         clusterName: 'test-container-status',
-        cardanoNode: { port: 53001 },
+        cardanoNode: { port: 53001, submitPort: 58090 },
         hydraNode: { apiPort: 54001, peerPort: 55001, monitoringPort: 56001 },
         shelleyGenesisOverrides: FAST_SHELLEY_GENESIS,
       });
@@ -174,7 +174,7 @@ describe('Devnet Integration Tests', () => {
     it('should check if container is running', { timeout: 300_000 }, async () => {
       const cluster = Cluster.make({
         clusterName: 'test-is-running',
-        cardanoNode: { port: 63001 },
+        cardanoNode: { port: 63001, submitPort: 68090 },
         hydraNode: { apiPort: 64001, peerPort: 65001, monitoringPort: 66001 },
         shelleyGenesisOverrides: FAST_SHELLEY_GENESIS,
       });
