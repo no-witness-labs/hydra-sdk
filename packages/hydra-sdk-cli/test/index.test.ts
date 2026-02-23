@@ -1,6 +1,6 @@
 import { WebSocketConstructor } from "@effect/platform/Socket";
 import { describe, it } from "@effect/vitest";
-import { Head, Socket, Config } from "@no-witness-labs/hydra-sdk-cli";
+import { Config, Head, Socket } from "@no-witness-labs/hydra-sdk-cli";
 import { Effect, Layer, Logger } from "effect";
 import { WS } from "vitest-websocket-mock";
 
@@ -44,7 +44,7 @@ describe("core", () => {
         yield* Effect.promise(() => server.connected);
         const hydraHead = yield* Head.HydraHeadController;
 
-        hydraHead.logStatus;
+        yield* hydraHead.logStatus;
       }).pipe(Effect.provide(TestLayer)),
     );
   });

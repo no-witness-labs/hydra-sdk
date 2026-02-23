@@ -1,15 +1,16 @@
-import { FetchHttpClient, HttpClient } from "@effect/platform";
-import { Protocol, Socket, Head } from "@no-witness-labs/hydra-sdk";
+import { FetchHttpClient } from "@effect/platform";
+import { Head,Protocol, Socket } from "@no-witness-labs/hydra-sdk";
+import type {
+  Scope} from "effect";
 import {
-  Effect,
-  Schedule,
-  Schema,
-  Queue,
-  PubSub,
-  Scope,
   Duration,
+  Effect,
+  PubSub,
+  Queue,
+  Schedule,
+  Schema
 } from "effect";
-import { TimeoutException } from "effect/Cause";
+import type { TimeoutException } from "effect/Cause";
 
 const awaitMessageWithSchema = <A, I>(
   socketController: Socket.SocketController,
@@ -42,7 +43,6 @@ export class HydraHeadController extends Effect.Service<HydraHeadController>()(
     effect: Effect.gen(function* () {
       yield* Effect.log("HydraHeadController was created");
 
-      const httpClient = yield* HttpClient.HttpClient;
       const socketController = yield* Socket.SocketController;
       const hydraStateMachine = yield* Head.HydraStateMachine;
 
@@ -55,7 +55,7 @@ export class HydraHeadController extends Effect.Service<HydraHeadController>()(
       const initialize = Effect.gen(function* () {
         yield* Effect.log(`Called initialize`);
 
-        var status: Protocol.Status = "IDLE";
+        let status: Protocol.Status = "IDLE";
         yield* Effect.log(`Awaiting [${status}] status`);
         hydraStateMachine.awaitStatus(status);
 
@@ -75,7 +75,7 @@ export class HydraHeadController extends Effect.Service<HydraHeadController>()(
       const abort = Effect.gen(function* () {
         yield* Effect.log(`Called abort`);
 
-        var status: Protocol.Status = "INITIALIZING";
+        let status: Protocol.Status = "INITIALIZING";
         yield* Effect.log(`Awaiting [${status}] status`);
         hydraStateMachine.awaitStatus(status);
 
@@ -96,7 +96,7 @@ export class HydraHeadController extends Effect.Service<HydraHeadController>()(
         Effect.gen(function* () {
           yield* Effect.log(`Called recover with recoverTxId: ${recoverTxId}`);
 
-          var status: Protocol.Status = "INITIALIZING";
+          const status: Protocol.Status = "INITIALIZING";
           yield* Effect.log(`Awaiting [${status}] status`);
           hydraStateMachine.awaitStatus(status);
 
@@ -110,7 +110,7 @@ export class HydraHeadController extends Effect.Service<HydraHeadController>()(
           yield* Effect.log(`Awaiting CommitRecovered message`);
 
           const commitRecoveredMessage = yield* Effect.gen(function* () {
-            var msg = yield* awaitMessageWithSchema(
+            let msg = yield* awaitMessageWithSchema(
               socketController,
               Protocol.CommitRecoveredMessageSchema,
               Duration.seconds(5),
@@ -133,7 +133,7 @@ export class HydraHeadController extends Effect.Service<HydraHeadController>()(
           yield* Effect.log(
             `Recover action complete, recovered TxId: [${commitRecoveredMessage.recoveredTxId}]`,
           );
-        });
+        }).pipe(Effect.scoped);
 
       const commit = Effect.gen(function* () {
         yield* Effect.log(`Called commit`);
@@ -168,7 +168,7 @@ export class HydraHeadController extends Effect.Service<HydraHeadController>()(
           yield* Effect.log(`Awaiting CommitRecovered message`);
 
           const txValidMessage = yield* Effect.gen(function* () {
-            var msg = yield* awaitMessageWithSchema(
+            let msg = yield* awaitMessageWithSchema(
               socketController,
               Protocol.TxValidMessageSchema,
               Duration.seconds(5),
@@ -213,7 +213,7 @@ export class HydraHeadController extends Effect.Service<HydraHeadController>()(
           yield* Effect.log(`Awaiting CommitRecovered message`);
 
           const txValidMessage = yield* Effect.gen(function* () {
-            var msg = yield* awaitMessageWithSchema(
+            let msg = yield* awaitMessageWithSchema(
               socketController,
               Protocol.DecommitApprovedMessageSchema,
               Duration.seconds(5),
@@ -241,7 +241,7 @@ export class HydraHeadController extends Effect.Service<HydraHeadController>()(
       const close = Effect.gen(function* () {
         yield* Effect.log(`Called close`);
 
-        var status: Protocol.Status = "OPEN";
+        let status: Protocol.Status = "OPEN";
         yield* Effect.log(`Awaiting [${status}] status`);
         hydraStateMachine.awaitStatus(status);
 
@@ -249,7 +249,7 @@ export class HydraHeadController extends Effect.Service<HydraHeadController>()(
         const message: Protocol.CloseMessage = { tag: "Close" };
         yield* socketController.sendMessage(JSON.stringify(message));
 
-        var status: Protocol.Status = "CLOSED";
+        status = "CLOSED";
         yield* Effect.log(`Awaiting [${status}] status`);
         hydraStateMachine.awaitStatus(status);
 
@@ -261,7 +261,7 @@ export class HydraHeadController extends Effect.Service<HydraHeadController>()(
       const contest = Effect.gen(function* () {
         yield* Effect.log(`Called contest`);
 
-        var status: Protocol.Status = "CLOSED";
+        const status: Protocol.Status = "CLOSED";
         yield* Effect.log(`Awaiting [${status}] status`);
         hydraStateMachine.awaitStatus(status);
 
@@ -280,10 +280,10 @@ export class HydraHeadController extends Effect.Service<HydraHeadController>()(
         yield* Effect.log(
           `Contest action is complete, snapshotNumber now is ${[headIsContestedMessage.snapshotNumber]}`,
         );
-      });
+      }).pipe(Effect.scoped);
 
       const fanout = Effect.gen(function* () {
-        var status: Protocol.Status = "FANOUT_POSSIBLE";
+        let status: Protocol.Status = "FANOUT_POSSIBLE";
         yield* Effect.log(`Awaiting [${status}] status`);
         hydraStateMachine.awaitStatus(status);
 

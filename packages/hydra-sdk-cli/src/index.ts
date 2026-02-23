@@ -5,7 +5,7 @@ import * as Command from "@effect/cli/Command";
 import type { ValidationError } from "@effect/cli/ValidationError";
 import * as NodeContext from "@effect/platform-node/NodeContext";
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
-import { Head, Protocol, Socket, Config } from "@no-witness-labs/hydra-sdk";
+import { Config,Head, Protocol, Socket } from "@no-witness-labs/hydra-sdk";
 import * as Effect from "effect/Effect";
 
 export const statusCommand = Command.make("status", {}).pipe(
@@ -127,4 +127,4 @@ runCommands(process.argv).pipe(
 );
 
 // Export and reimport since the lsp doesn't like to import @no-witness-labs/hydra-sdk-cli in tests
-export { Head, Protocol, Socket, Config };
+export { Config,Head, Protocol, Socket };

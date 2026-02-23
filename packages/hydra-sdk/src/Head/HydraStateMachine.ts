@@ -3,8 +3,8 @@ import {
   HttpClient,
   HttpClientResponse,
 } from "@effect/platform";
-import { Protocol, Socket, Config } from "@no-witness-labs/hydra-sdk";
-import { Duration, Effect, Option, Schedule, Schema } from "effect";
+import { Config,Protocol, Socket } from "@no-witness-labs/hydra-sdk";
+import { Duration, Effect, Option, Schema } from "effect";
 
 /**
  * Error thrown when awaiting a status times out.

@@ -1,9 +1,8 @@
 import { WebSocketConstructor } from "@effect/platform/Socket";
 import { describe, expect, it } from "@effect/vitest";
 import type { Protocol } from "@no-witness-labs/hydra-sdk";
-import { Head, Socket, Config } from "@no-witness-labs/hydra-sdk";
+import { Config,Head, Socket } from "@no-witness-labs/hydra-sdk";
 import { Effect, Layer, Logger } from "effect";
-import type { Scope } from "effect/Scope";
 import { WS } from "vitest-websocket-mock";
 
 const urlNoAppends = "localhost:1234";
