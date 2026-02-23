@@ -586,8 +586,7 @@ export const DepositActivatedMessageSchema = Schema.Struct({
   seq: Schema.Int,
   timestamp: Schema.DateTimeUtc,
 });
-export type DepositActivatedMessage =
-  typeof DepositActivatedMessageSchema.Type;
+export type DepositActivatedMessage = typeof DepositActivatedMessageSchema.Type;
 
 /**
  * Deposit expired event (incremental commit).

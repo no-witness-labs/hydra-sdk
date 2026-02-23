@@ -106,8 +106,7 @@ export const makeCommandRouter = (
     const awaitMatch = <A>(
       matcher: (event: ApiEvent) => MatchResult<A>,
       timeoutMs: number,
-    ): Effect.Effect<A, HeadError> =>
-      runAwait(Effect.void, matcher, timeoutMs);
+    ): Effect.Effect<A, HeadError> => runAwait(Effect.void, matcher, timeoutMs);
 
     const sendAndAwait = <A>(
       start: Effect.Effect<void, HeadError>,

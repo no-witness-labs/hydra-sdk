@@ -364,7 +364,7 @@ export const makeHeadTransport = (
     }
 
     const reconnect = normalizeReconnect(config);
-  const reconnectPolicy = makeReconnectPolicy(reconnect);
+    const reconnectPolicy = makeReconnectPolicy(reconnect);
     const outbound = yield* Queue.unbounded<string>();
     const isDisposed = yield* Ref.make(false);
     const webSocketConstructorLayer = yield* makeWebSocketConstructorLayer;
@@ -473,7 +473,7 @@ export const makeHeadTransport = (
           return yield* Effect.fail(
             new HeadError({
               message:
-                'Commit is scaffold-only in mock transport and must use REST API in real transport',
+                "Commit is scaffold-only in mock transport and must use REST API in real transport",
             }),
           );
         }
@@ -482,7 +482,7 @@ export const makeHeadTransport = (
           return yield* Effect.fail(
             new HeadError({
               message:
-                'SafeClose is scaffold-only and not part of Hydra websocket protocol',
+                "SafeClose is scaffold-only and not part of Hydra websocket protocol",
             }),
           );
         }

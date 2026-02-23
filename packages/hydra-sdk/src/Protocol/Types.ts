@@ -33,7 +33,9 @@ export const TokenSchema = Schema.Record({
  */
 export const ValueSchema = Schema.Struct({
   lovelace: Schema.Number,
-}).pipe(Schema.extend(Schema.Record({ key: Schema.String, value: Schema.Unknown })));
+}).pipe(
+  Schema.extend(Schema.Record({ key: Schema.String, value: Schema.Unknown })),
+);
 export type Value = typeof ValueSchema.Type;
 
 // --- UTxO types ---
