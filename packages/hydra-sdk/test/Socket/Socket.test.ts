@@ -5,8 +5,8 @@ import { Effect, Layer, Logger } from "effect";
 import type { Scope } from "effect/Scope";
 import { WS } from "vitest-websocket-mock";
 
-const urlNoAppends = "localhost:1234"
-const url = "ws://" + urlNoAppends
+const urlNoAppends = "localhost:1234";
+const url = "ws://" + urlNoAppends;
 
 const makeServer: Effect.Effect<WS, never, Scope> = Effect.acquireRelease(
   Effect.sync(() => new WS(url)), // acquire

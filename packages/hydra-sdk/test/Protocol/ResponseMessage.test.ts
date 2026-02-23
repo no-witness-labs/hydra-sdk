@@ -30,25 +30,46 @@ describe("GreetingsMessageSchema", () => {
     () =>
       Effect.gen(function* () {
         const expected = {
-          "env":{
-            "configuredPeers":"172.16.238.10:5001=http://172.16.238.10:5001,172.16.238.20:5001=http://172.16.238.20:5001",
-            "contestationPeriod":3,
-            "depositPeriod":3600,
-            "otherParties": [{"vkey":"b37aabd81024c043f53a069c91e51a5b52e4ea399ae17ee1fe3cb9c44db707eb"},{"vkey":"f68e5624f885d521d2f43c3959a0de70496d5464bd3171aba8248f50d5d72b41"}],
-            "participants": ["3aaa2e3de913b0f5aa7e7f076e122d737db5329df1aa905192284fea","f8a68cd18e59a6ace848155a0e967af64f4d00cf8acee8adc95a6b0d","1052386136b347f3bb7c67fe3f2ee4ef120e1836e5d2707bb068afa6"],
-            "party": {"vkey":"7abcda7de6d883e7570118c1ccc8ee2e911f2e628a41ab0685ffee15f39bba96"},
-            "signingKey": "0e3f3546a93bd1295eb9dce216941eefbce99ca9323df258d9beeee335920cce"
+          env: {
+            configuredPeers:
+              "172.16.238.10:5001=http://172.16.238.10:5001,172.16.238.20:5001=http://172.16.238.20:5001",
+            contestationPeriod: 3,
+            depositPeriod: 3600,
+            otherParties: [
+              {
+                vkey: "b37aabd81024c043f53a069c91e51a5b52e4ea399ae17ee1fe3cb9c44db707eb",
+              },
+              {
+                vkey: "f68e5624f885d521d2f43c3959a0de70496d5464bd3171aba8248f50d5d72b41",
+              },
+            ],
+            participants: [
+              "3aaa2e3de913b0f5aa7e7f076e122d737db5329df1aa905192284fea",
+              "f8a68cd18e59a6ace848155a0e967af64f4d00cf8acee8adc95a6b0d",
+              "1052386136b347f3bb7c67fe3f2ee4ef120e1836e5d2707bb068afa6",
+            ],
+            party: {
+              vkey: "7abcda7de6d883e7570118c1ccc8ee2e911f2e628a41ab0685ffee15f39bba96",
+            },
+            signingKey:
+              "0e3f3546a93bd1295eb9dce216941eefbce99ca9323df258d9beeee335920cce",
           },
-          "headStatus": "Open",
-          "hydraHeadId": "564a742e347cc0d9db8aa6c083dfd1d2807186f3ea56e4536cefadc7",
-          "hydraNodeVersion": "1.2.0-d967d641c0ccad884aff6187b4d1d6c8d92380dc",
-          "me" :{"vkey":"7abcda7de6d883e7570118c1ccc8ee2e911f2e628a41ab0685ffee15f39bba96"},
-          "networkInfo": {
-            "networkConnected":true,
-            "peersInfo": {"172.16.238.10:5001":true,"172.16.238.20:5001":true}
+          headStatus: "Open",
+          hydraHeadId:
+            "564a742e347cc0d9db8aa6c083dfd1d2807186f3ea56e4536cefadc7",
+          hydraNodeVersion: "1.2.0-d967d641c0ccad884aff6187b4d1d6c8d92380dc",
+          me: {
+            vkey: "7abcda7de6d883e7570118c1ccc8ee2e911f2e628a41ab0685ffee15f39bba96",
           },
-            "snapshotUtxo":{},
-            "tag":"Greetings"
+          networkInfo: {
+            networkConnected: true,
+            peersInfo: {
+              "172.16.238.10:5001": true,
+              "172.16.238.20:5001": true,
+            },
+          },
+          snapshotUtxo: {},
+          tag: "Greetings",
         };
 
         const decoded = yield* Schema.decodeUnknown(
@@ -71,12 +92,14 @@ describe("GreetingsMessageSchema", () => {
         headStatus: "Idle",
         hydraHeadId: "820082582089ff4f3ff4a6052ec9d073",
         snapshotUtxo: {
-          "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {
-            "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",
-            "value": {
-              "lovelace": 7620669
-            }
-          }
+          "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687":
+            {
+              address:
+                "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",
+              value: {
+                lovelace: 7620669,
+              },
+            },
         },
         timestamp: "2019-08-24T14:15:22.000Z",
         hydraNodeVersion: "1.0.0",
@@ -957,12 +980,14 @@ describe("WebSocketResponseMessageSchema", () => {
         headStatus: "Idle",
         hydraHeadId: "820082582089ff4f3ff4a6052ec9d073",
         snapshotUtxo: {
-          "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687": {
-            "address": "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",
-            "value": {
-              "lovelace": 7620669
-            }
-          }
+          "09d34606abdcd0b10ebc89307cbfa0b469f9144194137b45b7a04b273961add8#687":
+            {
+              address:
+                "addr1w9htvds89a78ex2uls5y969ttry9s3k9etww0staxzndwlgmzuul5",
+              value: {
+                lovelace: 7620669,
+              },
+            },
         },
         timestamp: "2019-08-24T14:15:22.000Z",
         hydraNodeVersion: "1.0.0",

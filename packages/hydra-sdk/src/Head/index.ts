@@ -1,2 +1,2 @@
 export * from "./HydraStateMachine.js";
-export * from "./HydraHead.js"
+export * from "./HydraHead.js";

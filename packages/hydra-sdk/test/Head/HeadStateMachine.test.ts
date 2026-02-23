@@ -6,15 +6,15 @@ import { Effect, Layer, Logger } from "effect";
 import type { Scope } from "effect/Scope";
 import { WS } from "vitest-websocket-mock";
 
-const urlNoAppends = "localhost:1234"
-const url = "ws://" + urlNoAppends
+const urlNoAppends = "localhost:1234";
+const url = "ws://" + urlNoAppends;
 
 const greetingsMessage = {
-    me: {
-      vkey: "41c3b71ac178ba33e59506a792679d5cdd6efe9a1f474a53f13f7dde16b35eb6",
-    },
-    headStatus: "Idle",
-    hydraNodeVersion: "1.0.0",
+  me: {
+    vkey: "41c3b71ac178ba33e59506a792679d5cdd6efe9a1f474a53f13f7dde16b35eb6",
+  },
+  headStatus: "Idle",
+  hydraNodeVersion: "1.0.0",
 };
 
 const headIsInitializingMessage = {
@@ -32,10 +32,11 @@ const headIsInitializingMessage = {
 class MockServer extends Effect.Service<MockServer>()("MockServer", {
   scoped: Effect.acquireRelease(
     Effect.sync(() => new WS(url)),
-    (ws) => Effect.sync(() => {
-      ws.close();
-      WS.clean();
-    }),
+    (ws) =>
+      Effect.sync(() => {
+        ws.close();
+        WS.clean();
+      }),
   ),
 }) {}
 
@@ -66,9 +67,7 @@ describe("Head.HydraStateMachine", () => {
 
       const status: Protocol.Status = stateMachine.getStatus();
       expect(status).toEqual("DISCONNECTED");
-    }).pipe(      
-      Effect.provide(TestLayer)
-    ),
+    }).pipe(Effect.provide(TestLayer)),
   );
 
   it.scoped("updates status when receiving valid status messages", () =>
@@ -94,9 +93,7 @@ describe("Head.HydraStateMachine", () => {
       );
       yield* Effect.logInfo(`Status after message: ${status}`);
       expect(status).toEqual("IDLE");
-    }).pipe(
-      Effect.provide(TestLayer)
-    ),
+    }).pipe(Effect.provide(TestLayer)),
   );
 
   it.scoped("ignores invalid messages", () =>
@@ -119,9 +116,7 @@ describe("Head.HydraStateMachine", () => {
 
       // Status should remain unchanged
       expect(statusAfter).toEqual(initialStatus);
-    }).pipe(
-      Effect.provide(TestLayer)
-    ),
+    }).pipe(Effect.provide(TestLayer)),
   );
 
   it.scoped("processes multiple status updates in sequence", () =>
@@ -161,9 +156,7 @@ describe("Head.HydraStateMachine", () => {
 
       // Verify status changed
       expect(status2).not.toEqual(status1);
-    }).pipe(
-      Effect.provide(TestLayer)
-    ),
+    }).pipe(Effect.provide(TestLayer)),
   );
 
   it.scoped("statusFiber continues processing messages", () =>
@@ -197,9 +190,7 @@ describe("Head.HydraStateMachine", () => {
         stateMachine.statusFiber.unsafePoll(),
       );
       expect(fiberStatusAfter).toBeNull();
-    }).pipe(
-      Effect.provide(TestLayer)
-    ),
+    }).pipe(Effect.provide(TestLayer)),
   );
 
   it.scoped("handles non-JSON messages gracefully", () =>
@@ -220,8 +211,6 @@ describe("Head.HydraStateMachine", () => {
 
       // Status should remain unchanged
       expect(statusAfter).toEqual(initialStatus);
-    }).pipe(
-      Effect.provide(TestLayer)
-    ),
+    }).pipe(Effect.provide(TestLayer)),
   );
 });

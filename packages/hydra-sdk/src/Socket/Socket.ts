@@ -46,98 +46,96 @@ export class SocketController extends Effect.Service<SocketController>()(
   "SocketController",
   {
     effect: Effect.gen(function* () {
-        const { wsUrl } = yield* Config.Config
-        yield* Effect.log(`SocketController was created at: ${wsUrl}`);
+      const { wsUrl } = yield* Config.Config;
+      yield* Effect.log(`SocketController was created at: ${wsUrl}`);
 
-        const socket: Socket.Socket = yield* Socket.makeWebSocket(wsUrl); // TODO: Add retry on the connection
-        const messageQueue: PubSub.PubSub<Uint8Array> =
-          yield* PubSub.unbounded<Uint8Array>();
+      const socket: Socket.Socket = yield* Socket.makeWebSocket(wsUrl); // TODO: Add retry on the connection
+      const messageQueue: PubSub.PubSub<Uint8Array> =
+        yield* PubSub.unbounded<Uint8Array>();
 
-        const retryPolicy = Schedule.intersect(
-          Schedule.exponential("100 millis"),
-          Schedule.recurs(20),
+      const retryPolicy = Schedule.intersect(
+        Schedule.exponential("100 millis"),
+        Schedule.recurs(20),
+      );
+
+      const socketConnection = socket
+        .run(
+          (data) => {
+            return PubSub.publish(messageQueue, data);
+          },
+          {
+            onOpen: Effect.gen(function* () {
+              yield* Effect.logInfo("Socket connected successfully");
+              yield* Effect.sleep("50 millis"); // Small delay to ensure handler is ready
+            }),
+          },
+        )
+        .pipe(
+          Effect.tap(Effect.logInfo(`Socket message received`)),
+          Effect.tapError((e) => Effect.logInfo(`Socket error received: ${e}`)),
+          Effect.tapDefect((d) =>
+            Effect.logInfo(`Socket defect received: ${d}`),
+          ),
+          Effect.forever,
         );
 
-        const socketConnection = socket
-          .run(
-            (data) => {
-              return PubSub.publish(messageQueue, data);
-            },
-            {
-              onOpen: Effect.gen(function* () {
-                yield* Effect.logInfo("Socket connected successfully");
-                yield* Effect.sleep("50 millis"); // Small delay to ensure handler is ready
-              }),
-            },
-          )
-          .pipe(
-            Effect.tap(Effect.logInfo(`Socket message received`)),
+      const socketFiber: RuntimeFiber<void, Socket.SocketError> =
+        yield* Effect.fork(Effect.retry(socketConnection, retryPolicy));
+
+      /**
+       * Send a message through the WebSocket connection.
+       *
+       * @param chunk - The message to send, either as a string or binary data
+       * @returns An effect that sends the message and handles errors
+       *
+       * @since 0.2.0
+       * @category methods
+       */
+      const sendMessage = (chunk: string | Uint8Array) =>
+        Effect.scoped(
+          socket.writer.pipe(
+            Effect.flatMap((write) => write(chunk)),
             Effect.tapError((e) =>
-              Effect.logInfo(`Socket error received: ${e}`),
+              Effect.logInfo(`Failed to send message: ${e}`),
             ),
-            Effect.tapDefect((d) =>
-              Effect.logInfo(`Socket defect received: ${d}`),
-            ),
-            Effect.forever,
-          );
+          ),
+        );
 
-        const socketFiber: RuntimeFiber<void, Socket.SocketError> =
-          yield* Effect.fork(Effect.retry(socketConnection, retryPolicy));
+      const sendClose = () =>
+        Effect.scoped(
+          socket.writer.pipe(
+            Effect.flatMap((write) => write(new Socket.CloseEvent())),
+          ),
+        );
 
+      return {
         /**
-         * Send a message through the WebSocket connection.
-         *
-         * @param chunk - The message to send, either as a string or binary data
-         * @returns An effect that sends the message and handles errors
+         * PubSub containing incoming WebSocket messages.
+         * Messages are published as they arrive and can be consumed using PubSub operations.
          *
          * @since 0.2.0
-         * @category methods
          */
-        const sendMessage = (chunk: string | Uint8Array) =>
-          Effect.scoped(
-            socket.writer.pipe(
-              Effect.flatMap((write) => write(chunk)),
-              Effect.tapError((e) =>
-                Effect.logInfo(`Failed to send message: ${e}`),
-              ),
-            ),
-          );
-
-        const sendClose = () =>
-          Effect.scoped(
-            socket.writer.pipe(
-              Effect.flatMap((write) => write(new Socket.CloseEvent())),
-            ),
-          );
-
-        return {
-          /**
-           * PubSub containing incoming WebSocket messages.
-           * Messages are published as they arrive and can be consumed using PubSub operations.
-           *
-           * @since 0.2.0
-           */
-          messageQueue,
-          /**
-           * Fiber managing the WebSocket connection lifecycle.
-           *
-           * @since 0.2.0
-           */
-          socketFiber,
-          /**
-           * Send a message through the WebSocket.
-           *
-           * @since 0.2.0
-           */
-          sendMessage,
-          /**
-           * Send a close the WebSocket connection message.
-           *
-           * @since 0.2.0
-           */
-          sendClose,
-        };
-      }),
+        messageQueue,
+        /**
+         * Fiber managing the WebSocket connection lifecycle.
+         *
+         * @since 0.2.0
+         */
+        socketFiber,
+        /**
+         * Send a message through the WebSocket.
+         *
+         * @since 0.2.0
+         */
+        sendMessage,
+        /**
+         * Send a close the WebSocket connection message.
+         *
+         * @since 0.2.0
+         */
+        sendClose,
+      };
+    }),
     dependencies: [
       /**
        * WebSocket constructor dependency injection.

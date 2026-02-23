@@ -1,19 +1,20 @@
 import { WebSocketConstructor } from "@effect/platform/Socket";
 import { describe, it } from "@effect/vitest";
-import { Head, Socket , Config } from "@no-witness-labs/hydra-sdk-cli";
+import { Head, Socket, Config } from "@no-witness-labs/hydra-sdk-cli";
 import { Effect, Layer, Logger } from "effect";
 import { WS } from "vitest-websocket-mock";
 
-const urlNoAppends = "localhost:1234"
-const url = "ws://" + urlNoAppends
+const urlNoAppends = "localhost:1234";
+const url = "ws://" + urlNoAppends;
 
 class MockServer extends Effect.Service<MockServer>()("MockServer", {
   scoped: Effect.acquireRelease(
     Effect.sync(() => new WS(url)),
-    (ws) => Effect.sync(() => {
-      ws.close();
-      WS.clean();
-    }),
+    (ws) =>
+      Effect.sync(() => {
+        ws.close();
+        WS.clean();
+      }),
   ),
 }) {}
 
@@ -41,12 +42,10 @@ describe("core", () => {
       Effect.gen(function* () {
         const server = yield* MockServer;
         yield* Effect.promise(() => server.connected);
-        const hydraHead = yield* Head.HydraHeadController
+        const hydraHead = yield* Head.HydraHeadController;
 
-        hydraHead.logStatus
-      }).pipe(
-        Effect.provide(TestLayer)
-      ),
+        hydraHead.logStatus;
+      }).pipe(Effect.provide(TestLayer)),
     );
   });
 });

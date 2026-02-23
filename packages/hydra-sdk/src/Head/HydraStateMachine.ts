@@ -1,4 +1,8 @@
-import { FetchHttpClient, HttpClient, HttpClientResponse } from "@effect/platform";
+import {
+  FetchHttpClient,
+  HttpClient,
+  HttpClientResponse,
+} from "@effect/platform";
 import { Protocol, Socket, Config } from "@no-witness-labs/hydra-sdk";
 import { Duration, Effect, Option, Schedule, Schema } from "effect";
 
@@ -52,57 +56,65 @@ export class HydraStateMachine extends Effect.Service<HydraStateMachine>()(
   {
     effect: Effect.gen(function* () {
       yield* Effect.log("HydraStateMachine was created");
-      const config = yield* Config.Config
+      const config = yield* Config.Config;
 
       const httpClient = yield* HttpClient.HttpClient;
       const socketController = yield* Socket.SocketController;
       const messageQueue = yield* socketController.messageQueue.subscribe;
 
-      const getMaybeStatusByHttp: Effect.Effect<Option.Option<Protocol.Status>> =
-        Effect.gen(function* () {
-          const responseOpt = yield* httpClient.get(
-            `${config.httpUrl}/head`,
-          ).pipe(Effect.option);
+      const getMaybeStatusByHttp: Effect.Effect<
+        Option.Option<Protocol.Status>
+      > = Effect.gen(function* () {
+        const responseOpt = yield* httpClient
+          .get(`${config.httpUrl}/head`)
+          .pipe(Effect.option);
 
-          if (Option.isNone(responseOpt)) {
-            return Option.none();
-          }
+        if (Option.isNone(responseOpt)) {
+          return Option.none();
+        }
 
-          const headResponseOpt = yield* Effect.option(
-            HttpClientResponse.schemaBodyJson(
-              Protocol.HeadResponseSchema
-            )(responseOpt.value)
-          );
+        const headResponseOpt = yield* Effect.option(
+          HttpClientResponse.schemaBodyJson(Protocol.HeadResponseSchema)(
+            responseOpt.value,
+          ),
+        );
 
-          return Option.map(headResponseOpt, Protocol.headResponseToStatus);
+        return Option.map(headResponseOpt, Protocol.headResponseToStatus);
       });
 
       const setStatus = (
-        maybeStatusByWs:  Option.Option<Protocol.Status>,
-        maybeStatusByHttp:  Option.Option<Protocol.Status>,
-      ) => Effect.gen(function* () {
-            if (Option.isSome(maybeStatusByWs) && Option.isSome(maybeStatusByHttp)) {
-              const wsStatus = maybeStatusByWs.value
-              const httpStatus = maybeStatusByHttp.value
+        maybeStatusByWs: Option.Option<Protocol.Status>,
+        maybeStatusByHttp: Option.Option<Protocol.Status>,
+      ) =>
+        Effect.gen(function* () {
+          if (
+            Option.isSome(maybeStatusByWs) &&
+            Option.isSome(maybeStatusByHttp)
+          ) {
+            const wsStatus = maybeStatusByWs.value;
+            const httpStatus = maybeStatusByHttp.value;
 
-              if (wsStatus !== httpStatus) {
-                yield* Effect.log(
-                  `Status mismatch from websocket: [${wsStatus}] and http: [${httpStatus}]. Using websocket.`
-                );
-                status = wsStatus
-              }
-            } else {
-              const maybeStatus = Option.firstSomeOf([maybeStatusByWs, maybeStatusByHttp]);
-              if (Option.isSome(maybeStatus)) {
-                status = maybeStatus.value
-              }
+            if (wsStatus !== httpStatus) {
+              yield* Effect.log(
+                `Status mismatch from websocket: [${wsStatus}] and http: [${httpStatus}]. Using websocket.`,
+              );
+              status = wsStatus;
             }
-      })
+          } else {
+            const maybeStatus = Option.firstSomeOf([
+              maybeStatusByWs,
+              maybeStatusByHttp,
+            ]);
+            if (Option.isSome(maybeStatus)) {
+              status = maybeStatus.value;
+            }
+          }
+        });
 
       let status: Protocol.Status = "DISCONNECTED";
-      const maybeStatusByHttp = yield* getMaybeStatusByHttp
+      const maybeStatusByHttp = yield* getMaybeStatusByHttp;
       if (Option.isSome(maybeStatusByHttp)) {
-        status = maybeStatusByHttp.value
+        status = maybeStatusByHttp.value;
       }
 
       const statusFiber = yield* Effect.fork(
@@ -124,8 +136,8 @@ export class HydraStateMachine extends Effect.Service<HydraStateMachine>()(
               yield* Effect.logError(`Failed to parse message: ${messageText}`);
             }
 
-            const maybeStatusByHttp = yield* getMaybeStatusByHttp
-            yield* setStatus(maybeStatusByWs, maybeStatusByHttp)
+            const maybeStatusByHttp = yield* getMaybeStatusByHttp;
+            yield* setStatus(maybeStatusByWs, maybeStatusByHttp);
           }
         }),
       );
@@ -177,12 +189,10 @@ export class HydraStateMachine extends Effect.Service<HydraStateMachine>()(
          * @since 0.3.0
          * @category methods
          */
-        awaitStatus
+        awaitStatus,
       };
     }),
 
-    dependencies: [
-      FetchHttpClient.layer,
-    ],
+    dependencies: [FetchHttpClient.layer],
   },
 ) {}

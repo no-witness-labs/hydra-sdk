@@ -39,7 +39,7 @@ export function socketMessageToStatus(
       return Option.some("OPEN");
     case "HeadIsContested":
       return Option.some("CLOSED");
-      case "HeadIsClosed":
+    case "HeadIsClosed":
       return Option.some("CLOSED");
     case "ReadyToFanout":
       return Option.some("FANOUT_POSSIBLE");
@@ -64,4 +64,3 @@ export function headResponseToStatus(
       return "CLOSED";
   }
 }
-
