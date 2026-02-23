@@ -236,12 +236,6 @@ const createEffect = (
 
             return Effect.void;
           }),
-          Effect.catchAll((error) =>
-            Effect.logError("Head projector loop error").pipe(
-              Effect.annotateLogs("error", String(error)),
-              Effect.asVoid,
-            ),
-          ),
         ),
       ),
     );
@@ -418,18 +412,7 @@ const createEffect = (
             yield* Effect.forever(
               Queue.take(dequeue).pipe(
                 Effect.tap((output) =>
-                  Effect.sync(() => {
-                    try {
-                      callback(output);
-                    } catch (err) {
-                      // Swallow – don't let a bad callback kill the subscription
-                      Effect.runFork(
-                        Effect.logWarning("Subscriber callback threw").pipe(
-                          Effect.annotateLogs("error", String(err)),
-                        ),
-                      );
-                    }
-                  }),
+                  Effect.sync(() => callback(output)),
                 ),
               ),
             );

@@ -155,18 +155,16 @@ export const makeHeadFsm = (): Effect.Effect<HeadFsm> =>
           const isValid = key in transitions;
 
           if (!isValid) {
-            const warning = `Invalid FSM transition: ${current} → ${target} via ${tag}`;
+            const message = `Invalid FSM transition: ${current} → ${target} via ${tag}`;
 
             if (options?.strict) {
-              return Effect.fail(new HeadError({ message: warning }));
+              return Effect.fail(new HeadError({ message }));
             }
 
-            // Trust-the-server: log and apply anyway.
+            // Trust-the-server: apply anyway.
             // This handles edge cases like reconnection where the server
             // may report a state we didn't observe the path to.
-            return Effect.logWarning(warning).pipe(
-              Effect.zipRight(Ref.set(status, target)),
-            );
+            return Ref.set(status, target);
           }
 
           return Ref.set(status, target);
