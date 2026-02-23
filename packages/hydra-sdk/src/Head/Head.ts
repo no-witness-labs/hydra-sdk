@@ -1,6 +1,21 @@
-import { Context, Data, Effect, Fiber, Layer, Queue, Stream } from "effect";
+import {
+  Context,
+  Data,
+  Effect,
+  Exit,
+  Fiber,
+  Layer,
+  PubSub,
+  Queue,
+  Ref,
+  Scope,
+  Stream,
+} from "effect";
 
-import { makeHeadFsm } from "./Head.fsm.js";
+import {
+  makeHeadFsm,
+  outputTagFromStatus,
+} from "./Head.fsm.js";
 import type { MatchResult } from "./Head.router.js";
 import {
   makeCommandRouter,
@@ -112,34 +127,14 @@ export interface HydraHead {
     fanout(): Effect.Effect<void, HeadError>;
     awaitReadyToFanout(): Effect.Effect<void, HeadError>;
     abort(): Effect.Effect<void, HeadError>;
-    events(): Stream.Stream<ServerOutput, HeadError>;
+    events(): Stream.Stream<ServerOutput>;
     dispose(): Effect.Effect<void, HeadError>;
   };
 }
 
-interface HydraHeadEffectApi {
-  readonly init: (params?: InitParams) => Effect.Effect<void, HeadError>;
-  // TODO(protocol-schema): replace unknown with protocol Transaction type.
-  // Commit is REST-driven in Hydra and this scaffold signature is temporary.
-  readonly commit: (utxos: unknown) => Effect.Effect<void, HeadError>;
-  readonly close: () => Effect.Effect<void, HeadError>;
-  readonly safeClose: () => Effect.Effect<void, HeadError>;
-  readonly fanout: () => Effect.Effect<void, HeadError>;
-  readonly awaitReadyToFanout: () => Effect.Effect<void, HeadError>;
-  readonly abort: () => Effect.Effect<void, HeadError>;
-  readonly events: () => Stream.Stream<ServerOutput, HeadError>;
-  readonly dispose: () => Effect.Effect<void, HeadError>;
-}
-
-const transitionEventTag: Record<HeadStatus, string> = {
-  Idle: "HeadIsIdle",
-  Initializing: "HeadIsInitializing",
-  Open: "HeadIsOpen",
-  Closed: "HeadIsClosed",
-  FanoutPossible: "ReadyToFanout",
-  Final: "HeadIsFinalized",
-  Aborted: "HeadIsAborted",
-};
+// ---------------------------------------------------------------------------
+// Command matching helpers
+// ---------------------------------------------------------------------------
 
 const isCommandFailure = (
   event: ApiEvent,
@@ -179,6 +174,10 @@ const matchServerTag = (
   return isCommandFailure(event, command);
 };
 
+// ---------------------------------------------------------------------------
+// Core factory
+// ---------------------------------------------------------------------------
+
 const createEffect = (
   config: HeadConfig,
 ): Effect.Effect<HydraHead, HeadError> =>
@@ -186,60 +185,60 @@ const createEffect = (
     const transport = yield* makeHeadTransport(config);
     const router = yield* makeCommandRouter(transport);
     const fsm = yield* makeHeadFsm();
-    const callbackSubscribers = new Set<(event: ServerOutput) => void>();
-    const iteratorSubscribers = new Set<Queue.Enqueue<ServerOutput>>();
-    const streamQueue = yield* Queue.unbounded<ServerOutput>();
 
-    let state: HeadStatus = "Idle";
-    let headId: string | null = null;
+    // -----------------------------------------------------------------------
+    // Managed state via Ref – safe for concurrent reads/writes
+    // fsm.status is the single source of truth for HeadStatus
+    // -----------------------------------------------------------------------
+    const headIdRef = yield* Ref.make<string | null>(null);
+    const disposedRef = yield* Ref.make(false);
 
+    // -----------------------------------------------------------------------
+    // Central PubSub – single fan-out primitive for all subscribers
+    //
+    // Using a sliding strategy with capacity 256 so that:
+    //   - A slow callback subscriber can't block the projector
+    //   - We don't accumulate unboundedly if nobody is listening
+    //   - Publishers (the projector) never block
+    // -----------------------------------------------------------------------
+    const hub = yield* PubSub.sliding<ServerOutput>(256);
+
+    // -----------------------------------------------------------------------
+    // Projector fiber – single loop that:
+    //   1. Takes raw transport events
+    //   2. Applies FSM transitions (which updates fsm.status)
+    //   3. Publishes to the PubSub hub
+    // -----------------------------------------------------------------------
     const { queue: projected, unsubscribe: unsubscribeProjected } =
       yield* transport.events.subscribe;
+
     const projectorFiber = yield* Effect.forkDaemon(
       Effect.forever(
         Queue.take(projected).pipe(
           Effect.flatMap((event) => {
             if (isServerOutput(event)) {
-              const next = Object.entries(transitionEventTag).find(
-                ([, tag]) => tag === event.output.tag,
-              );
-              if (next) {
-                state = next[0] as HeadStatus;
-              }
-
-              return Effect.zipRight(
+              return Effect.all([
+                // FSM handles both validation and state update
                 fsm.applyOutputTag(event.output.tag),
-                Effect.sync(() => {
-                  for (const callback of callbackSubscribers) {
-                    callback(event.output);
-                  }
-                }).pipe(
-                  Effect.zipRight(
-                    Effect.zipRight(
-                      Queue.offer(streamQueue, event.output).pipe(
-                        Effect.asVoid,
-                      ),
-                      Effect.forEach(iteratorSubscribers, (queue) =>
-                        Queue.offer(queue, event.output),
-                      ).pipe(Effect.asVoid),
-                    ),
-                  ),
-                ),
-              );
+                // Publish to hub – sliding means this never blocks
+                PubSub.publish(hub, event.output),
+              ]).pipe(Effect.asVoid);
             }
 
             if (event._tag === "Greetings") {
-              state = event.greetings.headStatus;
-              return fsm.applyOutputTag(
-                transitionEventTag[event.greetings.headStatus],
-              );
+              // On reconnect/greeting, force-sync FSM to the server's state.
+              // Use the output tag so applyOutputTag can validate/log if needed.
+              const tag = outputTagFromStatus(event.greetings.headStatus);
+              return tag !== undefined
+                ? fsm.applyOutputTag(tag)
+                : Ref.set(fsm.status, event.greetings.headStatus);
             }
 
             return Effect.void;
           }),
           Effect.catchAll((error) =>
-            Effect.logError("Head projector loop failed").pipe(
-              Effect.zipRight(Effect.logError(error)),
+            Effect.logError("Head projector loop error").pipe(
+              Effect.annotateLogs("error", String(error)),
               Effect.asVoid,
             ),
           ),
@@ -247,6 +246,24 @@ const createEffect = (
       ),
     );
 
+    // -----------------------------------------------------------------------
+    // Guard: reject operations after dispose
+    // -----------------------------------------------------------------------
+    const assertNotDisposed: Effect.Effect<void, HeadError> = Ref.get(
+      disposedRef,
+    ).pipe(
+      Effect.flatMap((disposed) =>
+        disposed
+          ? Effect.fail(
+              new HeadError({ message: "Head has been disposed" }),
+            )
+          : Effect.void,
+      ),
+    );
+
+    // -----------------------------------------------------------------------
+    // Command execution
+    // -----------------------------------------------------------------------
     const execute = (
       command: ClientInputTag,
       payload: unknown,
@@ -254,6 +271,7 @@ const createEffect = (
       timeoutMs: number,
     ): Effect.Effect<void, HeadError> =>
       Effect.gen(function* () {
+        yield* assertNotDisposed;
         yield* fsm.assertCommandAllowed(command);
         yield* router.sendAndAwait(
           transport.send(command, payload),
@@ -261,6 +279,10 @@ const createEffect = (
           timeoutMs,
         );
       });
+
+    // -----------------------------------------------------------------------
+    // Effect API implementations
+    // -----------------------------------------------------------------------
 
     const initEffect = (params?: InitParams): Effect.Effect<void, HeadError> =>
       execute(
@@ -270,10 +292,8 @@ const createEffect = (
         30_000,
       ).pipe(
         Effect.tap(() =>
-          Effect.sync(() => {
-            // TODO(protocol-schema): extract headId from HeadIsInitializing payload.
-            headId = "dummy-head-id";
-          }),
+          // TODO(protocol-schema): extract headId from HeadIsInitializing payload.
+          Ref.set(headIdRef, "dummy-head-id"),
         ),
       );
 
@@ -304,7 +324,9 @@ const createEffect = (
 
     const awaitReadyToFanoutEffect = (): Effect.Effect<void, HeadError> =>
       Effect.gen(function* () {
-        if (state === "Final") {
+        const currentState = yield* Ref.get(fsm.status);
+
+        if (currentState === "Final") {
           return yield* Effect.fail(
             new HeadError({
               message: "Fanout is not allowed when head is already Final",
@@ -312,7 +334,7 @@ const createEffect = (
           );
         }
 
-        if (state === "FanoutPossible") {
+        if (currentState === "FanoutPossible") {
           return;
         }
 
@@ -323,7 +345,6 @@ const createEffect = (
           ) {
             return matchSuccess(undefined);
           }
-
           return matchContinue();
         }, 60_000);
       });
@@ -347,55 +368,127 @@ const createEffect = (
         30_000,
       );
 
+    // -----------------------------------------------------------------------
+    // Event streams – derived from PubSub, no manual bookkeeping
+    // -----------------------------------------------------------------------
+
+    /**
+     * Each call to `events()` creates an independent subscriber to the hub.
+     * The subscription is scoped – when the consuming fiber/scope ends, the
+     * subscription is automatically cleaned up by Effect's resource management.
+     */
+    const eventsStream = (): Stream.Stream<ServerOutput> =>
+      Stream.fromPubSub(hub);
+
+    // -----------------------------------------------------------------------
+    // Dispose – structured teardown
+    // -----------------------------------------------------------------------
+
     const disposeEffect = (): Effect.Effect<void, HeadError> =>
       Effect.gen(function* () {
+        // Idempotent dispose
+        const alreadyDisposed = yield* Ref.getAndSet(disposedRef, true);
+        if (alreadyDisposed) return;
+
         yield* Fiber.interrupt(projectorFiber);
         yield* unsubscribeProjected;
         yield* Queue.shutdown(projected).pipe(Effect.orDie);
-        yield* Effect.forEach(iteratorSubscribers, (queue) =>
-          Queue.shutdown(queue).pipe(Effect.orDie),
-        ).pipe(Effect.asVoid);
-        yield* Queue.shutdown(streamQueue).pipe(Effect.orDie);
-        iteratorSubscribers.clear();
-        callbackSubscribers.clear();
+        yield* PubSub.shutdown(hub).pipe(Effect.orDie);
         yield* transport.dispose;
-        state = "Idle";
-        headId = null;
+        yield* Ref.set(fsm.status, "Idle");
+        yield* Ref.set(headIdRef, null);
       });
+
+    // -----------------------------------------------------------------------
+    // Callback-based subscribe (Promise API compatibility)
+    //
+    // Forks a scoped fiber that subscribes to the PubSub and dispatches to
+    // the callback. Interrupting the fiber tears down the scope, which
+    // automatically unsubscribes from the PubSub.
+    // -----------------------------------------------------------------------
 
     const subscribe = (
       callback: (event: ServerOutput) => void,
     ): Unsubscribe => {
-      callbackSubscribers.add(callback);
+      // Effect.scoped ensures PubSub.subscribe's Scope finalizer runs on interrupt
+      const fiber = Effect.runFork(
+        Effect.scoped(
+          Effect.gen(function* () {
+            const dequeue = yield* PubSub.subscribe(hub);
+            yield* Effect.forever(
+              Queue.take(dequeue).pipe(
+                Effect.tap((output) =>
+                  Effect.sync(() => {
+                    try {
+                      callback(output);
+                    } catch (err) {
+                      // Swallow – don't let a bad callback kill the subscription
+                      Effect.runFork(
+                        Effect.logWarning("Subscriber callback threw").pipe(
+                          Effect.annotateLogs("error", String(err)),
+                        ),
+                      );
+                    }
+                  }),
+                ),
+              ),
+            );
+          }),
+        ),
+      );
 
       let cancelled = false;
 
       return () => {
-        if (cancelled) {
-          return;
-        }
-
+        if (cancelled) return;
         cancelled = true;
-        callbackSubscribers.delete(callback);
+        Effect.runFork(Fiber.interrupt(fiber));
       };
     };
 
+    // -----------------------------------------------------------------------
+    // Async iterator (Promise API compatibility)
+    //
+    // Manually manages a PubSub subscription scope so we can yield events
+    // and guarantee cleanup when the iterator is abandoned (via finally).
+    // -----------------------------------------------------------------------
+
     const subscribeEvents =
       async function* (): AsyncIterableIterator<ServerOutput> {
-        const queue = await Effect.runPromise(Queue.unbounded<ServerOutput>());
-        iteratorSubscribers.add(queue);
+        // Create a manual scope so we control when it closes
+        const scope = Effect.runSync(Scope.make());
+
+        // Subscribe within that scope – the dequeue will be cleaned up
+        // when we close the scope
+        const dequeue = await Effect.runPromise(
+          PubSub.subscribe(hub).pipe(Scope.extend(scope)),
+        );
+
         try {
           while (true) {
-            const event = await Effect.runPromise(Queue.take(queue));
+            const event = await Effect.runPromise(Queue.take(dequeue));
             yield event;
           }
         } finally {
-          iteratorSubscribers.delete(queue);
-          await Effect.runPromise(Queue.shutdown(queue).pipe(Effect.orDie));
+          // Close scope → PubSub unsubscribes → dequeue shuts down
+          await Effect.runPromise(
+            Scope.close(scope, Exit.void),
+          );
         }
       };
 
-    const effectApi: HydraHeadEffectApi = {
+    // -----------------------------------------------------------------------
+    // Promise API helper
+    // -----------------------------------------------------------------------
+
+    const runEffect = <A>(op: Effect.Effect<A, HeadError>): Promise<A> =>
+      Effect.runPromise(op);
+
+    // -----------------------------------------------------------------------
+    // Assemble handle
+    // -----------------------------------------------------------------------
+
+    const effectApi = {
       init: initEffect,
       commit: commitEffect,
       close: closeEffect,
@@ -403,39 +496,39 @@ const createEffect = (
       fanout: fanoutEffect,
       awaitReadyToFanout: awaitReadyToFanoutEffect,
       abort: abortEffect,
-      events: () => Stream.fromQueue(streamQueue),
+      events: eventsStream,
       dispose: disposeEffect,
     };
 
-    const runEffectPromise = <A>(
-      operation: Effect.Effect<A, HeadError>,
-    ): Promise<A> => Effect.runPromise(operation);
-
     const handle: HydraHead = {
       get state() {
-        return state;
+        return Effect.runSync(Ref.get(fsm.status));
       },
       get headId() {
-        return headId;
+        return Effect.runSync(Ref.get(headIdRef));
       },
 
-      getState: () => state,
+      getState: () => Effect.runSync(Ref.get(fsm.status)),
 
-      init: (params?: InitParams) => runEffectPromise(effectApi.init(params)),
-      commit: (utxos: unknown) => runEffectPromise(effectApi.commit(utxos)),
-      close: () => runEffectPromise(effectApi.close()),
-      safeClose: () => runEffectPromise(effectApi.safeClose()),
-      fanout: () => runEffectPromise(effectApi.fanout()),
-      abort: () => runEffectPromise(effectApi.abort()),
+      init: (params?: InitParams) => runEffect(effectApi.init(params)),
+      commit: (utxos: unknown) => runEffect(effectApi.commit(utxos)),
+      close: () => runEffect(effectApi.close()),
+      safeClose: () => runEffect(effectApi.safeClose()),
+      fanout: () => runEffect(effectApi.fanout()),
+      abort: () => runEffect(effectApi.abort()),
       subscribe,
       subscribeEvents,
-      dispose: () => runEffectPromise(effectApi.dispose()),
+      dispose: () => runEffect(effectApi.dispose()),
 
       effect: effectApi,
     };
 
     return handle;
   });
+
+// ---------------------------------------------------------------------------
+// Scoped / Layer / convenience
+// ---------------------------------------------------------------------------
 
 const createScopedEffect = (config: HeadConfig) =>
   Effect.acquireRelease(createEffect(config), (head) =>
