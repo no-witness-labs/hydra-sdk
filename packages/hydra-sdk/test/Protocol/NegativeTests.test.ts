@@ -94,9 +94,9 @@ describe("Negative schema validation", () => {
         tag: "UnknownCommand",
       };
 
-      const result = yield* Schema.decodeUnknown(
-        Protocol.RequestMessageSchema,
-      )(input).pipe(Effect.either);
+      const result = yield* Schema.decodeUnknown(Protocol.RequestMessageSchema)(
+        input,
+      ).pipe(Effect.either);
 
       expect(result._tag).toBe("Left");
     }),
@@ -178,9 +178,9 @@ describe("Negative schema validation", () => {
         extraField: "should be ignored",
       };
 
-      const result = yield* Schema.decodeUnknown(
-        Protocol.TxValidMessageSchema,
-      )(input).pipe(Effect.either);
+      const result = yield* Schema.decodeUnknown(Protocol.TxValidMessageSchema)(
+        input,
+      ).pipe(Effect.either);
 
       expect(result._tag).toBe("Right");
     }),

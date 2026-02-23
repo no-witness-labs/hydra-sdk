@@ -1,17 +1,121 @@
-import { Protocol, Socket } from "@no-witness-labs/hydra-sdk";
-import { Effect, Option, Schema } from "effect";
+import {
+  FetchHttpClient,
+  HttpClient,
+  HttpClientResponse,
+} from "@effect/platform";
+import { Config, Protocol, Socket } from "@no-witness-labs/hydra-sdk";
+import { Duration, Effect, Option, Schema } from "effect";
 
-const url = "ws://localhost:4001";
+/**
+ * Error thrown when awaiting a status times out.
+ *
+ * @since 0.3.0
+ * @category errors
+ */
+export class StatusTimeoutError {
+  readonly _tag = "StatusTimeoutError";
+  constructor(
+    readonly expectedStatus: Protocol.Status,
+    readonly currentStatus: Protocol.Status,
+  ) {}
+}
 
+// =============================================================================
+// Hydra State Machine Service
+// =============================================================================
+
+/**
+ * A service that manages the Hydra head protocol state machine by monitoring
+ * WebSocket messages and tracking status transitions.
+ *
+ * Provides real-time status tracking with automatic message parsing,
+ * validation, and comprehensive logging for state transitions.
+ *
+ * @since 0.3.0
+ * @category services
+ * @example
+ * ```typescript
+ * import { Effect } from "effect";
+ * import { Head } from "@no-witness-labs/hydra-sdk";
+ *
+ * const program = Effect.gen(function* () {
+ *   const stateMachine = yield* Head.HydraStateMachine;
+ *   const currentStatus = stateMachine.getStatus();
+ *   console.log(`Hydra head status: ${currentStatus}`);
+ * });
+ *
+ * Effect.runPromise(
+ *   program.pipe(
+ *     Effect.provide(Head.HydraStateMachine.Default)
+ *   )
+ * );
+ * ```
+ */
 export class HydraStateMachine extends Effect.Service<HydraStateMachine>()(
   "HydraStateMachine",
   {
     effect: Effect.gen(function* () {
       yield* Effect.log("HydraStateMachine was created");
+      const config = yield* Config.Config;
 
+      const httpClient = yield* HttpClient.HttpClient;
       const socketController = yield* Socket.SocketController;
       const messageQueue = yield* socketController.messageQueue.subscribe;
+
+      const getMaybeStatusByHttp: Effect.Effect<
+        Option.Option<Protocol.Status>
+      > = Effect.gen(function* () {
+        const responseOpt = yield* httpClient
+          .get(`${config.httpUrl}/head`)
+          .pipe(Effect.option);
+
+        if (Option.isNone(responseOpt)) {
+          return Option.none();
+        }
+
+        const headResponseOpt = yield* Effect.option(
+          HttpClientResponse.schemaBodyJson(Protocol.HeadResponseSchema)(
+            responseOpt.value,
+          ),
+        );
+
+        return Option.map(headResponseOpt, Protocol.headResponseToStatus);
+      });
+
+      const setStatus = (
+        maybeStatusByWs: Option.Option<Protocol.Status>,
+        maybeStatusByHttp: Option.Option<Protocol.Status>,
+      ) =>
+        Effect.gen(function* () {
+          if (
+            Option.isSome(maybeStatusByWs) &&
+            Option.isSome(maybeStatusByHttp)
+          ) {
+            const wsStatus = maybeStatusByWs.value;
+            const httpStatus = maybeStatusByHttp.value;
+
+            if (wsStatus !== httpStatus) {
+              yield* Effect.log(
+                `Status mismatch from websocket: [${wsStatus}] and http: [${httpStatus}]. Using websocket.`,
+              );
+              status = wsStatus;
+            }
+          } else {
+            const maybeStatus = Option.firstSomeOf([
+              maybeStatusByWs,
+              maybeStatusByHttp,
+            ]);
+            if (Option.isSome(maybeStatus)) {
+              status = maybeStatus.value;
+            }
+          }
+        });
+
       let status: Protocol.Status = "DISCONNECTED";
+      const maybeStatusByHttp = yield* getMaybeStatusByHttp;
+      if (Option.isSome(maybeStatusByHttp)) {
+        status = maybeStatusByHttp.value;
+      }
 
       const statusFiber = yield* Effect.fork(
         Effect.gen(function* () {
@@ -19,7 +123,7 @@ export class HydraStateMachine extends Effect.Service<HydraStateMachine>()(
           while ((rawMessage = yield* messageQueue.take)) {
             const messageText: string = new TextDecoder().decode(rawMessage);
 
-            const maybeStatus: Option.Option<Protocol.Status> =
+            const maybeStatusByWs: Option.Option<Protocol.Status> =
               yield* Effect.option(
                 Schema.decode(
                   Schema.parseJson(Protocol.WebSocketResponseMessageSchema),
@@ -28,23 +132,67 @@ export class HydraStateMachine extends Effect.Service<HydraStateMachine>()(
                 Effect.map(Option.flatMap(Protocol.socketMessageToStatus)),
               );
 
-            if (Option.isSome(maybeStatus)) {
-              const newStatus = yield* maybeStatus;
-              yield* Effect.log(
-                `Valid status received [${newStatus}] from message: ${messageText}`,
-              );
-              status = newStatus;
+            if (Option.isNone(maybeStatusByWs)) {
+              yield* Effect.logError(`Failed to parse message: ${messageText}`);
             }
+
+            const maybeStatusByHttp = yield* getMaybeStatusByHttp;
+            yield* setStatus(maybeStatusByWs, maybeStatusByHttp);
           }
         }),
       );
 
+      const awaitStatus = (
+        expectedStatus: Protocol.Status,
+        attempts: number = 300,
+        sleepDuration: Duration.DurationInput = Duration.millis(100),
+      ): Effect.Effect<void, StatusTimeoutError> => {
+        const retry = (
+          attempts: number,
+        ): Effect.Effect<void, StatusTimeoutError> =>
+          Effect.suspend(() => {
+            if (status === expectedStatus) {
+              return Effect.void;
+            }
+
+            if (attempts <= 0) {
+              return Effect.fail(
+                new StatusTimeoutError(expectedStatus, status),
+              );
+            }
+
+            return Effect.sleep(sleepDuration).pipe(
+              Effect.flatMap(() => retry(attempts - 1)),
+            );
+          });
+
+        return retry(attempts);
+      };
+
       return {
+        /**
+         * Fiber managing the status monitoring lifecycle.
+         *
+         * @since 0.3.0
+         */
         statusFiber,
+        /**
+         * Retrieve the current Hydra head protocol status.
+         *
+         * @since 0.3.0
+         * @category methods
+         */
         getStatus: () => status,
+        /**
+         * Wait for a specific status within a given duration.
+         *
+         * @since 0.3.0
+         * @category methods
+         */
+        awaitStatus,
       };
     }),
 
-    dependencies: [Socket.SocketController.Default({ url })],
+    dependencies: [FetchHttpClient.layer],
   },
 ) {}

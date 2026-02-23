@@ -24,14 +24,18 @@ export const GreetingsMessageSchema = Schema.Struct({
     "FanoutPossible",
     "Final",
   ),
-  hydraHeadId: Schema.optional(Schema.String),
-  snapshotUtxo: Schema.optional(UTxOSchema),
-  timestamp: Schema.optional(Schema.DateTimeUtc),
   hydraNodeVersion: Schema.String,
-  env: Schema.optional(Schema.String),
-  networkInfo: Schema.optional(Schema.Unknown),
-  chainSyncedStatus: Schema.optional(Schema.Unknown),
-  currentSlot: Schema.optional(Schema.Int),
+  hydraHeadId: Schema.optional(Schema.String),
+  snapshotUtxo: Schema.optional(
+    Schema.Record({ key: Schema.String, value: Schema.Any }),
+  ), // TODO: make a better match
+  timestamp: Schema.optional(Schema.String),
+  env: Schema.optional(
+    Schema.Record({ key: Schema.String, value: Schema.Any }),
+  ), // Undocumented field of the Hydra Head response
+  networkInfo: Schema.optional(
+    Schema.Record({ key: Schema.String, value: Schema.Any }),
+  ), // Undocumented field of the Hydra Head response
 });
 export type GreetingsMessage = typeof GreetingsMessageSchema.Type;
 
@@ -582,8 +586,7 @@ export const DepositActivatedMessageSchema = Schema.Struct({
   seq: Schema.Int,
   timestamp: Schema.DateTimeUtc,
 });
-export type DepositActivatedMessage =
-  typeof DepositActivatedMessageSchema.Type;
+export type DepositActivatedMessage = typeof DepositActivatedMessageSchema.Type;
 
 /**
  * Deposit expired event (incremental commit).
