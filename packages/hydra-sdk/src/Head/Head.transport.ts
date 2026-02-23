@@ -262,7 +262,7 @@ const parseApiEvent = (raw: string): Effect.Effect<ApiEvent, HeadError> =>
 
 const encodeClientInput = (
   tag: ClientInputTag,
-  _payload?: unknown,
+  payload?: unknown,
 ): Effect.Effect<string, HeadError> =>
   Effect.try({
     try: () => {

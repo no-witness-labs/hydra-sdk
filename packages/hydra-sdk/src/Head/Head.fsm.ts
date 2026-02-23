@@ -71,6 +71,7 @@ const outputTagToStatus: Readonly<Record<string, HeadStatus>> = {
   HeadIsInitializing: "Initializing",
   HeadIsOpen: "Open",
   HeadIsClosed: "Closed",
+  HeadIsContested: "Closed",
   ReadyToFanout: "FanoutPossible",
   HeadIsFinalized: "Final",
   HeadIsAborted: "Aborted",

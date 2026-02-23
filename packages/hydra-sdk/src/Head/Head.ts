@@ -120,7 +120,8 @@ export interface HydraHead {
   newTx(transaction: unknown): Promise<void>;
   close(): Promise<void>;
   safeClose(): Promise<void>;
-  // TODO(protocol-schema): replace unknown with protocol Snapshot type.
+  // TODO(protocol-schema): contest currently has no payload in the Hydra websocket API;
+  // update this signature if the protocol schema introduces a contestation payload.
   contest(): Promise<void>;
   fanout(): Promise<void>;
   abort(): Promise<void>;
