@@ -1,7 +1,7 @@
 import { WebSocketConstructor } from "@effect/platform/Socket";
 import { describe, expect, it } from "@effect/vitest";
 import type { Protocol } from "@no-witness-labs/hydra-sdk";
-import { Config,Head, Socket } from "@no-witness-labs/hydra-sdk";
+import { Config, Head, Socket } from "@no-witness-labs/hydra-sdk";
 import { Effect, Layer, Logger } from "effect";
 import { WS } from "vitest-websocket-mock";
 

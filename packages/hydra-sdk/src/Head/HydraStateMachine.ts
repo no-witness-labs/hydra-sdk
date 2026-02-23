@@ -3,7 +3,7 @@ import {
   HttpClient,
   HttpClientResponse,
 } from "@effect/platform";
-import { Config,Protocol, Socket } from "@no-witness-labs/hydra-sdk";
+import { Config, Protocol, Socket } from "@no-witness-labs/hydra-sdk";
 import { Duration, Effect, Option, Schema } from "effect";
 
 /**

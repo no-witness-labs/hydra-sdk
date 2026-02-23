@@ -1,15 +1,7 @@
 import { FetchHttpClient } from "@effect/platform";
-import { Head,Protocol, Socket } from "@no-witness-labs/hydra-sdk";
-import type {
-  Scope} from "effect";
-import {
-  Duration,
-  Effect,
-  PubSub,
-  Queue,
-  Schedule,
-  Schema
-} from "effect";
+import { Head, Protocol, Socket } from "@no-witness-labs/hydra-sdk";
+import type { Scope } from "effect";
+import { Duration, Effect, PubSub, Queue, Schedule, Schema } from "effect";
 import type { TimeoutException } from "effect/Cause";
 
 const awaitMessageWithSchema = <A, I>(

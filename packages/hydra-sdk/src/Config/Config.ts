@@ -1,6 +1,4 @@
-import {
-  Effect,
-} from "effect";
+import { Effect } from "effect";
 
 export class Config extends Effect.Service<Config>()("Config", {
   effect: (urlNoAppends: string) =>
