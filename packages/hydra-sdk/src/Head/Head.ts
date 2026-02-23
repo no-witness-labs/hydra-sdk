@@ -187,47 +187,60 @@ const createEffect = (
     const fsm = yield* makeHeadFsm();
 
     // -----------------------------------------------------------------------
+    // Internal scope – all resources register finalizers here.
+    // Closing the scope tears down everything in LIFO order.
+    // -----------------------------------------------------------------------
+    const scope = yield* Scope.make();
+
+    // -----------------------------------------------------------------------
     // Managed state via Ref – safe for concurrent reads/writes
     // fsm.status is the single source of truth for HeadStatus
+    // disposedRef is a lightweight guard for clear error messages on
+    // post-dispose operations — the scope handles actual teardown.
     // -----------------------------------------------------------------------
     const headIdRef = yield* Ref.make<string | null>(null);
     const disposedRef = yield* Ref.make(false);
 
     // -----------------------------------------------------------------------
-    // Central PubSub – single fan-out primitive for all subscribers
+    // Resource acquisition + finalizer registration
     //
-    // Using a sliding strategy with capacity 256 so that:
-    //   - A slow callback subscriber can't block the projector
-    //   - We don't accumulate unboundedly if nobody is listening
-    //   - Publishers (the projector) never block
+    // Finalizers run LIFO: transport (first registered) disposes last,
+    // projector fiber (last registered) is interrupted first.
     // -----------------------------------------------------------------------
-    const hub = yield* PubSub.sliding<ServerOutput>(256);
 
-    // -----------------------------------------------------------------------
-    // Projector fiber – single loop that:
-    //   1. Takes raw transport events
-    //   2. Applies FSM transitions (which updates fsm.status)
-    //   3. Publishes to the PubSub hub
-    // -----------------------------------------------------------------------
+    // 1. Transport cleanup (runs last)
+    yield* Effect.addFinalizer(() => transport.dispose).pipe(
+      Scope.extend(scope),
+    );
+
+    // 2. PubSub hub
+    const hub = yield* PubSub.sliding<ServerOutput>(256);
+    yield* Effect.addFinalizer(() =>
+      PubSub.shutdown(hub).pipe(Effect.orDie),
+    ).pipe(Scope.extend(scope));
+
+    // 3. Projector subscription from transport
     const { queue: projected, unsubscribe: unsubscribeProjected } =
       yield* transport.events.subscribe;
+    yield* Effect.addFinalizer(() =>
+      unsubscribeProjected.pipe(
+        Effect.zipRight(Queue.shutdown(projected).pipe(Effect.orDie)),
+      ),
+    ).pipe(Scope.extend(scope));
 
-    const projectorFiber = yield* Effect.forkDaemon(
+    // 4. Projector fiber (interrupted first on scope close)
+    yield* Effect.forkIn(
       Effect.forever(
         Queue.take(projected).pipe(
           Effect.flatMap((event) => {
             if (isServerOutput(event)) {
               return Effect.all([
-                // FSM handles both validation and state update
                 fsm.applyOutputTag(event.output.tag),
-                // Publish to hub – sliding means this never blocks
                 PubSub.publish(hub, event.output),
               ]).pipe(Effect.asVoid);
             }
 
             if (event._tag === "Greetings") {
-              // On reconnect/greeting, force-sync FSM to the server's state.
-              // Use the output tag so applyOutputTag can validate/log if needed.
               const tag = outputTagFromStatus(event.greetings.headStatus);
               return tag !== undefined
                 ? fsm.applyOutputTag(tag)
@@ -238,6 +251,7 @@ const createEffect = (
           }),
         ),
       ),
+      scope,
     );
 
     // -----------------------------------------------------------------------
@@ -366,32 +380,25 @@ const createEffect = (
     // Event streams – derived from PubSub, no manual bookkeeping
     // -----------------------------------------------------------------------
 
-    /**
-     * Each call to `events()` creates an independent subscriber to the hub.
-     * The subscription is scoped – when the consuming fiber/scope ends, the
-     * subscription is automatically cleaned up by Effect's resource management.
-     */
     const eventsStream = (): Stream.Stream<ServerOutput> =>
       Stream.fromPubSub(hub);
 
     // -----------------------------------------------------------------------
-    // Dispose – structured teardown
+    // Dispose – close the internal scope
+    //
+    // Scope.close runs all finalizers in LIFO order:
+    //   1. Interrupt projector fiber
+    //   2. Unsubscribe + shutdown projected queue
+    //   3. Shutdown PubSub hub
+    //   4. Dispose transport
+    //
+    // Scope.close is idempotent — calling dispose() twice is safe.
     // -----------------------------------------------------------------------
 
-    const disposeEffect = (): Effect.Effect<void, HeadError> =>
-      Effect.gen(function* () {
-        // Idempotent dispose
-        const alreadyDisposed = yield* Ref.getAndSet(disposedRef, true);
-        if (alreadyDisposed) return;
-
-        yield* Fiber.interrupt(projectorFiber);
-        yield* unsubscribeProjected;
-        yield* Queue.shutdown(projected).pipe(Effect.orDie);
-        yield* PubSub.shutdown(hub).pipe(Effect.orDie);
-        yield* transport.dispose;
-        yield* Ref.set(fsm.status, "Idle");
-        yield* Ref.set(headIdRef, null);
-      });
+    const disposeEffect = (): Effect.Effect<void> =>
+      Ref.set(disposedRef, true).pipe(
+        Effect.zipRight(Scope.close(scope, Exit.void)),
+      );
 
     // -----------------------------------------------------------------------
     // Callback-based subscribe (Promise API compatibility)
@@ -404,7 +411,6 @@ const createEffect = (
     const subscribe = (
       callback: (event: ServerOutput) => void,
     ): Unsubscribe => {
-      // Effect.scoped ensures PubSub.subscribe's Scope finalizer runs on interrupt
       const fiber = Effect.runFork(
         Effect.scoped(
           Effect.gen(function* () {
@@ -432,19 +438,17 @@ const createEffect = (
     // -----------------------------------------------------------------------
     // Async iterator (Promise API compatibility)
     //
-    // Manually manages a PubSub subscription scope so we can yield events
-    // and guarantee cleanup when the iterator is abandoned (via finally).
+    // Uses a dedicated scope for the subscription lifetime. The scope
+    // closes in finally{} — whether the consumer breaks, throws, or
+    // the hub shuts down.
     // -----------------------------------------------------------------------
 
     const subscribeEvents =
       async function* (): AsyncIterableIterator<ServerOutput> {
-        // Create a manual scope so we control when it closes
-        const scope = Effect.runSync(Scope.make());
+        const iteratorScope = Effect.runSync(Scope.make());
 
-        // Subscribe within that scope – the dequeue will be cleaned up
-        // when we close the scope
         const dequeue = await Effect.runPromise(
-          PubSub.subscribe(hub).pipe(Scope.extend(scope)),
+          PubSub.subscribe(hub).pipe(Scope.extend(iteratorScope)),
         );
 
         try {
@@ -453,10 +457,7 @@ const createEffect = (
             yield event;
           }
         } finally {
-          // Close scope → PubSub unsubscribes → dequeue shuts down
-          await Effect.runPromise(
-            Scope.close(scope, Exit.void),
-          );
+          await Effect.runPromise(Scope.close(iteratorScope, Exit.void));
         }
       };
 
@@ -501,7 +502,7 @@ const createEffect = (
       abort: () => runEffect(effectApi.abort()),
       subscribe,
       subscribeEvents,
-      dispose: () => runEffect(effectApi.dispose()),
+      dispose: () => Effect.runPromise(effectApi.dispose()),
 
       effect: effectApi,
     };
