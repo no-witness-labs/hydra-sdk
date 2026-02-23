@@ -16,6 +16,7 @@ import {
   makeHeadFsm,
   outputTagFromStatus,
 } from "./Head.fsm.js";
+import { makeHeadHttpClient } from "./Head.http.js";
 import type { MatchResult } from "./Head.router.js";
 import {
   makeCommandRouter,
@@ -62,11 +63,17 @@ export type ClientInputTag =
   | "Init"
   // TODO(protocol-schema): Commit is REST-based in Hydra; retained here as scaffold API surface.
   | "Commit"
+  // TODO(protocol-schema): NewTx payload should use Protocol Transaction schema.
+  | "NewTx"
   | "Close"
   // TODO(protocol-schema): SafeClose is scaffold-only and not part of Hydra websocket commands.
   | "SafeClose"
+  | "Contest"
   | "Fanout"
-  | "Abort";
+  | "Abort"
+  // TODO(protocol-schema): Decommit / Recover payloads should use Protocol schemas.
+  | "Decommit"
+  | "Recover";
 
 export interface ClientMessage {
   readonly tag:
@@ -109,10 +116,33 @@ export interface HydraHead {
   // TODO(protocol-schema): replace unknown with protocol Transaction type.
   // Commit is REST-driven in Hydra and this scaffold signature is temporary.
   commit(utxos: unknown): Promise<void>;
+  // TODO(protocol-schema): replace unknown with protocol Transaction type.
+  newTx(transaction: unknown): Promise<void>;
   close(): Promise<void>;
   safeClose(): Promise<void>;
+  // TODO(protocol-schema): replace unknown with protocol Snapshot type.
+  contest(): Promise<void>;
   fanout(): Promise<void>;
   abort(): Promise<void>;
+  // TODO(protocol-schema): replace unknown with protocol Transaction type.
+  decommit(decommitTx: unknown): Promise<void>;
+  // TODO(protocol-schema): replace unknown with protocol TxId type.
+  recover(recoverTxId: unknown): Promise<void>;
+
+  // -- HTTP query methods (delegate to HeadHttpClient) ----------------------
+  // TODO(protocol-schema): replace unknown return types with decoded Protocol
+  // schema types once schema integration is complete.
+  getProtocolParameters(): Promise<unknown>;
+  getSnapshotUtxo(): Promise<unknown>;
+  getSnapshot(): Promise<unknown>;
+  getCommits(): Promise<unknown>;
+
+  // -- HTTP command methods (delegate to HeadHttpClient) --------------------
+  // TODO(protocol-schema): replace unknown param/return with Protocol types.
+  submitCommit(blueprintTx: unknown): Promise<unknown>;
+  submitTransaction(tx: unknown): Promise<unknown>;
+  submitCardanoTransaction(tx: unknown): Promise<unknown>;
+
   subscribe(callback: (event: ServerOutput) => void): Unsubscribe;
   subscribeEvents(): AsyncIterableIterator<ServerOutput>;
   dispose(): Promise<void>;
@@ -122,11 +152,32 @@ export interface HydraHead {
     // TODO(protocol-schema): replace unknown with protocol Transaction type.
     // Commit is REST-driven in Hydra and this scaffold signature is temporary.
     commit(utxos: unknown): Effect.Effect<void, HeadError>;
+    // TODO(protocol-schema): replace unknown with protocol Transaction type.
+    newTx(transaction: unknown): Effect.Effect<void, HeadError>;
     close(): Effect.Effect<void, HeadError>;
     safeClose(): Effect.Effect<void, HeadError>;
+    contest(): Effect.Effect<void, HeadError>;
     fanout(): Effect.Effect<void, HeadError>;
     awaitReadyToFanout(): Effect.Effect<void, HeadError>;
     abort(): Effect.Effect<void, HeadError>;
+    // TODO(protocol-schema): replace unknown with protocol Transaction type.
+    decommit(decommitTx: unknown): Effect.Effect<void, HeadError>;
+    // TODO(protocol-schema): replace unknown with protocol TxId type.
+    recover(recoverTxId: unknown): Effect.Effect<void, HeadError>;
+
+    // -- HTTP queries (delegate to HeadHttpClient) --------------------------
+    // TODO(protocol-schema): replace unknown return types with decoded types.
+    getProtocolParameters(): Effect.Effect<unknown, HeadError>;
+    getSnapshotUtxo(): Effect.Effect<unknown, HeadError>;
+    getSnapshot(): Effect.Effect<unknown, HeadError>;
+    getCommits(): Effect.Effect<unknown, HeadError>;
+
+    // -- HTTP commands (delegate to HeadHttpClient) -------------------------
+    // TODO(protocol-schema): replace unknown param/return with Protocol types.
+    submitCommit(blueprintTx: unknown): Effect.Effect<unknown, HeadError>;
+    submitTransaction(tx: unknown): Effect.Effect<unknown, HeadError>;
+    submitCardanoTransaction(tx: unknown): Effect.Effect<unknown, HeadError>;
+
     events(): Stream.Stream<ServerOutput>;
     dispose(): Effect.Effect<void, HeadError>;
   };
@@ -183,6 +234,7 @@ const createEffect = (
 ): Effect.Effect<HydraHead, HeadError> =>
   Effect.gen(function* () {
     const transport = yield* makeHeadTransport(config);
+    const httpClient = yield* makeHeadHttpClient(config.url);
     const router = yield* makeCommandRouter(transport);
     const fsm = yield* makeHeadFsm();
 
@@ -210,6 +262,11 @@ const createEffect = (
 
     // 1. Transport cleanup (runs last)
     yield* Effect.addFinalizer(() => transport.dispose).pipe(
+      Scope.extend(scope),
+    );
+
+    // 1b. HTTP client cleanup
+    yield* Effect.addFinalizer(() => httpClient.dispose).pipe(
       Scope.extend(scope),
     );
 
@@ -377,6 +434,140 @@ const createEffect = (
       );
 
     // -----------------------------------------------------------------------
+    // New WS command Effects
+    // -----------------------------------------------------------------------
+
+    const newTxEffect = (transaction: unknown): Effect.Effect<void, HeadError> =>
+      execute(
+        "NewTx",
+        { transaction },
+        (event) => {
+          // TODO(protocol-schema): match TxValid / TxInvalid via Protocol schemas.
+          if (event._tag === "ServerOutput" && event.output.tag === "TxValid") {
+            return matchSuccess(undefined);
+          }
+          if (
+            event._tag === "ServerOutput" &&
+            event.output.tag === "TxInvalid"
+          ) {
+            const payload = event.output.payload as
+              | { validationError?: { reason?: string } }
+              | undefined;
+            return matchFailure(
+              new HeadError({
+                message:
+                  payload?.validationError?.reason ?? "Transaction is invalid",
+              }),
+            );
+          }
+          return isCommandFailure(event, "NewTx");
+        },
+        30_000,
+      );
+
+    const contestEffect = (): Effect.Effect<void, HeadError> =>
+      execute(
+        "Contest",
+        undefined,
+        (event) => matchServerTag(event, "HeadIsContested", "Contest"),
+        60_000,
+      );
+
+    const decommitEffect = (
+      decommitTx: unknown,
+    ): Effect.Effect<void, HeadError> =>
+      execute(
+        "Decommit",
+        decommitTx,
+        (event) => {
+          // TODO(protocol-schema): match DecommitFinalized / DecommitInvalid via Protocol schemas.
+          if (
+            event._tag === "ServerOutput" &&
+            event.output.tag === "DecommitFinalized"
+          ) {
+            return matchSuccess(undefined);
+          }
+          if (
+            event._tag === "ServerOutput" &&
+            event.output.tag === "DecommitInvalid"
+          ) {
+            return matchFailure(
+              new HeadError({ message: "Decommit was rejected" }),
+            );
+          }
+          return isCommandFailure(event, "Decommit");
+        },
+        60_000,
+      );
+
+    const recoverEffect = (
+      recoverTxId: unknown,
+    ): Effect.Effect<void, HeadError> =>
+      execute(
+        "Recover",
+        recoverTxId,
+        (event) => {
+          // TODO(protocol-schema): match CommitRecovered via Protocol schemas.
+          if (
+            event._tag === "ServerOutput" &&
+            event.output.tag === "CommitRecovered"
+          ) {
+            return matchSuccess(undefined);
+          }
+          return isCommandFailure(event, "Recover");
+        },
+        30_000,
+      );
+
+    // -----------------------------------------------------------------------
+    // HTTP query/command Effect wrappers
+    //
+    // These delegate to the HeadHttpClient and gate on assertNotDisposed.
+    // TODO(protocol-schema): decode responses via Protocol schema types.
+    // -----------------------------------------------------------------------
+
+    const getProtocolParametersEffect = (): Effect.Effect<unknown, HeadError> =>
+      assertNotDisposed.pipe(
+        Effect.zipRight(httpClient.getProtocolParameters()),
+      );
+
+    const getSnapshotUtxoEffect = (): Effect.Effect<unknown, HeadError> =>
+      assertNotDisposed.pipe(
+        Effect.zipRight(httpClient.getSnapshotUtxo()),
+      );
+
+    const getSnapshotEffect = (): Effect.Effect<unknown, HeadError> =>
+      assertNotDisposed.pipe(
+        Effect.zipRight(httpClient.getSnapshot()),
+      );
+
+    const getCommitsEffect = (): Effect.Effect<unknown, HeadError> =>
+      assertNotDisposed.pipe(
+        Effect.zipRight(httpClient.getCommits()),
+      );
+
+    const submitCommitEffect = (
+      blueprintTx: unknown,
+    ): Effect.Effect<unknown, HeadError> =>
+      assertNotDisposed.pipe(
+        Effect.zipRight(httpClient.submitCommit(blueprintTx)),
+      );
+
+    const submitTransactionEffect = (
+      tx: unknown,
+    ): Effect.Effect<unknown, HeadError> =>
+      assertNotDisposed.pipe(
+        Effect.zipRight(httpClient.submitTransaction(tx)),
+      );
+
+    const submitCardanoTransactionEffect = (
+      tx: unknown,
+    ): Effect.Effect<unknown, HeadError> =>
+      assertNotDisposed.pipe(
+        Effect.zipRight(httpClient.submitCardanoTransaction(tx)),
+      );
+
+    // -----------------------------------------------------------------------
     // Event streams – derived from PubSub, no manual bookkeeping
     // -----------------------------------------------------------------------
 
@@ -475,11 +666,24 @@ const createEffect = (
     const effectApi = {
       init: initEffect,
       commit: commitEffect,
+      newTx: newTxEffect,
       close: closeEffect,
       safeClose: safeCloseEffect,
+      contest: contestEffect,
       fanout: fanoutEffect,
       awaitReadyToFanout: awaitReadyToFanoutEffect,
       abort: abortEffect,
+      decommit: decommitEffect,
+      recover: recoverEffect,
+      // HTTP queries
+      getProtocolParameters: getProtocolParametersEffect,
+      getSnapshotUtxo: getSnapshotUtxoEffect,
+      getSnapshot: getSnapshotEffect,
+      getCommits: getCommitsEffect,
+      // HTTP commands
+      submitCommit: submitCommitEffect,
+      submitTransaction: submitTransactionEffect,
+      submitCardanoTransaction: submitCardanoTransactionEffect,
       events: eventsStream,
       dispose: disposeEffect,
     };
@@ -496,10 +700,29 @@ const createEffect = (
 
       init: (params?: InitParams) => runEffect(effectApi.init(params)),
       commit: (utxos: unknown) => runEffect(effectApi.commit(utxos)),
+      newTx: (transaction: unknown) => runEffect(effectApi.newTx(transaction)),
       close: () => runEffect(effectApi.close()),
       safeClose: () => runEffect(effectApi.safeClose()),
+      contest: () => runEffect(effectApi.contest()),
       fanout: () => runEffect(effectApi.fanout()),
       abort: () => runEffect(effectApi.abort()),
+      decommit: (decommitTx: unknown) =>
+        runEffect(effectApi.decommit(decommitTx)),
+      recover: (recoverTxId: unknown) =>
+        runEffect(effectApi.recover(recoverTxId)),
+      // HTTP queries
+      getProtocolParameters: () =>
+        Effect.runPromise(effectApi.getProtocolParameters()),
+      getSnapshotUtxo: () => Effect.runPromise(effectApi.getSnapshotUtxo()),
+      getSnapshot: () => Effect.runPromise(effectApi.getSnapshot()),
+      getCommits: () => Effect.runPromise(effectApi.getCommits()),
+      // HTTP commands
+      submitCommit: (blueprintTx: unknown) =>
+        Effect.runPromise(effectApi.submitCommit(blueprintTx)),
+      submitTransaction: (tx: unknown) =>
+        Effect.runPromise(effectApi.submitTransaction(tx)),
+      submitCardanoTransaction: (tx: unknown) =>
+        Effect.runPromise(effectApi.submitCardanoTransaction(tx)),
       subscribe,
       subscribeEvents,
       dispose: () => Effect.runPromise(effectApi.dispose()),

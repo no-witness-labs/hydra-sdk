@@ -30,6 +30,9 @@ const transitions: Record<TransitionKey, HeadStatus> = {
   // Closed → FanoutPossible when contestation period ends
   "Closed:ReadyToFanout": "FanoutPossible",
 
+  // Closed → Closed (contest resets the contestation deadline)
+  "Closed:HeadIsContested": "Closed",
+
   // FanoutPossible → Final via Fanout
   "FanoutPossible:HeadIsFinalized": "Final",
 };
@@ -45,10 +48,14 @@ const transitions: Record<TransitionKey, HeadStatus> = {
 const commandAllowedFrom: Record<ClientInputTag, ReadonlySet<HeadStatus>> = {
   Init: new Set(["Idle"]),
   Commit: new Set(["Initializing"]),
+  NewTx: new Set(["Open"]),
   Close: new Set(["Open"]),
   // TODO(protocol-schema): SafeClose is scaffold-only until protocol integration.
   SafeClose: new Set(["Open"]),
+  Contest: new Set(["Closed"]),
   Fanout: new Set(["FanoutPossible"]),
+  Decommit: new Set(["Open"]),
+  Recover: new Set(["Open"]),
   // Abort is valid from Initializing per the Hydra spec.
   // Idle is included as a no-harm guard: aborting before any on-chain
   // activity is a no-op rather than an error.
