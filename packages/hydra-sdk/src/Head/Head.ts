@@ -128,7 +128,7 @@ export interface HydraHead {
     awaitReadyToFanout(): Effect.Effect<void, HeadError>;
     abort(): Effect.Effect<void, HeadError>;
     events(): Stream.Stream<ServerOutput>;
-    dispose(): Effect.Effect<void, HeadError>;
+    dispose(): Effect.Effect<void>;
   };
 }
 
@@ -396,8 +396,10 @@ const createEffect = (
     // -----------------------------------------------------------------------
 
     const disposeEffect = (): Effect.Effect<void> =>
-      Ref.set(disposedRef, true).pipe(
-        Effect.zipRight(Scope.close(scope, Exit.void)),
+      Ref.getAndSet(disposedRef, true).pipe(
+        Effect.flatMap((alreadyDisposed) =>
+          alreadyDisposed ? Effect.void : Scope.close(scope, Exit.void),
+        ),
       );
 
     // -----------------------------------------------------------------------
@@ -503,6 +505,9 @@ const createEffect = (
       subscribe,
       subscribeEvents,
       dispose: () => Effect.runPromise(effectApi.dispose()),
+      // Note: dispose() uses Effect.runPromise directly because
+      // disposeEffect returns Effect<void> (never fails), while
+      // runEffect expects Effect<A, HeadError>.
 
       effect: effectApi,
     };
