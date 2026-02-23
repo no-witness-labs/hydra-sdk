@@ -1,10 +1,8 @@
 import { WebSocketConstructor } from "@effect/platform/Socket";
 import { describe, it } from "@effect/vitest";
-import { Head, Socket , Config, statusCommand } from "@no-witness-labs/hydra-sdk-cli";
+import { Head, Socket , Config } from "@no-witness-labs/hydra-sdk-cli";
 import { Effect, Layer, Logger } from "effect";
-import type { Scope } from "effect/Scope";
 import { WS } from "vitest-websocket-mock";
-import { HydraHeadController } from "../../hydra-sdk/src/Head";
 
 const urlNoAppends = "localhost:1234"
 const url = "ws://" + urlNoAppends
@@ -43,7 +41,7 @@ describe("core", () => {
       Effect.gen(function* () {
         const server = yield* MockServer;
         yield* Effect.promise(() => server.connected);
-        const hydraHead = yield* HydraHeadController
+        const hydraHead = yield* Head.HydraHeadController
 
         hydraHead.logStatus
       }).pipe(
