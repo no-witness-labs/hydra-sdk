@@ -38,13 +38,14 @@
  * @module
  */
 
-import { writeFile, mkdir, chmod } from 'fs/promises';
-import { join } from 'path';
-
 import { Data, Effect } from 'effect';
+import { chmod, mkdir, writeFile } from 'fs/promises';
+import { join } from 'path';
 
 import type { ResolvedDevNetConfig, ShelleyGenesis } from './Config.js';
 import {
+  buildByronGenesis,
+  buildShelleyGenesis,
   DEFAULT_ALONZO_GENESIS,
   DEFAULT_CONWAY_GENESIS,
   DEFAULT_HYDRA_SK,
@@ -58,8 +59,6 @@ import {
   DEFAULT_PAYMENT_SKEY,
   DEFAULT_PAYMENT_VKEY,
   DEFAULT_VRF_SKEY,
-  buildByronGenesis,
-  buildShelleyGenesis,
 } from './Config.js';
 import * as Container from './Container.js';
 
@@ -132,6 +131,7 @@ const DEFAULT_TOPOLOGY = {
  */
 function stripDockerFraming(raw: string): string {
   // Remove all non-printable characters except newlines/tabs
+  // eslint-disable-next-line no-control-regex
   const cleaned = raw.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '');
   return cleaned.trim();
 }
@@ -355,7 +355,7 @@ function publishHydraScriptsEffect(
  *
  * @internal
  */
-function extractTxIds(output: string): string[] {
+function extractTxIds(output: string): Array<string> {
   const cleaned = stripDockerFraming(output);
 
   // Find all 64-char hex strings (Cardano tx IDs are 32 bytes = 64 hex chars)

@@ -156,9 +156,9 @@ function waitForHttpEffect(
     yield* Effect.tryPromise({
       try: async () => {
         const {
-          timeout = 60000,
           interval = 1000,
           requiredSuccesses = 1,
+          timeout = 60000,
         } = options;
         const startTime = Date.now();
         let successCount = 0;
@@ -207,9 +207,9 @@ function waitForWebSocketEffect(
     yield* Effect.tryPromise({
       try: async () => {
         const {
-          timeout = 60000,
           interval = 1000,
           requiredSuccesses = 1,
+          timeout = 60000,
         } = options;
         const startTime = Date.now();
         let successCount = 0;
@@ -253,7 +253,7 @@ function waitForPortEffect(
   return Effect.gen(function* () {
     yield* Effect.tryPromise({
       try: async () => {
-        const { timeout = 60000, interval = 1000 } = options;
+        const { interval = 1000, timeout = 60000 } = options;
         const startTime = Date.now();
         const { createConnection } = await import('net');
 
@@ -307,7 +307,7 @@ function waitForContainerHealthyEffect(
     yield* Effect.tryPromise({
       try: async () => {
         const docker = new Docker();
-        const { timeout = 120000, interval = 2000 } = options;
+        const { interval = 2000, timeout = 120000 } = options;
         const startTime = Date.now();
 
         while (Date.now() - startTime < timeout) {

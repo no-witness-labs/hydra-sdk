@@ -63,12 +63,10 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 
 import type { DevNetConfig, ResolvedDevNetConfig } from './Config.js';
-import {
-  DEFAULT_DEVNET_CONFIG,
-} from './Config.js';
+import { DEFAULT_DEVNET_CONFIG } from './Config.js';
 import * as Container from './Container.js';
-import * as Genesis from './Genesis.js';
 import type { GeneratedKeys } from './Genesis.js';
+import * as Genesis from './Genesis.js';
 import * as Health from './Health.js';
 import * as Images from './Images.js';
 

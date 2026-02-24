@@ -1,6 +1,13 @@
-import { afterAll, describe, expect, it } from 'vitest';
 import { Cluster, Container, Images } from '@no-witness-labs/hydra-devnet';
 import Docker from 'dockerode';
+import { afterAll, describe, expect, it } from 'vitest';
+
+/**
+ * Heavy integration tests (cluster start/stop, container ops) require a running
+ * Docker daemon with Cardano + Hydra images and take several minutes.
+ * Set RUN_INTEGRATION_TESTS=true to enable them.
+ */
+const runIntegration = process.env.RUN_INTEGRATION_TESTS === 'true';
 
 /**
  * Fast Shelley genesis config for testing.
@@ -8,9 +15,9 @@ import Docker from 'dockerode';
  * Same configuration used in evolution-sdk integration tests.
  */
 const FAST_SHELLEY_GENESIS = {
-  slotLength: 0.02, // 20ms per slot (50x faster than default 1s)
-  epochLength: 50, // Very short epochs for faster testing
   activeSlotsCoeff: 1.0, // Block every slot (100% probability)
+  epochLength: 50, // Very short epochs for faster testing
+  slotLength: 0.02, // 20ms per slot (50x faster than default 1s)
 } as const;
 
 /**
@@ -23,7 +30,7 @@ const FAST_SHELLEY_GENESIS = {
  * Run with: pnpm test:devnet
  */
 describe('Devnet Integration Tests', () => {
-  const createdClusters: Cluster.Cluster[] = [];
+  const createdClusters: Array<Cluster.Cluster> = [];
 
   afterAll(async () => {
     for (const cluster of createdClusters) {
@@ -79,12 +86,12 @@ describe('Devnet Integration Tests', () => {
     });
   });
 
-  describe('Cluster Lifecycle', () => {
+  describe.skipIf(!runIntegration)('Cluster Lifecycle', () => {
     it('should start cluster and all containers become running', { timeout: 300_000 }, async () => {
       const cluster = Cluster.make({
         clusterName: 'test-start-cluster',
         cardanoNode: { port: 23001, submitPort: 28090 },
-        hydraNode: { apiPort: 24001, peerPort: 25001, monitoringPort: 26001 },
+        hydraNode: { apiPort: 24001, monitoringPort: 26001, peerPort: 25001 },
         shelleyGenesisOverrides: FAST_SHELLEY_GENESIS,
       });
       createdClusters.push(cluster);
@@ -116,7 +123,7 @@ describe('Devnet Integration Tests', () => {
       const cluster = Cluster.make({
         clusterName: 'test-stop-cluster',
         cardanoNode: { port: 33001, submitPort: 38090 },
-        hydraNode: { apiPort: 34001, peerPort: 35001, monitoringPort: 36001 },
+        hydraNode: { apiPort: 34001, monitoringPort: 36001, peerPort: 35001 },
         shelleyGenesisOverrides: FAST_SHELLEY_GENESIS,
       });
       createdClusters.push(cluster);
@@ -135,7 +142,7 @@ describe('Devnet Integration Tests', () => {
       const cluster = Cluster.make({
         clusterName: 'test-running-status',
         cardanoNode: { port: 43001, submitPort: 48090 },
-        hydraNode: { apiPort: 44001, peerPort: 45001, monitoringPort: 46001 },
+        hydraNode: { apiPort: 44001, monitoringPort: 46001, peerPort: 45001 },
         shelleyGenesisOverrides: FAST_SHELLEY_GENESIS,
       });
       createdClusters.push(cluster);
@@ -150,12 +157,12 @@ describe('Devnet Integration Tests', () => {
     });
   });
 
-  describe('Container Operations', () => {
+  describe.skipIf(!runIntegration)('Container Operations', () => {
     it('should get container status after start', { timeout: 300_000 }, async () => {
       const cluster = Cluster.make({
         clusterName: 'test-container-status',
         cardanoNode: { port: 53001, submitPort: 58090 },
-        hydraNode: { apiPort: 54001, peerPort: 55001, monitoringPort: 56001 },
+        hydraNode: { apiPort: 54001, monitoringPort: 56001, peerPort: 55001 },
         shelleyGenesisOverrides: FAST_SHELLEY_GENESIS,
       });
       createdClusters.push(cluster);
@@ -174,8 +181,8 @@ describe('Devnet Integration Tests', () => {
     it('should check if container is running', { timeout: 300_000 }, async () => {
       const cluster = Cluster.make({
         clusterName: 'test-is-running',
-        cardanoNode: { port: 63001, submitPort: 68090 },
-        hydraNode: { apiPort: 64001, peerPort: 65001, monitoringPort: 66001 },
+        cardanoNode: { port: 63001, submitPort: 60090 },
+        hydraNode: { apiPort: 64001, monitoringPort: 64601, peerPort: 64501 },
         shelleyGenesisOverrides: FAST_SHELLEY_GENESIS,
       });
       createdClusters.push(cluster);
@@ -188,7 +195,7 @@ describe('Devnet Integration Tests', () => {
     });
   });
 
-  describe('Image Operations', () => {
+  describe.skipIf(!runIntegration)('Image Operations', () => {
     it('should check if image is available', { timeout: 30_000 }, async () => {
       // Check for a common image that likely exists
       const available = await Images.isAvailable('hello-world');
