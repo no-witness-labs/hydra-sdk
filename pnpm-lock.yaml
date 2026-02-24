@@ -210,6 +210,9 @@ importers:
       '@babel/cli':
         specifier: ^7.28.0
         version: 7.28.6(@babel/core@7.29.0)
+      '@no-witness-labs/hydra-devnet':
+        specifier: workspace:*
+        version: link:../hydra-devnet
       '@types/node':
         specifier: ^22.19.7
         version: 22.19.11
