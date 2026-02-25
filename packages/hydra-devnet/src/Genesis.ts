@@ -47,8 +47,6 @@ import {
   buildByronGenesis,
   buildShelleyGenesis,
   DEFAULT_ALONZO_GENESIS,
-  DEFAULT_BYRON_DELEGATE_KEY_BASE64,
-  DEFAULT_BYRON_DELEGATION_CERT,
   DEFAULT_CONWAY_GENESIS,
   DEFAULT_HYDRA_SK,
   DEFAULT_HYDRA_VK,
@@ -273,14 +271,6 @@ function writeConfigFilesEffect(
             join(tempDir, 'pool.cert'),
             JSON.stringify(DEFAULT_OPCERT, null, 2),
           ).then(() => chmod(join(tempDir, 'pool.cert'), 0o600)),
-          writeFile(
-            join(tempDir, 'byron-delegation.cert'),
-            JSON.stringify(DEFAULT_BYRON_DELEGATION_CERT, null, 2),
-          ),
-          writeFile(
-            join(tempDir, 'byron-delegate.key'),
-            Buffer.from(DEFAULT_BYRON_DELEGATE_KEY_BASE64, 'base64'),
-          ).then(() => chmod(join(tempDir, 'byron-delegate.key'), 0o600)),
         ]);
       },
       catch: (cause: unknown) =>

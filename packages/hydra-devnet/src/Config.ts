@@ -779,38 +779,6 @@ export const DEFAULT_VRF_SKEY: CardanoKey = {
 };
 
 // ---------------------------------------------------------------------------
-// Default Byron Delegation Credentials (pre-generated, test-only)
-// ---------------------------------------------------------------------------
-
-/**
- * Byron delegation certificate linking the genesis issuer key to the delegate key.
- * Required by cardano-node for block production through instant hard-fork chain.
- * DO NOT use in production — test-only.
- *
- * @since 0.1.0
- * @category constants
- */
-export const DEFAULT_BYRON_DELEGATION_CERT = {
-  omega: 0,
-  issuerPk:
-    'NclXQiNNEpaaLdSxP3VFeOPIfSuFqBcNtmv8/7fftBKtgW1Aig7UqHJ/czsywkWFFVmBYPRnGjXspUl3wEMvuQ==',
-  delegatePk:
-    '24ejRK+kCDs1g4f3PcodFEUFVgNFWtfmuoEtVQf8/Ii2j2ruXHebJmZZPrwtAdbJYwDiSEvsHr95+BAF1ifGsA==',
-  cert: '498c72e35ef30cd4657b48bfcc0a84a555a67981e3b6104a0d1708ab84510367d81e1ba3f47619565b1ee1098e31dcb8eb648d8030e061b568de113fdf3d6a09',
-} as const;
-
-/**
- * Byron delegate signing key (binary CBOR, base64-encoded).
- * Matched pair with the delegation certificate above.
- * DO NOT use in production — test-only.
- *
- * @since 0.1.0
- * @category constants
- */
-export const DEFAULT_BYRON_DELEGATE_KEY_BASE64 =
-  'WIBIEAVE04iVnDoP4MfUG2WL0U5Ez9vCjpBCis6OwrFxVeJt/oNoafFh8xBqFTIppaG0Jm2XlHK4ofM/KzLVqYLM24ejRK+kCDs1g4f3PcodFEUFVgNFWtfmuoEtVQf8/Ii2j2ruXHebJmZZPrwtAdbJYwDiSEvsHr95+BAF1ifGsA==' as const;
-
-// ---------------------------------------------------------------------------
 // Default Payment Keys (pre-generated, test-only)
 // ---------------------------------------------------------------------------
 
