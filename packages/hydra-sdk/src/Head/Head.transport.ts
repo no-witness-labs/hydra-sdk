@@ -55,14 +55,14 @@ const makeWebSocketConstructorLayer: Effect.Effect<
       }),
   });
 
-  const constructor = (wsModule.default ?? wsModule.WebSocket) as unknown as (
-    url: string,
-    protocols?: string | Array<string>,
-  ) => globalThis.WebSocket;
+  const WsClass = wsModule.default ?? wsModule.WebSocket;
 
   return Layer.succeed(
     Socket.WebSocketConstructor,
-    Socket.WebSocketConstructor.of(constructor),
+    Socket.WebSocketConstructor.of(
+      (url, protocols) =>
+        new WsClass(url, protocols) as unknown as globalThis.WebSocket,
+    ),
   );
 });
 
