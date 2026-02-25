@@ -2,7 +2,7 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { Head } from "@no-witness-labs/hydra-sdk";
-import { Effect } from "effect";
+import { Effect, ManagedRuntime } from "effect";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 type HeadStatus = Head.HeadStatus;
@@ -69,19 +69,17 @@ async function commitEmpty(cluster: {
 }
 
 /**
- * Retry Close command with exponential backoff.
- *
- * The Hydra Close tx can transiently fail with `PostTxOnChainFailed` when
- * the L1 UTxO set isn't fully settled yet. We retry with backoff.
+ * Retry a close operation with exponential backoff.
+ * Handles transient `PostTxOnChainFailed` when the L1 UTxO set isn't settled.
  */
 async function retryClose(
-  head: HydraHead,
+  closeFn: () => Promise<void>,
   maxAttempts = 5,
   baseDelayMs = 2_000,
 ): Promise<void> {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      await Effect.runPromise(head.effect.close());
+      await closeFn();
       return;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -114,18 +112,16 @@ async function waitForState(
 }
 
 // ---------------------------------------------------------------------------
-// Test suite
+// Promise API
 // ---------------------------------------------------------------------------
 
-describe("Head Integration (devnet)", () => {
-  // Dynamically imported to avoid loading dockerode/tar-stream when skipped
+describe("Head Integration — Promise API", () => {
   let cluster: any;
 
   beforeAll(async () => {
     const { Cluster } = await import("@no-witness-labs/hydra-devnet");
-
     cluster = Cluster.make({
-      clusterName: "head-integration",
+      clusterName: "head-promise",
       cardanoNode: { port: 7001, submitPort: 7090 },
       hydraNode: {
         apiPort: 7401,
@@ -145,19 +141,12 @@ describe("Head Integration (devnet)", () => {
     }
   }, 120_000);
 
-  // -------------------------------------------------------------------------
-  // Single lifecycle exercising all three API styles:
-  //   Promise API  → init + commit
-  //   Effect API   → close + fanout
-  // -------------------------------------------------------------------------
-
   it(
-    "full lifecycle: init → commit → close → fanout across API styles",
+    "full lifecycle: init → commit → close → fanout",
     async () => {
       const head = await Head.create({ url: cluster.hydraApiUrl });
 
       try {
-        // -- Promise API: init + commit --
         await waitForState(head, "Idle");
         expect(head.getState()).toBe("Idle");
 
@@ -168,15 +157,143 @@ describe("Head Integration (devnet)", () => {
         await waitForState(head, "Open");
         expect(head.getState()).toBe("Open");
 
-        // -- Effect API: close (with retry for transient PostTxOnChainFailed) --
-        await retryClose(head);
+        await retryClose(() => head.close());
         expect(head.getState()).toBe("Closed");
 
-        // -- Effect API: fanout (awaits ReadyToFanout internally) --
-        await Effect.runPromise(head.effect.fanout());
+        await head.fanout();
         expect(head.getState()).toBe("Final");
       } finally {
         await head.dispose();
+      }
+    },
+    300_000,
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Effect API
+// ---------------------------------------------------------------------------
+
+describe("Head Integration — Effect API", () => {
+  let cluster: any;
+
+  beforeAll(async () => {
+    const { Cluster } = await import("@no-witness-labs/hydra-devnet");
+    cluster = Cluster.make({
+      clusterName: "head-effect",
+      cardanoNode: { port: 7002, submitPort: 7190 },
+      hydraNode: {
+        apiPort: 7402,
+        peerPort: 7502,
+        monitoringPort: 7602,
+        contestationPeriod: 3,
+      },
+    });
+    await cluster.start();
+  }, 300_000);
+
+  afterAll(async () => {
+    try {
+      await cluster?.remove();
+    } catch {
+      // Best-effort cleanup
+    }
+  }, 120_000);
+
+  it(
+    "full lifecycle: init → commit → close → fanout",
+    async () => {
+      const head = await Effect.runPromise(
+        Head.effect.create({ url: cluster.hydraApiUrl }),
+      );
+
+      try {
+        await waitForState(head, "Idle");
+        expect(head.getState()).toBe("Idle");
+
+        await Effect.runPromise(head.effect.init());
+        expect(head.getState()).toBe("Initializing");
+
+        await commitEmpty(cluster);
+        await waitForState(head, "Open");
+        expect(head.getState()).toBe("Open");
+
+        await retryClose(() => Effect.runPromise(head.effect.close()));
+        expect(head.getState()).toBe("Closed");
+
+        await Effect.runPromise(head.effect.fanout());
+        expect(head.getState()).toBe("Final");
+      } finally {
+        await Effect.runPromise(head.effect.dispose());
+      }
+    },
+    300_000,
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Layer API (Effect + DI)
+// ---------------------------------------------------------------------------
+
+describe("Head Integration — Layer API", () => {
+  let cluster: any;
+
+  beforeAll(async () => {
+    const { Cluster } = await import("@no-witness-labs/hydra-devnet");
+    cluster = Cluster.make({
+      clusterName: "head-layer",
+      cardanoNode: { port: 7003, submitPort: 7290 },
+      hydraNode: {
+        apiPort: 7403,
+        peerPort: 7503,
+        monitoringPort: 7603,
+        contestationPeriod: 3,
+      },
+    });
+    await cluster.start();
+  }, 300_000);
+
+  afterAll(async () => {
+    try {
+      await cluster?.remove();
+    } catch {
+      // Best-effort cleanup
+    }
+  }, 120_000);
+
+  it(
+    "full lifecycle: init → commit → close → fanout",
+    async () => {
+      const runtime = ManagedRuntime.make(
+        Head.layer({ url: cluster.hydraApiUrl }),
+      );
+
+      try {
+        const head = await runtime.runPromise(Head.HydraHeadService);
+
+        await waitForState(head, "Idle");
+        expect(head.getState()).toBe("Idle");
+
+        await runtime.runPromise(head.effect.init());
+        expect(head.getState()).toBe("Initializing");
+
+        await commitEmpty(cluster);
+        await waitForState(head, "Open");
+        expect(head.getState()).toBe("Open");
+
+        await retryClose(() => runtime.runPromise(head.effect.close()));
+        expect(head.getState()).toBe("Closed");
+
+        await runtime.runPromise(head.effect.fanout());
+        expect(head.getState()).toBe("Final");
+      } finally {
+        // runtime.dispose() interrupts daemon fibers (WebSocket reconnect
+        // loop) which may block indefinitely. Bound it with a timeout so
+        // the test does not hang after a successful lifecycle.
+        await Promise.race([
+          runtime.dispose(),
+          new Promise((r) => setTimeout(r, 10_000)),
+        ]);
       }
     },
     300_000,
