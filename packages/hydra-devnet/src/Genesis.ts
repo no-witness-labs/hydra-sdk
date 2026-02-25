@@ -219,7 +219,9 @@ function writeConfigFilesEffect(
       try: async () => {
         await mkdir(tempDir, { recursive: true });
 
-        // Build genesis configs
+        // Build genesis configs with a shared timestamp so Byron startTime
+        // and Shelley systemStart refer to the exact same instant.
+        const nowSeconds = Math.floor(Date.now() / 1000);
         const shelleyGenesis = buildShelleyGenesis(
           keys.paymentAddressHex,
           DEFAULT_INITIAL_FUNDS_LOVELACE,
@@ -227,8 +229,9 @@ function writeConfigFilesEffect(
             ...shelleyOverrides,
             networkMagic: config.cardanoNode.networkMagic,
           },
+          nowSeconds,
         );
-        const byronGenesis = buildByronGenesis();
+        const byronGenesis = buildByronGenesis(nowSeconds);
 
         // Write all config files in parallel
         await Promise.all([

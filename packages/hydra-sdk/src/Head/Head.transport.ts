@@ -37,11 +37,18 @@ interface NormalizedReconnect {
 
 const clampAtLeastZero = (value: number): number => Math.max(0, value);
 
+const isNodeJs =
+  typeof process !== "undefined" && process.versions?.node !== undefined;
+
 const makeWebSocketConstructorLayer: Effect.Effect<
   Layer.Layer<Socket.WebSocketConstructor>,
   HeadError
 > = Effect.gen(function* () {
-  if (typeof globalThis.WebSocket === "function") {
+  // In browsers, use the native global WebSocket.
+  // In Node.js, always prefer the `ws` library — Node's built-in
+  // globalThis.WebSocket (undici-based) has compatibility issues with
+  // @effect/platform's Socket module.
+  if (!isNodeJs && typeof globalThis.WebSocket === "function") {
     return Socket.layerWebSocketConstructorGlobal;
   }
 
@@ -55,14 +62,14 @@ const makeWebSocketConstructorLayer: Effect.Effect<
       }),
   });
 
-  const constructor = (wsModule.default ?? wsModule.WebSocket) as unknown as (
-    url: string,
-    protocols?: string | Array<string>,
-  ) => globalThis.WebSocket;
+  const WsClass = wsModule.default ?? wsModule.WebSocket;
 
   return Layer.succeed(
     Socket.WebSocketConstructor,
-    Socket.WebSocketConstructor.of(constructor),
+    Socket.WebSocketConstructor.of(
+      (url, protocols) =>
+        new WsClass(url, protocols) as unknown as globalThis.WebSocket,
+    ),
   );
 });
 
@@ -169,6 +176,23 @@ const parseClientInputTag = (value: unknown): ClientInputTag | undefined => {
   }
 };
 
+const parseChainTxTag = (value: unknown): ClientInputTag | undefined => {
+  switch (value) {
+    case "InitTx":
+      return "Init";
+    case "CommitTx":
+      return "Commit";
+    case "CloseTx":
+      return "Close";
+    case "FanoutTx":
+      return "Fanout";
+    case "AbortTx":
+      return "Abort";
+    default:
+      return undefined;
+  }
+};
+
 const parseApiEvent = (raw: string): Effect.Effect<ApiEvent, HeadError> =>
   Effect.try({
     try: () => {
@@ -215,12 +239,20 @@ const parseApiEvent = (raw: string): Effect.Effect<ApiEvent, HeadError> =>
         tag === "RejectedInputBecauseUnsynced" ||
         tag === "PostTxOnChainFailed"
       ) {
+        // CommandFailed uses clientInput.tag, PostTxOnChainFailed uses
+        // postChainTx.tag (e.g. "CloseTx" → "Close"). Try both sources.
         const clientInput = parsed.clientInput as { tag?: unknown } | undefined;
+        const postChainTx = parsed.postChainTx as
+          | { tag?: unknown }
+          | undefined;
+        const inputTag =
+          parseClientInputTag(clientInput?.tag) ??
+          parseChainTxTag(postChainTx?.tag);
         return {
           _tag: "ClientMessage",
           message: {
             tag,
-            clientInputTag: parseClientInputTag(clientInput?.tag),
+            clientInputTag: inputTag,
             reason:
               typeof parsed.reason === "string" ? parsed.reason : undefined,
           },
@@ -254,13 +286,10 @@ const encodeClientInput = (
       switch (tag) {
         case "Init":
         case "Close":
+        case "SafeClose":
         case "Fanout":
         case "Abort":
           return JSON.stringify({ tag });
-        case "SafeClose":
-          throw new Error(
-            'Unsupported client input "SafeClose": not part of Hydra websocket protocol',
-          );
         case "Commit":
           throw new Error(
             'Unsupported client input "Commit": must be sent via REST API, not websocket',
@@ -474,15 +503,6 @@ export const makeHeadTransport = (
             new HeadError({
               message:
                 "Commit is scaffold-only in mock transport and must use REST API in real transport",
-            }),
-          );
-        }
-
-        if (tag === "SafeClose") {
-          return yield* Effect.fail(
-            new HeadError({
-              message:
-                "SafeClose is scaffold-only and not part of Hydra websocket protocol",
             }),
           );
         }

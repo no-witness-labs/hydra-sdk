@@ -616,16 +616,13 @@ function createHydraNodeEffect(
           },
           HostConfig: {
             PortBindings: {
-              // Hydra API port (4001 internal → configured host port)
-              ['4001/tcp']: [
+              [`${config.hydraNode.apiPort}/tcp`]: [
                 { HostPort: String(config.hydraNode.apiPort) },
               ],
-              // Peer port
-              ['5001/tcp']: [
+              [`${config.hydraNode.peerPort}/tcp`]: [
                 { HostPort: String(config.hydraNode.peerPort) },
               ],
-              // Monitoring port
-              ['6001/tcp']: [
+              [`${config.hydraNode.monitoringPort}/tcp`]: [
                 { HostPort: String(config.hydraNode.monitoringPort) },
               ],
             },
@@ -640,10 +637,12 @@ function createHydraNodeEffect(
             config.hydraNode.nodeId,
             '--api-host',
             '0.0.0.0',
+            '--api-port',
+            String(config.hydraNode.apiPort),
             '--listen',
-            '0.0.0.0:5001',
+            `0.0.0.0:${config.hydraNode.peerPort}`,
             '--monitoring-port',
-            '6001',
+            String(config.hydraNode.monitoringPort),
             '--persistence-dir',
             '/data',
             '--hydra-signing-key',
@@ -659,7 +658,7 @@ function createHydraNodeEffect(
             '--hydra-scripts-tx-id',
             scriptsTxId,
             '--contestation-period',
-            String(config.hydraNode.contestationPeriod),
+            `${config.hydraNode.contestationPeriod}s`,
           ],
         });
       },
