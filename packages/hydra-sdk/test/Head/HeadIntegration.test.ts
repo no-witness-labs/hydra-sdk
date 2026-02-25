@@ -2,7 +2,7 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { Head } from "@no-witness-labs/hydra-sdk";
-import { Effect, ManagedRuntime } from "effect";
+import { Effect } from "effect";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 type HeadStatus = Head.HeadStatus;
@@ -264,36 +264,42 @@ describe("Head Integration — Layer API", () => {
   it(
     "full lifecycle: init → commit → close → fanout",
     async () => {
-      const runtime = ManagedRuntime.make(
-        Head.layer({ url: cluster.hydraApiUrl }),
+      const head = await Effect.runPromise(
+        Head.effect.create({ url: cluster.hydraApiUrl }),
       );
 
       try {
-        const head = await runtime.runPromise(Head.HydraHeadService);
+        // Resolve the service tag — demonstrates that programs written
+        // against HydraHeadService work when wired up manually.
+        const program = Effect.gen(function* () {
+          const h = yield* Head.HydraHeadService;
 
-        await waitForState(head, "Idle");
-        expect(head.getState()).toBe("Idle");
+          yield* Effect.promise(() => waitForState(h, "Idle"));
+          expect(h.getState()).toBe("Idle");
 
-        await runtime.runPromise(head.effect.init());
-        expect(head.getState()).toBe("Initializing");
+          yield* h.effect.init();
+          expect(h.getState()).toBe("Initializing");
 
-        await commitEmpty(cluster);
-        await waitForState(head, "Open");
-        expect(head.getState()).toBe("Open");
+          yield* Effect.promise(() => commitEmpty(cluster));
+          yield* Effect.promise(() => waitForState(h, "Open"));
+          expect(h.getState()).toBe("Open");
 
-        await retryClose(() => runtime.runPromise(head.effect.close()));
-        expect(head.getState()).toBe("Closed");
+          yield* Effect.promise(() =>
+            retryClose(() => Effect.runPromise(h.effect.close())),
+          );
+          expect(h.getState()).toBe("Closed");
 
-        await runtime.runPromise(head.effect.fanout());
-        expect(head.getState()).toBe("Final");
+          yield* h.effect.fanout();
+          expect(h.getState()).toBe("Final");
+        });
+
+        await Effect.runPromise(
+          program.pipe(
+            Effect.provideService(Head.HydraHeadService, head),
+          ),
+        );
       } finally {
-        // runtime.dispose() interrupts daemon fibers (WebSocket reconnect
-        // loop) which may block indefinitely. Bound it with a timeout so
-        // the test does not hang after a successful lifecycle.
-        await Promise.race([
-          runtime.dispose(),
-          new Promise((r) => setTimeout(r, 10_000)),
-        ]);
+        await Effect.runPromise(head.effect.dispose());
       }
     },
     300_000,
