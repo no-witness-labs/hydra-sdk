@@ -9,16 +9,6 @@ type HeadStatus = Head.HeadStatus;
 type HydraHead = Head.HydraHead;
 
 // ---------------------------------------------------------------------------
-// Fast Shelley genesis — 20ms slots for quick contestation periods
-// ---------------------------------------------------------------------------
-
-const FAST_SHELLEY_GENESIS = {
-  activeSlotsCoeff: 1.0,
-  epochLength: 50,
-  slotLength: 0.02,
-} as const;
-
-// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -79,6 +69,32 @@ async function commitEmpty(cluster: {
 }
 
 /**
+ * Retry Close command with exponential backoff.
+ *
+ * The Hydra Close tx can transiently fail with `PostTxOnChainFailed` when
+ * the L1 UTxO set isn't fully settled yet. We retry with backoff.
+ */
+async function retryClose(
+  head: HydraHead,
+  maxAttempts = 5,
+  baseDelayMs = 2_000,
+): Promise<void> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await Effect.runPromise(head.effect.close());
+      return;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!msg.includes("PostTxOnChainFailed") || attempt === maxAttempts) {
+        throw err;
+      }
+      const delay = baseDelayMs * attempt;
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+}
+
+/**
  * Poll `head.getState()` until it matches `target` or timeout expires.
  */
 async function waitForState(
@@ -115,9 +131,8 @@ describe("Head Integration (devnet)", () => {
         apiPort: 7401,
         peerPort: 7501,
         monitoringPort: 7601,
-        contestationPeriod: 1,
+        contestationPeriod: 3,
       },
-      shelleyGenesisOverrides: FAST_SHELLEY_GENESIS,
     });
     await cluster.start();
   }, 300_000);
@@ -133,8 +148,7 @@ describe("Head Integration (devnet)", () => {
   // -------------------------------------------------------------------------
   // Single lifecycle exercising all three API styles:
   //   Promise API  → init + commit
-  //   Effect API   → close
-  //   Layer API    → fanout (via HydraHeadService)
+  //   Effect API   → close + fanout
   // -------------------------------------------------------------------------
 
   it(
@@ -154,8 +168,8 @@ describe("Head Integration (devnet)", () => {
         await waitForState(head, "Open");
         expect(head.getState()).toBe("Open");
 
-        // -- Effect API: close --
-        await Effect.runPromise(head.effect.close());
+        // -- Effect API: close (with retry for transient PostTxOnChainFailed) --
+        await retryClose(head);
         expect(head.getState()).toBe("Closed");
 
         // -- Effect API: fanout (awaits ReadyToFanout internally) --

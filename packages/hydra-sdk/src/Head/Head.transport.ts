@@ -286,13 +286,10 @@ const encodeClientInput = (
       switch (tag) {
         case "Init":
         case "Close":
+        case "SafeClose":
         case "Fanout":
         case "Abort":
           return JSON.stringify({ tag });
-        case "SafeClose":
-          throw new Error(
-            'Unsupported client input "SafeClose": not part of Hydra websocket protocol',
-          );
         case "Commit":
           throw new Error(
             'Unsupported client input "Commit": must be sent via REST API, not websocket',
@@ -506,15 +503,6 @@ export const makeHeadTransport = (
             new HeadError({
               message:
                 "Commit is scaffold-only in mock transport and must use REST API in real transport",
-            }),
-          );
-        }
-
-        if (tag === "SafeClose") {
-          return yield* Effect.fail(
-            new HeadError({
-              message:
-                "SafeClose is scaffold-only and not part of Hydra websocket protocol",
             }),
           );
         }

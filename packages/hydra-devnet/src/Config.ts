@@ -359,7 +359,7 @@ export type CardanoKey = {
  * @category constants
  */
 export const DEFAULT_CARDANO_NODE_IMAGE =
-  'ghcr.io/intersectmbo/cardano-node:10.5.1' as const;
+  'ghcr.io/intersectmbo/cardano-node:10.5.3' as const;
 
 /**
  * Default Hydra node Docker image.
@@ -367,7 +367,7 @@ export const DEFAULT_CARDANO_NODE_IMAGE =
  * @category constants
  */
 export const DEFAULT_HYDRA_NODE_IMAGE =
-  'ghcr.io/cardano-scaling/hydra-node:0.21.0' as const;
+  'ghcr.io/cardano-scaling/hydra-node:1.2.0' as const;
 
 // ---------------------------------------------------------------------------
 // Default Container Configuration
@@ -552,9 +552,9 @@ export const DEFAULT_BYRON_GENESIS: ByronGenesis = {
  * @category constants
  */
 export const DEFAULT_SHELLEY_GENESIS: ShelleyGenesis = {
-  epochLength: 432000,
+  epochLength: 5,
   activeSlotsCoeff: 1.0,
-  slotLength: 1,
+  slotLength: 0.1,
   securityParam: 2160,
   genDelegs: {},
   initialFunds: {},
@@ -577,7 +577,7 @@ export const DEFAULT_SHELLEY_GENESIS: ShelleyGenesis = {
     minUTxOValue: 0,
     nOpt: 100,
     poolDeposit: 0,
-    protocolVersion: { major: 10, minor: 0 },
+    protocolVersion: { major: 9, minor: 0 },
     rho: 0.1,
     tau: 0.1,
   },
@@ -697,7 +697,7 @@ export const DEFAULT_CONWAY_GENESIS: ConwayGenesis = {
   govActionDeposit: 50000000000,
   dRepDeposit: 500000000,
   dRepActivity: 20,
-  minFeeRefScriptCostPerByte: 44,
+  minFeeRefScriptCostPerByte: 15,
   plutusV3CostModel: [
     100788, 420, 1, 1, 1000, 173, 0, 1, 1000, 59957, 4, 1, 11183, 32, 201305,
     8356, 4, 16000, 100, 16000, 100, 16000, 100, 16000, 100, 16000, 100, 16000,
@@ -777,6 +777,38 @@ export const DEFAULT_VRF_SKEY: CardanoKey = {
   cborHex:
     '5840899795b70e9f34b737159fe21a6170568d6031e187f0cc84555c712b7c29b45cb882007593ef70f86e5c0948561a3b8e8851529a4f98975f2b24e768dda38ce2',
 };
+
+// ---------------------------------------------------------------------------
+// Default Byron Delegation Credentials (pre-generated, test-only)
+// ---------------------------------------------------------------------------
+
+/**
+ * Byron delegation certificate linking the genesis issuer key to the delegate key.
+ * Required by cardano-node for block production through instant hard-fork chain.
+ * DO NOT use in production — test-only.
+ *
+ * @since 0.1.0
+ * @category constants
+ */
+export const DEFAULT_BYRON_DELEGATION_CERT = {
+  omega: 0,
+  issuerPk:
+    'NclXQiNNEpaaLdSxP3VFeOPIfSuFqBcNtmv8/7fftBKtgW1Aig7UqHJ/czsywkWFFVmBYPRnGjXspUl3wEMvuQ==',
+  delegatePk:
+    '24ejRK+kCDs1g4f3PcodFEUFVgNFWtfmuoEtVQf8/Ii2j2ruXHebJmZZPrwtAdbJYwDiSEvsHr95+BAF1ifGsA==',
+  cert: '498c72e35ef30cd4657b48bfcc0a84a555a67981e3b6104a0d1708ab84510367d81e1ba3f47619565b1ee1098e31dcb8eb648d8030e061b568de113fdf3d6a09',
+} as const;
+
+/**
+ * Byron delegate signing key (binary CBOR, base64-encoded).
+ * Matched pair with the delegation certificate above.
+ * DO NOT use in production — test-only.
+ *
+ * @since 0.1.0
+ * @category constants
+ */
+export const DEFAULT_BYRON_DELEGATE_KEY_BASE64 =
+  'WIBIEAVE04iVnDoP4MfUG2WL0U5Ez9vCjpBCis6OwrFxVeJt/oNoafFh8xBqFTIppaG0Jm2XlHK4ofM/KzLVqYLM24ejRK+kCDs1g4f3PcodFEUFVgNFWtfmuoEtVQf8/Ii2j2ruXHebJmZZPrwtAdbJYwDiSEvsHr95+BAF1ifGsA==' as const;
 
 // ---------------------------------------------------------------------------
 // Default Payment Keys (pre-generated, test-only)
@@ -907,15 +939,20 @@ export function buildShelleyGenesis(
   addressHex: string,
   lovelace: number = DEFAULT_INITIAL_FUNDS_LOVELACE,
   overrides: Partial<ShelleyGenesis> = {},
+  nowSeconds?: number,
 ): ShelleyGenesis {
+  // Use provided timestamp or compute one, truncated to whole seconds.
+  // Format matches `date -u +%FT%TZ` used by the official hydra demo.
+  const epochSec = nowSeconds ?? Math.floor(Date.now() / 1000);
   return {
     ...DEFAULT_SHELLEY_GENESIS,
     ...overrides,
     initialFunds: {
       [addressHex]: lovelace,
     },
-    // Always use current time for devnet genesis
-    systemStart: new Date().toISOString(),
+    systemStart: new Date(epochSec * 1000)
+      .toISOString()
+      .replace(/\.\d{3}Z$/, 'Z'),
   };
 }
 
@@ -925,9 +962,9 @@ export function buildShelleyGenesis(
  * @since 0.1.0
  * @category utilities
  */
-export function buildByronGenesis(): ByronGenesis {
+export function buildByronGenesis(nowSeconds?: number): ByronGenesis {
   return {
     ...DEFAULT_BYRON_GENESIS,
-    startTime: Math.floor(Date.now() / 1000),
+    startTime: nowSeconds ?? Math.floor(Date.now() / 1000),
   };
 }

@@ -573,6 +573,10 @@ function createCardanoNodeEffect(
             '/opt/cardano/config/vrf.skey',
             '--shelley-operational-certificate',
             '/opt/cardano/config/pool.cert',
+            '--byron-delegation-certificate',
+            '/opt/cardano/config/byron-delegation.cert',
+            '--byron-signing-key',
+            '/opt/cardano/config/byron-delegate.key',
           ],
         });
       },
@@ -658,7 +662,7 @@ function createHydraNodeEffect(
             '--hydra-scripts-tx-id',
             scriptsTxId,
             '--contestation-period',
-            String(config.hydraNode.contestationPeriod),
+            `${config.hydraNode.contestationPeriod}s`,
           ],
         });
       },

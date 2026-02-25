@@ -47,6 +47,8 @@ import {
   buildByronGenesis,
   buildShelleyGenesis,
   DEFAULT_ALONZO_GENESIS,
+  DEFAULT_BYRON_DELEGATE_KEY_BASE64,
+  DEFAULT_BYRON_DELEGATION_CERT,
   DEFAULT_CONWAY_GENESIS,
   DEFAULT_HYDRA_SK,
   DEFAULT_HYDRA_VK,
@@ -219,7 +221,9 @@ function writeConfigFilesEffect(
       try: async () => {
         await mkdir(tempDir, { recursive: true });
 
-        // Build genesis configs
+        // Build genesis configs with a shared timestamp so Byron startTime
+        // and Shelley systemStart refer to the exact same instant.
+        const nowSeconds = Math.floor(Date.now() / 1000);
         const shelleyGenesis = buildShelleyGenesis(
           keys.paymentAddressHex,
           DEFAULT_INITIAL_FUNDS_LOVELACE,
@@ -227,8 +231,9 @@ function writeConfigFilesEffect(
             ...shelleyOverrides,
             networkMagic: config.cardanoNode.networkMagic,
           },
+          nowSeconds,
         );
-        const byronGenesis = buildByronGenesis();
+        const byronGenesis = buildByronGenesis(nowSeconds);
 
         // Write all config files in parallel
         await Promise.all([
@@ -268,6 +273,14 @@ function writeConfigFilesEffect(
             join(tempDir, 'pool.cert'),
             JSON.stringify(DEFAULT_OPCERT, null, 2),
           ).then(() => chmod(join(tempDir, 'pool.cert'), 0o600)),
+          writeFile(
+            join(tempDir, 'byron-delegation.cert'),
+            JSON.stringify(DEFAULT_BYRON_DELEGATION_CERT, null, 2),
+          ),
+          writeFile(
+            join(tempDir, 'byron-delegate.key'),
+            Buffer.from(DEFAULT_BYRON_DELEGATE_KEY_BASE64, 'base64'),
+          ).then(() => chmod(join(tempDir, 'byron-delegate.key'), 0o600)),
         ]);
       },
       catch: (cause: unknown) =>
