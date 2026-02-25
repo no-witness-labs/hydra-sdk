@@ -1,3 +1,6 @@
+import { writeFile } from "node:fs/promises";
+import { join } from "node:path";
+
 import { Head } from "@no-witness-labs/hydra-sdk";
 import { Effect } from "effect";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -20,21 +23,59 @@ const FAST_SHELLEY_GENESIS = {
 // ---------------------------------------------------------------------------
 
 /**
- * Commit via HTTP REST API (single-party, empty UTxO set).
- * Hydra's `POST /commit` accepts a JSON body of UTxOs to commit.
- * For an empty commit this opens the head immediately.
+ * Draft a commit tx via HTTP, sign it with cardano-cli, and submit to L1.
+ *
+ * Hydra's `POST /commit` returns a **draft** transaction that the client
+ * must sign and submit to the Cardano L1. For an empty commit (single-party,
+ * no UTxOs) the flow is:
+ *   1. POST /commit with {} → draft tx (CBOR text envelope)
+ *   2. Write draft tx to host tempDir (visible inside cardano-node container)
+ *   3. cardano-cli sign inside the container (reads from ro mount, writes /tmp)
+ *   4. cardano-cli submit inside the container
  */
-async function commitViaHttp(httpUrl: string): Promise<void> {
-  const response = await fetch(`${httpUrl}/commit`, {
+async function commitEmpty(cluster: {
+  hydraHttpUrl: string;
+  tempDir: string;
+  cardanoNode: { id: string; name: string };
+  config: { cardanoNode: { networkMagic: number } };
+}): Promise<void> {
+  const { Container } = await import("@no-witness-labs/hydra-devnet");
+
+  // 1. Draft the commit tx
+  const response = await fetch(`${cluster.hydraHttpUrl}/commit`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({}),
   });
   if (!response.ok) {
     throw new Error(
-      `Commit failed: ${response.status} ${await response.text()}`,
+      `Commit draft failed: ${response.status} ${await response.text()}`,
     );
   }
+  const draftTx = await response.text();
+
+  // 2. Write draft tx to host tempDir (bind-mounted as /opt/cardano/config:ro)
+  await writeFile(join(cluster.tempDir, "commit-draft.json"), draftTx);
+
+  // 3. Sign inside the cardano-node container
+  await Container.exec(cluster.cardanoNode, [
+    "sh",
+    "-c",
+    "cardano-cli conway transaction sign" +
+      " --tx-file /opt/cardano/config/commit-draft.json" +
+      " --signing-key-file /opt/cardano/config/payment.skey" +
+      " --out-file /tmp/commit-signed.json",
+  ]);
+
+  // 4. Submit to L1
+  await Container.exec(cluster.cardanoNode, [
+    "sh",
+    "-c",
+    "cardano-cli conway transaction submit" +
+      " --tx-file /tmp/commit-signed.json" +
+      " --socket-path /opt/cardano/ipc/node.socket" +
+      ` --testnet-magic ${cluster.config.cardanoNode.networkMagic}`,
+  ]);
 }
 
 /**
@@ -90,114 +131,40 @@ describe("Head Integration (devnet)", () => {
   }, 120_000);
 
   // -------------------------------------------------------------------------
-  // Promise API
+  // Single lifecycle exercising all three API styles:
+  //   Promise API  → init + commit
+  //   Effect API   → close
+  //   Layer API    → fanout (via HydraHeadService)
   // -------------------------------------------------------------------------
 
-  describe("Promise API", () => {
-    it(
-      "full lifecycle: init → commit(HTTP) → close → fanout",
-      async () => {
-        const head = await Head.create({ url: cluster.hydraApiUrl });
+  it(
+    "full lifecycle: init → commit → close → fanout across API styles",
+    async () => {
+      const head = await Head.create({ url: cluster.hydraApiUrl });
 
-        try {
-          // 1. Should start Idle after Greetings
-          await waitForState(head, "Idle");
-          expect(head.getState()).toBe("Idle");
+      try {
+        // -- Promise API: init + commit --
+        await waitForState(head, "Idle");
+        expect(head.getState()).toBe("Idle");
 
-          // 2. Init — transitions to Initializing
-          await head.init();
-          expect(head.getState()).toBe("Initializing");
+        await head.init();
+        expect(head.getState()).toBe("Initializing");
 
-          // 3. Commit via HTTP — transitions to Open
-          await commitViaHttp(cluster.hydraHttpUrl);
-          await waitForState(head, "Open");
-          expect(head.getState()).toBe("Open");
+        await commitEmpty(cluster);
+        await waitForState(head, "Open");
+        expect(head.getState()).toBe("Open");
 
-          // 4. Close — transitions to Closed
-          await head.close();
-          expect(head.getState()).toBe("Closed");
+        // -- Effect API: close --
+        await Effect.runPromise(head.effect.close());
+        expect(head.getState()).toBe("Closed");
 
-          // 5. Fanout — internally awaits ReadyToFanout, then finalizes
-          await head.fanout();
-          expect(head.getState()).toBe("Final");
-        } finally {
-          await head.dispose();
-        }
-      },
-      300_000,
-    );
-  });
-
-  // -------------------------------------------------------------------------
-  // Effect API
-  // -------------------------------------------------------------------------
-
-  describe("Effect API", () => {
-    it(
-      "full lifecycle: init → commit(HTTP) → close → fanout",
-      async () => {
-        const head = await Head.create({ url: cluster.hydraApiUrl });
-
-        try {
-          await waitForState(head, "Idle");
-
-          await Effect.runPromise(head.effect.init());
-          expect(head.getState()).toBe("Initializing");
-
-          await commitViaHttp(cluster.hydraHttpUrl);
-          await waitForState(head, "Open");
-
-          await Effect.runPromise(head.effect.close());
-          expect(head.getState()).toBe("Closed");
-
-          await Effect.runPromise(head.effect.fanout());
-          expect(head.getState()).toBe("Final");
-        } finally {
-          await Effect.runPromise(head.effect.dispose());
-        }
-      },
-      300_000,
-    );
-  });
-
-  // -------------------------------------------------------------------------
-  // Effect + DI (Layer)
-  // -------------------------------------------------------------------------
-
-  describe("Effect + DI (Layer)", () => {
-    it(
-      "full lifecycle via HydraHeadService layer",
-      async () => {
-        const config = { url: cluster.hydraApiUrl };
-
-        const program = Effect.gen(function* () {
-          const head = yield* Head.HydraHeadService;
-
-          // Wait for Idle
-          yield* Effect.tryPromise(() => waitForState(head, "Idle"));
-
-          // Init
-          yield* head.effect.init();
-          expect(head.getState()).toBe("Initializing");
-
-          // Commit via HTTP
-          yield* Effect.tryPromise(() =>
-            commitViaHttp(cluster.hydraHttpUrl),
-          );
-          yield* Effect.tryPromise(() => waitForState(head, "Open"));
-
-          // Close
-          yield* head.effect.close();
-          expect(head.getState()).toBe("Closed");
-
-          // Fanout
-          yield* head.effect.fanout();
-          expect(head.getState()).toBe("Final");
-        }).pipe(Effect.provide(Head.layer(config)), Effect.scoped);
-
-        await Effect.runPromise(program);
-      },
-      300_000,
-    );
-  });
+        // -- Effect API: fanout (awaits ReadyToFanout internally) --
+        await Effect.runPromise(head.effect.fanout());
+        expect(head.getState()).toBe("Final");
+      } finally {
+        await head.dispose();
+      }
+    },
+    300_000,
+  );
 });
