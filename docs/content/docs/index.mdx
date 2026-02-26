@@ -1,19 +1,19 @@
 ---
 title: Hydra SDK
-description: A modern TypeScript monorepo template with best practices
+description: A TypeScript SDK for the Cardano Hydra Head protocol
 ---
 
 import { Card, Cards } from "fumadocs-ui/components/card"
 
 # Hydra SDK
 
-A modern, type-safe TypeScript monorepo template with excellent developer experience and best practices.
+A type-safe TypeScript SDK for managing [Hydra Head](https://hydra.family/) protocol interactions on Cardano. Built with [Effect](https://effect.website/) for robust error handling, resource management, and composability.
 
 ## Quick Start
 
 <Cards>
-  <Card title="Getting Started" description="Learn the basics and set up your first package" href="/docs/getting-started" />
-  <Card title="Core Package" description="Example core package with utilities" href="/docs/core" />
+  <Card title="Getting Started" description="Install the SDK and connect to a Hydra node" href="/docs/getting-started" />
+  <Card title="Head Basics" description="Understand the Head lifecycle, states, and commands" href="/docs/head-basics" />
   <Card title="API Reference" description="Complete API documentation for all modules" href="/docs/modules" />
 </Cards>
 
@@ -25,14 +25,26 @@ A modern, type-safe TypeScript monorepo template with excellent developer experi
 - **Fast** - Turbo for caching and parallel builds
 - **Complete** - Testing, linting, formatting, and docs included
 
-## Project Structure
+## Packages
+
+| Package | Description |
+|---------|-------------|
+| `@no-witness-labs/hydra-sdk` | Core SDK — Head lifecycle, WebSocket transport, protocol types |
+| `@no-witness-labs/hydra-sdk-cli` | CLI tool for head lifecycle commands |
+| `@no-witness-labs/hydra-devnet` | Local Docker-based Cardano + Hydra development environment |
+
+## Architecture
 
 ```
-├── packages/           # Workspace packages
-│   └── core/          # Example core package
-├── docs/              # Documentation site (Fumadocs)
-├── .changeset/        # Changeset configuration
-├── .github/           # GitHub Actions workflows
-├── turbo.json         # Turbo configuration
-└── tsconfig.base.json # Base TypeScript config
+@no-witness-labs/hydra-sdk
+├── Head      # HydraHead client — lifecycle commands, event subscriptions
+├── Protocol  # Hydra protocol message schemas (Effect Schema)
+├── Socket    # WebSocket transport with reconnection
+└── Config    # Connection configuration
+
+@no-witness-labs/hydra-devnet
+├── Cluster   # Docker-based Cardano + Hydra cluster orchestration
+├── Container # Docker container lifecycle management
+├── Genesis   # Key generation and genesis config building
+└── Health    # Service health check polling
 ```

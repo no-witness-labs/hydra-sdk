@@ -1,0 +1,308 @@
+---
+title: "@no-witness-labs/hydra-sdk"
+description: Core SDK for Hydra Head protocol management
+---
+
+# @no-witness-labs/hydra-sdk
+
+Core SDK for managing Hydra Head protocol interactions. Exports four namespaces:
+
+```ts
+import { Config, Socket, Protocol, Head } from "@no-witness-labs/hydra-sdk";
+```
+
+---
+
+## Head
+
+The primary module for creating and managing Hydra Head connections.
+
+### `Head.create(config)`
+
+Create a new `HydraHead` instance.
+
+```ts
+declare const create: (config: HeadConfig) => Promise<HydraHead>
+```
+
+**Parameters:**
+
+- `config` — Connection and reconnection settings
+
+**Returns:** A `HydraHead` handle with lifecycle commands and event subscriptions.
+
+```ts
+const head = await Head.create({ url: "ws://localhost:4001" });
+```
+
+### `Head.withHead(config, body)`
+
+Bracket pattern — creates a head, runs `body`, then disposes automatically.
+
+```ts
+declare const withHead: <A>(
+  config: HeadConfig,
+  body: (head: HydraHead) => Promise<A>,
+) => Promise<A>
+```
+
+```ts
+await Head.withHead({ url: "ws://localhost:4001" }, async (head) => {
+  await head.init();
+  // head is disposed on exit
+});
+```
+
+### `Head.layer(config)`
+
+Create an Effect Layer for dependency injection.
+
+```ts
+declare const layer: (
+  config: HeadConfig,
+) => Layer<HydraHeadService, HeadError>
+```
+
+### `Head.effect.create(config)`
+
+Effect-based factory.
+
+```ts
+declare const create: (
+  config: HeadConfig,
+) => Effect<HydraHead, HeadError>
+```
+
+### `Head.effect.createScoped(config)`
+
+Scoped Effect — head is disposed when the scope closes.
+
+```ts
+declare const createScoped: (
+  config: HeadConfig,
+) => Effect<HydraHead, HeadError, Scope>
+```
+
+### HeadConfig
+
+```ts
+interface HeadConfig {
+  readonly url: string;
+  readonly historyOnConnect?: boolean;
+  readonly historyOnReconnect?: boolean;
+  readonly reconnect?: {
+    readonly maxRetries?: number;     // default: 10
+    readonly initialDelayMs?: number; // default: 500
+    readonly maxDelayMs?: number;     // default: 30000
+    readonly factor?: number;         // default: 1.7
+    readonly jitter?: number;         // default: 0.2
+  };
+}
+```
+
+### HydraHead
+
+```ts
+interface HydraHead {
+  // State
+  readonly state: HeadStatus;
+  readonly headId: string | null;
+  getState(): HeadStatus;
+
+  // Lifecycle commands (Promise API)
+  init(params?: InitParams): Promise<void>;
+  commit(utxos: unknown): Promise<void>;
+  close(): Promise<void>;
+  safeClose(): Promise<void>;
+  fanout(): Promise<void>;
+  abort(): Promise<void>;
+
+  // Event subscription
+  subscribe(callback: (event: ServerOutput) => void): Unsubscribe;
+  subscribeEvents(): AsyncIterableIterator<ServerOutput>;
+
+  // Cleanup
+  dispose(): Promise<void>;
+
+  // Effect API
+  readonly effect: {
+    init(params?: InitParams): Effect<void, HeadError>;
+    commit(utxos: unknown): Effect<void, HeadError>;
+    close(): Effect<void, HeadError>;
+    safeClose(): Effect<void, HeadError>;
+    fanout(): Effect<void, HeadError>;
+    awaitReadyToFanout(): Effect<void, HeadError>;
+    abort(): Effect<void, HeadError>;
+    events(): Stream<ServerOutput>;
+    dispose(): Effect<void, HeadError>;
+  };
+}
+```
+
+### HeadStatus
+
+```ts
+type HeadStatus =
+  | "Idle"
+  | "Initializing"
+  | "Open"
+  | "Closed"
+  | "FanoutPossible"
+  | "Final"
+  | "Aborted";
+```
+
+### HeadError
+
+```ts
+class HeadError extends Data.TaggedError("HeadError")<{
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+```
+
+---
+
+## Protocol
+
+Hydra protocol message types defined with Effect Schema.
+
+### Request Messages (Client → Server)
+
+| Message | Description |
+|---------|-------------|
+| `InitMessage` | Initialize a new Hydra Head |
+| `AbortMessage` | Abort initialization |
+| `NewTxMessage` | Submit a transaction |
+| `CloseMessage` | Close the head |
+| `ContestMessage` | Contest closure with a more recent snapshot |
+| `FanoutMessage` | Execute final fanout to L1 |
+| `SafeCloseMessage` | Graceful close (waits for pending txs) |
+| `DecommitMessage` | Request UTxO decommit |
+| `RecoverMessage` | Recover failed commit deposit |
+
+### Response Messages (Server → Client)
+
+| Message | Description |
+|---------|-------------|
+| `HeadIsInitializingMessage` | Init transaction observed on L1 |
+| `HeadIsOpenMessage` | All parties committed |
+| `HeadIsClosedMessage` | Close transaction observed |
+| `HeadIsContestedMessage` | Closure contested |
+| `ReadyToFanoutMessage` | Contestation period ended |
+| `HeadIsFinalizedMessage` | Fanout confirmed on L1 |
+| `HeadIsAbortedMessage` | Abort confirmed on L1 |
+| `TxValidMessage` | Transaction accepted |
+| `TxInvalidMessage` | Transaction rejected |
+| `SnapshotConfirmedMessage` | Multi-party snapshot confirmed |
+| `CommitRecordedMessage` | Incremental commit recorded |
+| `CommitApprovedMessage` | Commit approved |
+| `CommitFinalizedMessage` | Commit confirmed on L1 |
+| `DecommitRequestedMessage` | Decommit request recorded |
+| `DecommitApprovedMessage` | Decommit approved |
+| `DecommitFinalizedMessage` | Decommit confirmed on L1 |
+| `PeerConnectedMessage` | Peer connected |
+| `PeerDisconnectedMessage` | Peer disconnected |
+| `CommandFailedMessage` | Command execution failed |
+| `PostTxOnChainFailedMessage` | On-chain transaction failed |
+| `InvalidInputMessage` | Invalid client input |
+
+### Domain Types
+
+```ts
+// Multi-asset value
+interface Value {
+  lovelace: bigint;
+  [policyId: string]: { [assetName: string]: bigint };
+}
+
+// Transaction output
+interface TxOut {
+  address: string;
+  value: Value;
+  datum?: unknown;
+  datumHash?: string;
+  referenceScript?: unknown;
+}
+
+// UTxO set — keyed by "txHash#index"
+type UTxO = Record<string, TxOut>;
+
+// Hydra party
+interface Party {
+  vkey: string;
+}
+```
+
+### Status Utilities
+
+```ts
+// Convert a server message to a Status
+declare const socketMessageToStatus: (msg: unknown) => Option<Status>;
+
+// Convert an HTTP /head response to a Status
+declare const headResponseToStatus: (response: unknown) => Status;
+
+type Status =
+  | "DISCONNECTED"
+  | "IDLE"
+  | "INITIALIZING"
+  | "OPEN"
+  | "CLOSED"
+  | "FANOUT_POSSIBLE"
+  | "FINAL";
+```
+
+---
+
+## Socket
+
+WebSocket connection management with automatic reconnection and message queuing.
+
+### SocketController
+
+```ts
+class SocketController {
+  // Send a message through the WebSocket
+  sendMessage(chunk: string | Uint8Array): Effect<void, SocketError>;
+
+  // Close the WebSocket connection
+  sendClose(): Effect<void, SocketError>;
+
+  // Incoming message queue (PubSub)
+  readonly messageQueue: PubSub<Uint8Array>;
+
+  // Connection lifecycle fiber
+  readonly socketFiber: RuntimeFiber<void, SocketError>;
+}
+```
+
+Features:
+- Automatic reconnection with exponential backoff (up to 20 retries)
+- `PubSub`-based message distribution for multiple consumers
+- Comprehensive connection lifecycle logging
+
+---
+
+## Config
+
+Connection configuration service.
+
+### Config.Config
+
+```ts
+class Config extends Effect.Service<Config>()("Config", {
+  effect: (url: string) => Effect.gen(function* () {
+    const wsUrl = "ws://" + url;
+    const httpUrl = "http://" + url;
+    return { wsUrl, httpUrl };
+  }),
+}) {}
+```
+
+Derives WebSocket and HTTP URLs from a base URL string. Used as a dependency by Socket and Head modules.
+
+```ts
+// Provide to Effect programs
+Effect.provide(Config.Config.Default("localhost:4001"))
+```

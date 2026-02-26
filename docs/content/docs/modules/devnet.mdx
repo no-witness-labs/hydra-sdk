@@ -1,0 +1,294 @@
+---
+title: "@no-witness-labs/hydra-devnet"
+description: Local Docker-based Cardano + Hydra development environment
+---
+
+# @no-witness-labs/hydra-devnet
+
+A local development environment that orchestrates Docker containers for a single-node Cardano network with a Hydra node. Handles key generation, genesis configuration, and full cluster lifecycle.
+
+```ts
+import { Cluster } from "@no-witness-labs/hydra-devnet";
+```
+
+## Prerequisites
+
+- Docker running locally
+- `cardano-node` and `hydra-node` images (pulled automatically)
+
+---
+
+## Cluster
+
+The primary module for creating and managing a local Cardano + Hydra cluster.
+
+### `Cluster.make(config)`
+
+Create a new cluster instance.
+
+```ts
+declare const make: (config?: DevNetConfig) => Cluster
+```
+
+```ts
+const cluster = Cluster.make({ clusterName: "my-devnet" });
+await cluster.start();
+
+console.log(cluster.hydraApiUrl);  // ws://localhost:4001
+console.log(cluster.hydraHttpUrl); // http://localhost:4001
+console.log(cluster.cardanoNodeUrl); // localhost:3001
+
+await cluster.stop();
+await cluster.remove();
+```
+
+### `Cluster.withCluster(config, body)`
+
+Bracket pattern — starts a cluster, runs `body`, then stops and removes automatically.
+
+```ts
+declare const withCluster: <A>(
+  config: DevNetConfig,
+  body: (cluster: Cluster) => Promise<A>,
+) => Promise<A>
+```
+
+```ts
+await Cluster.withCluster({}, async (cluster) => {
+  const head = await Head.create({ url: cluster.hydraApiUrl });
+  await head.init();
+  // cluster is stopped + removed on exit
+});
+```
+
+### `Cluster.managedLayer()`
+
+Effect Layer for dependency injection.
+
+```ts
+declare const managedLayer: (
+  config?: DevNetConfig,
+) => Layer<ClusterService, ClusterError>
+```
+
+### Cluster Interface
+
+```ts
+interface Cluster {
+  // Connection URLs
+  readonly hydraApiUrl: string;
+  readonly hydraHttpUrl: string;
+  readonly cardanoNodeUrl: string;
+  readonly ipcSocket: string;
+
+  // Generated cryptographic keys
+  readonly keys: GeneratedKeys;
+
+  // Lifecycle
+  start(): Promise<void>;
+  stop(): Promise<void>;
+  remove(): Promise<void>;
+
+  // Container references
+  readonly cardanoNode: Container;
+  readonly hydraNode: Container;
+  readonly config: ResolvedDevNetConfig;
+
+  // Effect API
+  readonly effect: {
+    start(): Effect<void, ClusterError>;
+    stop(): Effect<void, ClusterError>;
+    remove(): Effect<void, ClusterError>;
+  };
+}
+```
+
+### DevNetConfig
+
+```ts
+interface DevNetConfig {
+  readonly clusterName?: string; // default: "hydra-devnet"
+  readonly cardanoNode?: {
+    readonly image?: string;        // default: ghcr.io/intersectmbo/cardano-node:10.5.3
+    readonly port?: number;         // default: 3001
+    readonly submitPort?: number;   // default: 8090
+    readonly networkMagic?: number; // default: 42
+  };
+  readonly hydraNode?: {
+    readonly image?: string;              // default: ghcr.io/cardano-scaling/hydra-node:1.2.0
+    readonly apiPort?: number;            // default: 4001
+    readonly peerPort?: number;           // default: 5001
+    readonly monitoringPort?: number;     // default: 6001
+    readonly contestationPeriod?: number; // default: 60
+    readonly nodeId?: string;             // default: "devnet-1"
+  };
+  readonly shelleyGenesisOverrides?: Partial<ShelleyGenesis>;
+}
+```
+
+### Startup Sequence
+
+When `cluster.start()` is called, the following happens:
+
+1. Pull Docker images (`cardano-node`, `hydra-node`)
+2. Generate cryptographic keys (Cardano payment keys + Hydra signing keys)
+3. Build genesis configurations (Byron, Shelley, Alonzo, Conway — instant hard fork)
+4. Create Docker network and IPC socket volume
+5. Start Cardano node and wait for block production
+6. Publish Hydra protocol scripts to L1
+7. Start Hydra node and wait for API readiness
+
+### ClusterError
+
+```ts
+class ClusterError extends Data.TaggedError("ClusterError")<{
+  readonly operation: string;
+  readonly cluster?: string;
+  readonly cause: unknown;
+}> {}
+```
+
+---
+
+## Container
+
+Docker container lifecycle management.
+
+```ts
+import { Container } from "@no-witness-labs/hydra-devnet";
+```
+
+### Functions
+
+```ts
+Container.create(docker, image, name, options) → Promise<Container>
+Container.start(container)  → Promise<void>
+Container.stop(container)   → Promise<void>
+Container.remove(container) → Promise<void>
+Container.exec(container, command) → Promise<string>
+Container.run(docker, image, options) → Promise<string>
+```
+
+### ContainerError
+
+```ts
+class ContainerError extends Data.TaggedError("ContainerError")<{
+  readonly operation: string;
+  readonly container: string;
+  readonly cause: unknown;
+}> {}
+
+class DockerNotRunningError extends Data.TaggedError("DockerNotRunningError")<{
+  readonly cause: unknown;
+}> {}
+```
+
+---
+
+## Genesis
+
+Cryptographic key generation and genesis configuration building.
+
+```ts
+import { Genesis } from "@no-witness-labs/hydra-devnet";
+```
+
+### Functions
+
+```ts
+// Generate Cardano payment keys and Hydra signing keys
+Genesis.generateKeys(tempDir, config) → Promise<GeneratedKeys>
+
+// Write Byron, Shelley, Alonzo, Conway genesis configs
+Genesis.writeConfigFiles(tempDir, keys, config) → Promise<void>
+
+// Publish Hydra protocol scripts to L1, returns tx ID
+Genesis.publishHydraScripts(tempDir, config) → Promise<string>
+```
+
+### GeneratedKeys
+
+```ts
+interface GeneratedKeys {
+  readonly paymentSkeyPath: string;
+  readonly paymentVkeyPath: string;
+  readonly paymentKeyHash: string;
+  readonly paymentAddressHex: string;
+  readonly paymentAddress: string;
+  readonly hydraSkPath: string;
+  readonly hydraVkPath: string;
+}
+```
+
+### GenesisError
+
+```ts
+class GenesisError extends Data.TaggedError("GenesisError")<{
+  readonly reason: string;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+```
+
+---
+
+## Health
+
+Health check polling for services.
+
+```ts
+import { Health } from "@no-witness-labs/hydra-devnet";
+```
+
+### Functions
+
+```ts
+Health.waitForHttp(url, options?)        → Promise<void>
+Health.waitForWebSocket(url, options?)   → Promise<void>
+Health.waitForCardanoNode(port, options?) → Promise<void>
+Health.waitForHydraNode(port, options?)   → Promise<void>
+```
+
+### HealthCheckOptions
+
+```ts
+interface HealthCheckOptions {
+  timeout?: number;           // default: 60000
+  interval?: number;          // default: 1000
+  requiredSuccesses?: number; // default: 1
+}
+```
+
+### HealthCheckError
+
+```ts
+class HealthCheckError extends Data.TaggedError("HealthCheckError")<{
+  readonly service: string;
+  readonly cause: unknown;
+}> {}
+```
+
+---
+
+## Images
+
+Docker image availability and pulling.
+
+```ts
+import { Images } from "@no-witness-labs/hydra-devnet";
+```
+
+### Functions
+
+```ts
+Images.isAvailable(imageName)    → Promise<boolean>
+Images.pull(imageName)           → Promise<void>
+Images.ensureAvailable(imageName) → Promise<void>
+```
+
+### Default Images
+
+| Image | Version |
+|-------|---------|
+| `ghcr.io/intersectmbo/cardano-node` | `10.5.3` |
+| `ghcr.io/cardano-scaling/hydra-node` | `1.2.0` |

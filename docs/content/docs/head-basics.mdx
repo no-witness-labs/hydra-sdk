@@ -1,0 +1,214 @@
+---
+title: Head Basics
+description: Understand the Hydra Head lifecycle, state machine, and event handling
+---
+
+# Head Basics
+
+A Hydra Head is an off-chain mini-ledger shared by a fixed set of participants. The `HydraHead` client manages the full lifecycle — from initialization through finalization — with built-in state machine validation.
+
+## Head Lifecycle
+
+Every head progresses through a series of states:
+
+```
+Idle → Initializing → Open → Closed → FanoutPossible → Final
+                 ↘               ↘
+                  Aborted         Aborted
+```
+
+| State | Description |
+|-------|-------------|
+| `Idle` | Initial state, ready to initialize |
+| `Initializing` | Init transaction posted to L1, waiting for all parties to commit |
+| `Open` | All parties committed, head is operational for L2 transactions |
+| `Closed` | Close transaction posted to L1, in contestation period |
+| `FanoutPossible` | Contestation period ended, ready for fanout |
+| `Final` | Fanout transaction posted to L1, head is finalized |
+| `Aborted` | Initialization was aborted |
+
+## Commands
+
+Each command is only valid in specific states. The SDK's built-in FSM rejects invalid commands with a `HeadError`:
+
+| Command | Allowed From | Transitions To | Description |
+|---------|-------------|----------------|-------------|
+| `init()` | Idle | Initializing | Post init transaction to L1 |
+| `commit()` | Initializing | Open | Commit UTxOs into the head |
+| `close()` | Open | Closed | Post close transaction to L1 |
+| `safeClose()` | Open | Closed | Graceful close (waits for pending txs) |
+| `fanout()` | FanoutPossible | Final | Distribute final UTxO set back to L1 |
+| `abort()` | Idle, Initializing | Aborted | Abort head initialization |
+
+## Event Subscription
+
+The head emits events for every protocol state change and transaction result.
+
+### Callback
+
+```ts
+const unsubscribe = head.subscribe((event) => {
+  switch (event.tag) {
+    case "HeadIsInitializing":
+      console.log("Head is initializing...");
+      break;
+    case "HeadIsOpen":
+      console.log("Head is open!");
+      break;
+    case "HeadIsClosed":
+      console.log("Head closed, contestation period started");
+      break;
+    case "HeadIsFinalized":
+      console.log("Head finalized on L1");
+      break;
+  }
+});
+
+// Stop listening
+unsubscribe();
+```
+
+### Async Iterator
+
+```ts
+for await (const event of head.subscribeEvents()) {
+  console.log(`${event.tag}:`, event.payload);
+  if (event.tag === "HeadIsFinalized") break;
+}
+```
+
+### Effect Stream
+
+```ts
+import { Effect, Stream } from "effect";
+
+const program = Effect.scoped(
+  Effect.gen(function* () {
+    const head = yield* Head.effect.createScoped({
+      url: "ws://localhost:4001",
+    });
+
+    yield* head.effect
+      .events()
+      .pipe(
+        Stream.tap((event) =>
+          Effect.log(`${event.tag}`)
+        ),
+        Stream.takeUntil((event) => event.tag === "HeadIsFinalized"),
+        Stream.runDrain,
+      );
+  }),
+);
+```
+
+## Server Events
+
+These are the events emitted by the Hydra node:
+
+### State Transitions
+
+| Event | Description |
+|-------|-------------|
+| `HeadIsInitializing` | Init transaction observed on L1 |
+| `HeadIsOpen` | All parties committed, head is open |
+| `HeadIsClosed` | Close transaction observed on L1 |
+| `HeadIsContested` | A party contested with a more recent snapshot |
+| `ReadyToFanout` | Contestation period ended |
+| `HeadIsFinalized` | Fanout transaction confirmed on L1 |
+| `HeadIsAborted` | Abort transaction confirmed on L1 |
+
+### Transaction Events
+
+| Event | Description |
+|-------|-------------|
+| `TxValid` | Transaction accepted into the head |
+| `TxInvalid` | Transaction rejected with reason |
+| `SnapshotConfirmed` | Multi-party confirmed snapshot |
+
+### Network Events
+
+| Event | Description |
+|-------|-------------|
+| `PeerConnected` | A peer connected to the network |
+| `PeerDisconnected` | A peer disconnected |
+| `Greetings` | Initial connection response with head status |
+
+### Commit/Decommit Events
+
+| Event | Description |
+|-------|-------------|
+| `CommitRecorded` | Incremental commit deposit recorded |
+| `CommitApproved` | Deposit approved by all parties |
+| `CommitFinalized` | Deposit confirmed on L1 |
+| `DecommitRequested` | Decommit request recorded |
+| `DecommitApproved` | Decommit approved by all parties |
+| `DecommitFinalized` | UTxO distributed back to L1 |
+
+## Error Handling
+
+All operations can fail with `HeadError`. The Promise API throws, while the Effect API returns typed errors:
+
+```ts
+// Promise API
+try {
+  await head.init();
+} catch (error) {
+  // HeadError: Command Init is not allowed while head is Open
+  console.error(error.message);
+}
+
+// Effect API
+import { Effect } from "effect";
+
+const result = yield* head.effect.init().pipe(
+  Effect.catchTag("HeadError", (error) =>
+    Effect.log(`Failed: ${error.message}`),
+  ),
+);
+```
+
+## Reconnection
+
+The WebSocket transport automatically reconnects with exponential backoff:
+
+```ts
+const head = await Head.create({
+  url: "ws://localhost:4001",
+  reconnect: {
+    maxRetries: 10,       // give up after 10 attempts
+    initialDelayMs: 500,  // first retry after 500ms
+    maxDelayMs: 30_000,   // cap delay at 30s
+    factor: 1.7,          // exponential factor
+    jitter: 0.2,          // randomize ±20%
+  },
+});
+```
+
+On reconnect, the SDK re-syncs the FSM state from the server's `Greetings` message.
+
+## Resource Management
+
+Always dispose the head when done to clean up the WebSocket connection and internal fibers:
+
+```ts
+// Manual
+const head = await Head.create({ url: "ws://localhost:4001" });
+try {
+  // ... operations ...
+} finally {
+  await head.dispose();
+}
+
+// Bracket (recommended)
+await Head.withHead({ url: "ws://localhost:4001" }, async (head) => {
+  // automatically disposed on exit
+});
+
+// Effect scoped (recommended for Effect users)
+const program = Effect.scoped(
+  Effect.gen(function* () {
+    const head = yield* Head.effect.createScoped({ url: "ws://localhost:4001" });
+    // automatically disposed when scope closes
+  }),
+);
+```
