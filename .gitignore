@@ -6,6 +6,7 @@
 # Docs build artifacts
 docs/out/
 docs/.next/
+docs/.source/
 
 # Dependencies
 node_modules
