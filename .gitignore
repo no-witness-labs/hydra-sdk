@@ -1,8 +1,11 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # Template
-docs
 .tsbuildinfo
+
+# Docs build artifacts
+docs/out/
+docs/.next/
 
 # Dependencies
 node_modules
