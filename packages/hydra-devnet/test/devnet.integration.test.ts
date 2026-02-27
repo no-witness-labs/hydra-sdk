@@ -5,9 +5,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 /**
  * Heavy integration tests (cluster start/stop, container ops) require a running
  * Docker daemon with Cardano + Hydra images and take several minutes.
- * Set RUN_INTEGRATION_TESTS=true to enable them.
  */
-const runIntegration = process.env.RUN_INTEGRATION_TESTS === 'true';
 
 /**
  * Fast Shelley genesis config for testing.
@@ -86,7 +84,7 @@ describe('Devnet Integration Tests', () => {
     });
   });
 
-  describe.skipIf(!runIntegration)('Cluster Lifecycle', () => {
+  describe('Cluster Lifecycle', () => {
     it('should start cluster and all containers become running', { timeout: 300_000 }, async () => {
       const cluster = Cluster.make({
         clusterName: 'test-start-cluster',
@@ -157,7 +155,7 @@ describe('Devnet Integration Tests', () => {
     });
   });
 
-  describe.skipIf(!runIntegration)('Container Operations', () => {
+  describe('Container Operations', () => {
     it('should get container status after start', { timeout: 300_000 }, async () => {
       const cluster = Cluster.make({
         clusterName: 'test-container-status',
@@ -195,7 +193,7 @@ describe('Devnet Integration Tests', () => {
     });
   });
 
-  describe.skipIf(!runIntegration)('Image Operations', () => {
+  describe('Image Operations', () => {
     it('should check if image is available', { timeout: 30_000 }, async () => {
       // Check for a common image that likely exists
       const available = await Images.isAvailable('hello-world');
