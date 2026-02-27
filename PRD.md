@@ -13,7 +13,7 @@
 | ------- | ----------------- | ------------------ | ----------------------------------------------------------------------------------------------------------- |
 | 1.0     | February 16, 2026 | No Witness Labs    | Initial draft                                                                                               |
 | 1.1     | February 26, 2026 | No Witness Labs    | Sync with GitHub issues: milestone status, CLI package rename, #9 superseded, #30 and #39 added to roadmap |
-| 1.2     | February 26, 2026 | No Witness Labs    | PRD upgrade to skill schema: 5-section structure, removed implementation code samples, condensed Executive Summary, Testing Approach table, Appendix replaced with reference |
+| 1.2     | February 26, 2026 | No Witness Labs    | PRD upgrade to skill schema: 4-section structure, removed implementation code samples, condensed Executive Summary, Testing Approach table, Appendix replaced with reference |
 
 ---
 
@@ -389,7 +389,7 @@ evolution-sdk (defines interfaces + domain types)
 hydra-sdk (implements Provider, uses Schema transforms)
 ```
 
-evolution-sdk is declared as an **optional peer dependency**. The core SDK modules (Protocol, Socket, Head, Query) work without evolution-sdk installed. Only the `Provider` module requires it.
+evolution-sdk is declared as an **optional peer dependency**. The core SDK modules (Protocol, Head, Query) work without evolution-sdk installed. Only the `Provider` module requires it.
 
 #### Two Type Universes
 
@@ -420,7 +420,7 @@ The Provider module is exposed via a subpath export (`@no-witness-labs/hydra-sdk
 
 ### Error Handling
 
-All errors extend `Data.TaggedError` from Effect (`SocketError`, `HeadError`, `ProtocolError`). The Effect API surfaces errors in the type signature; the Promise API throws them, documented with `@throws` JSDoc. The full error taxonomy and Hybrid API implementation rules are defined in [hybrid-effect-api.instructions.md](/.github/instructions/hybrid-effect-api.instructions.md).
+All errors extend `Data.TaggedError` from Effect (`HeadError`, `ProtocolError`). The Effect API surfaces errors in the type signature; the Promise API throws them, documented with `@throws` JSDoc. The full error taxonomy and Hybrid API implementation rules are defined in [hybrid-effect-api.instructions.md](/.github/instructions/hybrid-effect-api.instructions.md).
 
 ### Technology Stack
 
@@ -539,7 +539,7 @@ Multi-head orchestration across multiple `hydra-node` instances. Out of scope fo
 
 | Layer         | Tool                         | Scope                                                                         |
 | ------------- | ---------------------------- | ----------------------------------------------------------------------------- |
-| Unit          | Vitest                       | Protocol schema validation, FSM transitions, Socket reconnection              |
+| Unit          | Vitest                       | Protocol schema validation, FSM transitions, Transport reconnection           |
 | Integration   | Vitest + hydra-devnet        | Full head lifecycle, multi-party heads, reconnection, L1↔L2 commit/fanout    |
 | Cross-browser | Playwright                   | Chromium, Firefox, WebKit — WebSocket connection, wallet extension interaction |
 | Platform      | CI matrix                    | Linux, macOS, Windows                                                         |
