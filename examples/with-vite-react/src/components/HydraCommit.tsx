@@ -311,7 +311,7 @@ async function buildBlueprintTxCbor(
   const built = await client
     .newTx()
     .collectFrom({ inputs: utxoInputs })
-    .build({ availableUtxos: [] });
+    .build();
 
   const tx = await built.toTransaction();
   const cborHex = Transaction.toCBORHex(tx);
@@ -322,32 +322,43 @@ async function buildBlueprintTxCbor(
 }
 
 /**
- * Merge wallet witness set into a draft transaction using evolution-sdk.
- * Parses both tx and witness with evolution-sdk, merges vkey witnesses,
- * and re-serializes.
+ * Sign a draft commit transaction from hydra-node using the CIP-30 wallet,
+ * then assemble the signed transaction following the evolution-sdk pattern.
  */
-function mergeTxWitnesses(draftTxHex: string, walletWitnessHex: string): string {
+async function signDraftCommitTx(
+  draftTxHex: string,
+  walletApi: CardanoWalletApi,
+): Promise<string> {
+  // 1. Ask wallet to sign (partial=true, hydra-node already constructed the tx)
+  const walletWitnessHex = await walletApi.signTx(draftTxHex, true);
+
+  // 2. Parse draft tx and wallet witness set
   const draftTx = Transaction.fromCBORHex(draftTxHex);
   const walletWitness = TransactionWitnessSet.fromCBORHex(walletWitnessHex);
 
-  // Merge vkey witnesses from wallet into draft tx's witness set
-  const existingVkeys = draftTx.witnessSet.vkeyWitnesses ?? [];
-  const walletVkeys = walletWitness.vkeyWitnesses ?? [];
-  const mergedVkeys = [...existingVkeys, ...walletVkeys];
-
+  // 3. Merge hydra-node's existing vkey witnesses with wallet's vkey witnesses
   const mergedWitnessSet = new TransactionWitnessSet.TransactionWitnessSet({
-    ...draftTx.witnessSet,
-    vkeyWitnesses: mergedVkeys.length > 0 ? mergedVkeys : undefined,
+    vkeyWitnesses: [
+      ...(draftTx.witnessSet.vkeyWitnesses ?? []),
+      ...(walletWitness.vkeyWitnesses ?? []),
+    ],
+    nativeScripts: draftTx.witnessSet.nativeScripts,
+    bootstrapWitnesses: draftTx.witnessSet.bootstrapWitnesses,
+    plutusV1Scripts: draftTx.witnessSet.plutusV1Scripts,
+    plutusV2Scripts: draftTx.witnessSet.plutusV2Scripts,
+    plutusV3Scripts: draftTx.witnessSet.plutusV3Scripts,
+    plutusData: draftTx.witnessSet.plutusData,
+    redeemers: draftTx.witnessSet.redeemers,
   });
 
-  const mergedTx = new Transaction.Transaction({
+  const signedTx = new Transaction.Transaction({
     body: draftTx.body,
     witnessSet: mergedWitnessSet,
     isValid: draftTx.isValid,
     auxiliaryData: draftTx.auxiliaryData,
   });
 
-  return Transaction.toCBORHex(mergedTx);
+  return Transaction.toCBORHex(signedTx);
 }
 
 /**
@@ -564,17 +575,10 @@ export default function HydraCommit({ walletApi }: Props) {
         let finalTxHex = draftTx.cborHex;
 
         if (hasWalletUtxos) {
-          // 2. Ask wallet to sign (partial=true, since hydra-node already signed)
+          // 2. Sign draft tx with wallet and assemble
           appendLog("RequestingWalletSignature");
-          const walletWitnessHex = await walletApi.signTx(
-            draftTx.cborHex,
-            true,
-          );
-          appendLog("WalletSigned");
-
-          // 3. Merge wallet witnesses into the draft tx
-          finalTxHex = mergeTxWitnesses(draftTx.cborHex, walletWitnessHex);
-          appendLog("WitnessesMerged");
+          finalTxHex = await signDraftCommitTx(draftTx.cborHex, walletApi);
+          appendLog("TxSigned");
         }
 
         // 4. Submit the final tx to Cardano L1
