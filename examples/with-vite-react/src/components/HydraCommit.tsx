@@ -1,16 +1,20 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Head } from "@no-witness-labs/hydra-sdk";
+import type { InlineDatum, UTxO } from "@evolution-sdk/evolution";
 import {
   Address,
+  AssetName,
   Assets,
-  CBOR,
   createClient,
+  Data,
+  DatumHash,
+  DatumOption,
+  PolicyId,
+  Script,
   Transaction,
   TransactionHash,
   TransactionWitnessSet,
-  UTxO,
 } from "@evolution-sdk/evolution";
-import { decodeHexAddress } from "@cardano-foundation/cardano-connect-with-wallet-core";
+import { Head } from "@no-witness-labs/hydra-sdk";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type HeadStatus = Head.HeadStatus;
 
@@ -22,21 +26,6 @@ interface LogEntry {
   ts: number;
   tag: string;
   payload?: unknown;
-}
-
-interface ParsedUtxo {
-  txHash: string;
-  index: number;
-  addressHex: string;
-  lovelace: bigint;
-  assets: Array<{ policyId: string; assetName: string; quantity: bigint }>;
-  /** Datum hash hex (32 bytes) if present on the output. */
-  datumHash: string | null;
-  /** Inline datum as raw CBOR hex, if present. */
-  inlineDatumCbor: string | null;
-  /** Reference script as raw CBOR hex, if present. */
-  referenceScriptCbor: string | null;
-  raw: string;
 }
 
 const HYDRA_URL = import.meta.env.VITE_HYDRA_NODE_URL as string | undefined;
@@ -51,141 +40,6 @@ function isMock(wsUrl: string): boolean {
   return wsUrl.startsWith("mock://");
 }
 
-/** Convert Uint8Array to hex string. */
-function toHex(bytes: Uint8Array): string {
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-/** Decode a CIP-30 TransactionUnspentOutput CBOR hex string. */
-function parseUtxoHex(hex: string): ParsedUtxo {
-  try {
-    // CIP-30 TransactionUnspentOutput = [TransactionInput, TransactionOutput]
-    const decoded = CBOR.fromCBORHex(hex);
-    if (!Array.isArray(decoded) || decoded.length < 2) {
-      throw new Error("Expected CBOR array(2)");
-    }
-
-    // TransactionInput: [txHash(bytes32), index(uint)]
-    const input = decoded[0] as ReadonlyArray<CBOR.CBOR>;
-    const txHash =
-      input[0] instanceof Uint8Array ? toHex(input[0]) : "";
-    const index =
-      typeof input[1] === "bigint" ? Number(input[1]) : 0;
-
-    // TransactionOutput: array (Shelley) or record/map (Babbage/Conway)
-    const output = decoded[1];
-    let lovelace = 0n;
-    let addressHex = "";
-    const assets: ParsedUtxo["assets"] = [];
-
-    // Extract address, value, datum option (key 2), and script ref (key 3)
-    let addressCbor: CBOR.CBOR | undefined;
-    let valueCbor: CBOR.CBOR | undefined;
-    let datumOptionCbor: CBOR.CBOR | undefined;
-    let scriptRefCbor: CBOR.CBOR | undefined;
-    if (Array.isArray(output)) {
-      // Shelley format: [address, value, datumHash?]
-      addressCbor = output[0];
-      valueCbor = output[1];
-      // Shelley outputs can have an optional datum hash at index 2
-      if (output[2] instanceof Uint8Array) datumOptionCbor = output[2];
-    } else if (output instanceof Map) {
-      // Babbage/Conway as Map
-      addressCbor = output.get(0n) ?? output.get(0);
-      valueCbor = output.get(1n) ?? output.get(1);
-      datumOptionCbor = output.get(2n) ?? output.get(2);
-      scriptRefCbor = output.get(3n) ?? output.get(3);
-    } else if (output && typeof output === "object" && !("_tag" in output)) {
-      // Babbage/Conway as Record {0: address, 1: value, 2: datumOption, 3: scriptRef}
-      const rec = output as Record<string | number, CBOR.CBOR>;
-      addressCbor = rec[0];
-      valueCbor = rec[1];
-      datumOptionCbor = rec[2];
-      scriptRefCbor = rec[3];
-    }
-
-    if (addressCbor instanceof Uint8Array) {
-      addressHex = toHex(addressCbor);
-    }
-
-    // Parse datum option: Conway/Babbage uses [0, hash] for datum hash or [1, datum] for inline datum
-    let datumHash: string | null = null;
-    let inlineDatumCbor: string | null = null;
-    if (datumOptionCbor instanceof Uint8Array) {
-      // Shelley-style raw datum hash (32 bytes)
-      datumHash = toHex(datumOptionCbor);
-    } else if (Array.isArray(datumOptionCbor) && datumOptionCbor.length === 2) {
-      const tag = datumOptionCbor[0];
-      const val = datumOptionCbor[1];
-      if (tag === 0n || tag === 0) {
-        // [0, hash] = datum hash
-        if (val instanceof Uint8Array) datumHash = toHex(val);
-      } else if (tag === 1n || tag === 1) {
-        // [1, datum] = inline datum — encode back to CBOR hex
-        inlineDatumCbor = CBOR.toCBORHex(val as CBOR.CBOR);
-      }
-    }
-
-    // Parse reference script
-    let referenceScriptCbor: string | null = null;
-    if (scriptRefCbor !== undefined && scriptRefCbor !== null) {
-      // Encode the script ref back to CBOR hex for the Hydra API
-      referenceScriptCbor = CBOR.toCBORHex(scriptRefCbor as CBOR.CBOR);
-    }
-
-    if (valueCbor !== undefined) {
-      if (typeof valueCbor === "bigint") {
-        lovelace = valueCbor;
-      } else if (Array.isArray(valueCbor) && valueCbor.length >= 2) {
-        // [lovelace, multiasset]
-        if (typeof valueCbor[0] === "bigint") lovelace = valueCbor[0];
-
-        const multiAsset = valueCbor[1];
-        const entries: Iterable<[CBOR.CBOR, CBOR.CBOR]> =
-          multiAsset instanceof Map
-            ? multiAsset.entries()
-            : typeof multiAsset === "object" && multiAsset !== null
-              ? Object.entries(multiAsset as Record<string, CBOR.CBOR>)
-              : [];
-
-        for (const [policyKey, assetMap] of entries) {
-          const policyId =
-            policyKey instanceof Uint8Array ? toHex(policyKey) : String(policyKey);
-
-          const assetEntries: Iterable<[CBOR.CBOR, CBOR.CBOR]> =
-            assetMap instanceof Map
-              ? assetMap.entries()
-              : typeof assetMap === "object" && assetMap !== null
-                ? Object.entries(assetMap as Record<string, CBOR.CBOR>)
-                : [];
-
-          for (const [nameKey, qty] of assetEntries) {
-            const assetName =
-              nameKey instanceof Uint8Array ? tryUtf8(nameKey) : String(nameKey);
-            const quantity = typeof qty === "bigint" ? qty : 0n;
-            assets.push({ policyId, assetName, quantity });
-          }
-        }
-      }
-    }
-
-    return { txHash, index, addressHex, lovelace, assets, datumHash, inlineDatumCbor, referenceScriptCbor, raw: hex };
-  } catch {
-    return { txHash: hex.slice(0, 64), index: 0, addressHex: "", lovelace: 0n, assets: [], datumHash: null, inlineDatumCbor: null, referenceScriptCbor: null, raw: hex };
-  }
-}
-
-/** Try to decode bytes as UTF-8, fall back to hex. */
-function tryUtf8(bytes: Uint8Array): string {
-  try {
-    const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-    // Only use UTF-8 if it looks like readable text
-    if (/^[\x20-\x7e]+$/.test(text)) return text;
-    return toHex(bytes);
-  } catch {
-    return toHex(bytes);
-  }
-}
 
 /** Format lovelace as ADA with 6 decimal places. */
 function formatAda(lovelace: bigint): string {
@@ -196,107 +50,57 @@ function formatAda(lovelace: bigint): string {
   });
 }
 
-/**
- * Convert inline datum CBOR hex to Hydra-compatible JSON.
- * Decodes the CBOR and produces a JSON representation matching
- * what CML's PlutusData.to_json() would produce.
- */
-function inlineDatumToJson(cborHex: string): unknown {
-  try {
-    const decoded = CBOR.fromCBORHex(cborHex);
-    return cborToPlutusJson(decoded);
-  } catch {
-    return cborHex;
-  }
-}
-
-/** Recursively convert a decoded CBOR value to Plutus JSON format. */
-function cborToPlutusJson(val: CBOR.CBOR): unknown {
-  if (typeof val === "bigint") return { int: Number(val) };
-  if (typeof val === "number") return { int: val };
-  if (typeof val === "string") return { bytes: val };
-  if (val instanceof Uint8Array) return { bytes: toHex(val) };
-  if (Array.isArray(val)) return { list: val.map(cborToPlutusJson) };
-  if (val instanceof Map) {
-    const entries: Array<{ k: unknown; v: unknown }> = [];
-    for (const [k, v] of val.entries()) {
-      entries.push({ k: cborToPlutusJson(k as CBOR.CBOR), v: cborToPlutusJson(v as CBOR.CBOR) });
-    }
-    return { map: entries };
-  }
-  // CBOR tagged value (constructor)
-  if (val && typeof val === "object" && "_tag" in val) {
-    const tagged = val as { _tag: string; tag: number; value: CBOR.CBOR };
-    if (tagged._tag === "CborTag") {
-      // Plutus constructor: tag 121+n for constructor index n (0-6)
-      // or tag 1280+n for constructor index 7+
-      const idx = tagged.tag >= 1280 ? tagged.tag - 1280 : tagged.tag - 121;
-      const fields = Array.isArray(tagged.value)
-        ? tagged.value.map(cborToPlutusJson)
-        : [cborToPlutusJson(tagged.value)];
-      return { constructor: idx, fields };
-    }
-  }
-  return val;
-}
-
-/** Build a Hydra-compatible UTxO map from selected parsed UTxOs (blueprint format). */
+/** Build a Hydra-compatible UTxO map from evolution-sdk UTxOs. */
 function buildHydraUtxoMap(
-  selected: Array<ParsedUtxo>,
+  selected: ReadonlyArray<UTxO.UTxO>,
 ): Record<string, Record<string, unknown>> {
   const utxoMap: Record<string, Record<string, unknown>> = {};
   for (const u of selected) {
-    const key = `${u.txHash}#${u.index}`;
-    const bech32Addr = u.addressHex ? decodeHexAddress(u.addressHex) : "";
+    const txHash = TransactionHash.toHex(u.transactionId);
+    const key = `${txHash}#${u.index}`;
+    const bech32Addr = Address.toBech32(u.address);
 
     // Build value object
-    const value: Record<string, unknown> = { lovelace: Number(u.lovelace) };
-    for (const asset of u.assets) {
-      if (!value[asset.policyId]) value[asset.policyId] = {};
-      (value[asset.policyId] as Record<string, number>)[asset.assetName] =
-        Number(asset.quantity);
+    const lovelace = Assets.lovelaceOf(u.assets);
+    const value: Record<string, unknown> = { lovelace: Number(lovelace) };
+    for (const [pid, name, qty] of Assets.flatten(u.assets)) {
+      const pidHex = PolicyId.toHex(pid);
+      const nameHex = AssetName.toHex(name);
+      if (!value[pidHex]) value[pidHex] = {};
+      (value[pidHex] as Record<string, number>)[nameHex] = Number(qty);
     }
 
-    // Match reference format: inlineDatum (JSON), inlineDatumRaw (CBOR hex), inlineDatumhash
+    // Datum info
+    let datumHash: string | null = null;
+    let inlineDatumCbor: string | null = null;
+    if (u.datumOption) {
+      if (DatumOption.isDatumHash(u.datumOption)) {
+        datumHash = DatumHash.toHex(u.datumOption);
+      } else if (DatumOption.isInlineDatum(u.datumOption)) {
+        inlineDatumCbor = Data.toCBORHex(
+          (u.datumOption as InlineDatum.InlineDatum).data,
+        );
+      }
+    }
+
     utxoMap[key] = {
       address: bech32Addr,
       datum: null,
-      inlineDatum: u.inlineDatumCbor ? inlineDatumToJson(u.inlineDatumCbor) : null,
-      inlineDatumRaw: u.inlineDatumCbor ?? null,
-      inlineDatumhash: u.datumHash ?? null,
-      referenceScript: null,
+      inlineDatum: null,
+      inlineDatumRaw: inlineDatumCbor,
+      inlineDatumhash: datumHash,
+      referenceScript: u.scriptRef ? Script.toCBORHex(u.scriptRef) : null,
       value,
     };
   }
   return utxoMap;
 }
 
-
-/**
- * Build a blueprint transaction CBOR hex using evolution-sdk's transaction builder.
- *
- * Uses createClient + newTx() to produce proper Conway-era transaction CBOR
- * that the hydra-node uses to construct the actual commit transaction.
- */
+/** Build a blueprint transaction CBOR hex using evolution-sdk's transaction builder. */
 async function buildBlueprintTxCbor(
-  selected: Array<ParsedUtxo>,
-  changeAddress: string,
+  selected: ReadonlyArray<UTxO.UTxO>,
   walletApi: CardanoWalletApi,
 ): Promise<string> {
-  const parsedAddress = Address.fromBech32(changeAddress);
-  const utxoInputs = selected.map((u) => {
-    let assets = Assets.fromLovelace(u.lovelace);
-    for (const asset of u.assets) {
-      assets = Assets.addByHex(assets, asset.policyId, asset.assetName, asset.quantity);
-    }
-    return new UTxO.UTxO({
-      transactionId: TransactionHash.fromHex(u.txHash),
-      index: BigInt(u.index),
-      address: u.addressHex ? Address.fromHex(u.addressHex) : parsedAddress,
-      assets,
-    });
-  });
-
   const blockfrostKey = import.meta.env.VITE_BLOCKFROST_KEY_PREPROD as string;
   const client = createClient({
     network: "preprod",
@@ -310,15 +114,11 @@ async function buildBlueprintTxCbor(
 
   const built = await client
     .newTx()
-    .collectFrom({ inputs: utxoInputs })
+    .collectFrom({ inputs: selected })
     .build();
 
   const tx = await built.toTransaction();
-  const cborHex = Transaction.toCBORHex(tx);
-
-  console.log("[Blueprint TX] inputs:", tx.body.inputs.length, "outputs:", tx.body.outputs.length, "fee:", tx.body.fee.toString());
-  console.log("[Blueprint TX] scriptDataHash:", tx.body.scriptDataHash ?? "none");
-  return cborHex;
+  return Transaction.toCBORHex(tx);
 }
 
 /**
@@ -377,13 +177,15 @@ export default function HydraCommit({ walletApi }: Props) {
   const [url, setUrl] = useState(HYDRA_URL ?? "mock://test");
   const [head, setHead] = useState<Head.HydraHead | null>(null);
   const [status, setStatus] = useState<HeadStatus>("Idle");
-  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [logs, setLogs] = useState<Array<LogEntry>>([]);
   const [error, setError] = useState<string | null>(null);
-  const [utxos, setUtxos] = useState<string[] | null>(null);
+  const [utxos, setUtxos] = useState<ReadonlyArray<UTxO.UTxO> | null>(null);
   const [selectedUtxos, setSelectedUtxos] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
   const [busyLabel, setBusyLabel] = useState<string | null>(null);
-  const [contestationDeadline, setContestationDeadline] = useState<Date | null>(null);
+  const [contestationDeadline, setContestationDeadline] = useState<Date | null>(
+    null,
+  );
   const [countdown, setCountdown] = useState<string | null>(null);
 
   const headRef = useRef<Head.HydraHead | null>(null);
@@ -479,28 +281,20 @@ export default function HydraCommit({ walletApi }: Props) {
 
   // -- Lifecycle actions ------------------------------------------------------
 
-  const run = useCallback(
-    async (label: string, fn: () => Promise<void>) => {
-      setError(null);
-      setBusy(true);
-      setBusyLabel(label);
-      try {
-        await fn();
-        if (headRef.current) setStatus(headRef.current.getState());
-      } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
-      } finally {
-        setBusy(false);
-        setBusyLabel(null);
-      }
-    },
-    [],
-  );
-
-  const parsedUtxos = useMemo(
-    () => utxos?.map(parseUtxoHex) ?? [],
-    [utxos],
-  );
+  const run = useCallback(async (label: string, fn: () => Promise<void>) => {
+    setError(null);
+    setBusy(true);
+    setBusyLabel(label);
+    try {
+      await fn();
+      if (headRef.current) setStatus(headRef.current.getState());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+      setBusyLabel(null);
+    }
+  }, []);
 
   const handleInit = useCallback(
     () => run("Initializing head on L1...", () => head!.init()),
@@ -510,8 +304,10 @@ export default function HydraCommit({ walletApi }: Props) {
   const handleCommit = useCallback(
     () =>
       run("Committing to head...", async () => {
+        const walletUtxos = utxos ?? [];
+
         if (isMock(url)) {
-          await head!.commit(utxos ?? []);
+          await head!.commit(walletUtxos);
           return;
         }
 
@@ -521,19 +317,34 @@ export default function HydraCommit({ walletApi }: Props) {
           : `${httpBase}/commit`;
 
         // Build commit payload from selected UTxOs
-        const selected = parsedUtxos.filter((_, i) => selectedUtxos.has(i));
+        const selected = walletUtxos.filter((_, i) => selectedUtxos.has(i));
         const hasWalletUtxos = selected.length > 0;
 
         // Build blueprint commit request body
         let commitBody: unknown;
         if (hasWalletUtxos) {
-          const changeAddress = selected[0]!.addressHex
-            ? decodeHexAddress(selected[0]!.addressHex)
-            : "";
+          // Pick an unselected UTxO with >= 2 ADA as a fee UTxO (like the reference impl)
+          const feeUtxo = walletUtxos.find(
+            (u, i) =>
+              !selectedUtxos.has(i) &&
+              Assets.lovelaceOf(u.assets) >= 2_000_000n,
+          );
+          if (!feeUtxo) {
+            throw new Error(
+              "No unselected UTxO with >= 2 ADA available for fee coverage. " +
+                "Please deselect one UTxO to use for fees.",
+            );
+          }
 
-          appendLog("BuildingBlueprintTx");
-          const blueprintCbor = await buildBlueprintTxCbor(selected, changeAddress, walletApi);
-          const utxoMap = buildHydraUtxoMap(selected);
+          const allUtxos = [...selected, feeUtxo];
+          const feeHash = TransactionHash.toHex(feeUtxo.transactionId);
+          appendLog("BuildingBlueprintTx", {
+            commitUtxos: selected.length,
+            feeUtxo: `${feeHash.slice(0, 8)}...#${feeUtxo.index}`,
+          });
+
+          const blueprintCbor = await buildBlueprintTxCbor(allUtxos, walletApi);
+          const utxoMap = buildHydraUtxoMap(allUtxos);
 
           commitBody = {
             blueprintTx: {
@@ -549,7 +360,10 @@ export default function HydraCommit({ walletApi }: Props) {
         }
 
         // Log full commit request for debugging
-        console.log("[Commit] Full request body:", JSON.stringify(commitBody, null, 2));
+        console.log(
+          "[Commit] Full request body:",
+          JSON.stringify(commitBody, null, 2),
+        );
 
         appendLog("CommitRequest", {
           endpoint: commitUrl,
@@ -594,7 +408,7 @@ export default function HydraCommit({ walletApi }: Props) {
           throw submitErr;
         }
       }),
-    [head, url, utxos, parsedUtxos, selectedUtxos, walletApi, run, appendLog],
+    [head, url, utxos, selectedUtxos, walletApi, run, appendLog],
   );
 
   const handleClose = useCallback(
@@ -617,10 +431,21 @@ export default function HydraCommit({ walletApi }: Props) {
   const handleFetchUtxos = useCallback(async () => {
     setError(null);
     try {
-      const result = await walletApi.getUtxos();
-      setUtxos(result ?? []);
+      const blockfrostKey = import.meta.env
+        .VITE_BLOCKFROST_KEY_PREPROD as string;
+      const client = createClient({
+        network: "preprod",
+        provider: {
+          type: "blockfrost",
+          baseUrl: "https://cardano-preprod.blockfrost.io/api/v0",
+          projectId: blockfrostKey,
+        },
+        wallet: { type: "api" as const, api: walletApi as never },
+      });
+      const result = await client.getWalletUtxos();
+      setUtxos(result);
       setSelectedUtxos(new Set());
-      appendLog("FetchedUTxOs", { count: result?.length ?? 0 });
+      appendLog("FetchedUTxOs", { count: result.length });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -638,9 +463,7 @@ export default function HydraCommit({ walletApi }: Props) {
   const toggleAllUtxos = useCallback(() => {
     if (!utxos) return;
     setSelectedUtxos((prev) =>
-      prev.size === utxos.length
-        ? new Set()
-        : new Set(utxos.map((_, i) => i)),
+      prev.size === utxos.length ? new Set() : new Set(utxos.map((_, i) => i)),
     );
   }, [utxos]);
 
@@ -707,11 +530,12 @@ export default function HydraCommit({ walletApi }: Props) {
           <span className="rounded bg-gray-800 px-2 py-0.5 text-sm font-mono font-medium">
             {status}
           </span>
-          {countdown && (status === "Closed" || status === "FanoutPossible") && (
-            <span className="rounded bg-amber-900/40 px-2 py-0.5 text-sm font-mono text-amber-300">
-              Fanout in {countdown}
-            </span>
-          )}
+          {countdown &&
+            (status === "Closed" || status === "FanoutPossible") && (
+              <span className="rounded bg-amber-900/40 px-2 py-0.5 text-sm font-mono text-amber-300">
+                Fanout in {countdown}
+              </span>
+            )}
           {busyLabel && (
             <span className="flex items-center gap-2 text-sm text-yellow-300">
               <svg
@@ -788,64 +612,71 @@ export default function HydraCommit({ walletApi }: Props) {
       )}
 
       {/* UTxO Selector */}
-      {head && parsedUtxos.length > 0 && (
+      {head && utxos && utxos.length > 0 && (
         <div>
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-sm font-medium text-gray-400">
-              Wallet UTxOs ({parsedUtxos.length})
+              Wallet UTxOs ({utxos.length})
             </h3>
             <button
               onClick={toggleAllUtxos}
               className="text-xs text-indigo-400 hover:text-indigo-300"
             >
-              {selectedUtxos.size === parsedUtxos.length
+              {selectedUtxos.size === utxos.length
                 ? "Deselect all"
                 : "Select all"}
             </button>
           </div>
           <div className="max-h-60 overflow-y-auto rounded border border-gray-800 bg-gray-950 p-2 text-xs">
-            {parsedUtxos.map((parsed, i) => (
-              <label
-                key={i}
-                className={`flex cursor-pointer items-start gap-2 rounded px-2 py-1.5 hover:bg-gray-800 ${
-                  selectedUtxos.has(i) ? "bg-gray-800/50" : ""
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedUtxos.has(i)}
-                  onChange={() => toggleUtxo(i)}
-                  className="mt-0.5 accent-indigo-500"
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-gray-400">
-                      {parsed.txHash.slice(0, 8)}...
-                      {parsed.txHash.slice(-8)}#{parsed.index}
-                    </span>
-                    <span className="font-medium text-emerald-400">
-                      {formatAda(parsed.lovelace)} ADA
-                    </span>
-                  </div>
-                  {parsed.assets.length > 0 && (
-                    <div className="mt-0.5 flex flex-wrap gap-1">
-                      {parsed.assets.map((asset, j) => (
-                        <span
-                          key={j}
-                          className="inline-block rounded bg-indigo-900/40 px-1.5 py-0.5 text-indigo-300"
-                          title={`${asset.policyId}.${asset.assetName}`}
-                        >
-                          {asset.assetName || asset.policyId.slice(0, 8)}
-                          {asset.quantity > 1n
-                            ? ` x${asset.quantity.toString()}`
-                            : ""}
-                        </span>
-                      ))}
+            {utxos.map((u, i) => {
+              const txHash = TransactionHash.toHex(u.transactionId);
+              const lovelace = Assets.lovelaceOf(u.assets);
+              const tokens = Assets.flatten(u.assets);
+              return (
+                <label
+                  key={i}
+                  className={`flex cursor-pointer items-start gap-2 rounded px-2 py-1.5 hover:bg-gray-800 ${
+                    selectedUtxos.has(i) ? "bg-gray-800/50" : ""
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedUtxos.has(i)}
+                    onChange={() => toggleUtxo(i)}
+                    className="mt-0.5 accent-indigo-500"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-gray-400">
+                        {txHash.slice(0, 8)}...
+                        {txHash.slice(-8)}#{Number(u.index)}
+                      </span>
+                      <span className="font-medium text-emerald-400">
+                        {formatAda(lovelace)} ADA
+                      </span>
                     </div>
-                  )}
-                </div>
-              </label>
-            ))}
+                    {tokens.length > 0 && (
+                      <div className="mt-0.5 flex flex-wrap gap-1">
+                        {tokens.map(([pid, name, qty], j) => {
+                          const pidHex = PolicyId.toHex(pid);
+                          const nameHex = AssetName.toHex(name);
+                          return (
+                            <span
+                              key={j}
+                              className="inline-block rounded bg-indigo-900/40 px-1.5 py-0.5 text-indigo-300"
+                              title={`${pidHex}.${nameHex}`}
+                            >
+                              {nameHex || pidHex.slice(0, 8)}
+                              {qty > 1n ? ` x${qty.toString()}` : ""}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </label>
+              );
+            })}
           </div>
         </div>
       )}
