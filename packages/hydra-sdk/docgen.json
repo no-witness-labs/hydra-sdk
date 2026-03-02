@@ -4,10 +4,29 @@
   "srcDir": "src",
   "outDir": "docs",
   "theme": "markdown",
+  "enforceVersion": false,
+  "exclude": [
+    "src/**/index.ts",
+    "src/Config/**",
+    "src/Socket/**",
+    "src/Protocol/**",
+    "src/Head/Hydra*.ts",
+    "src/Head/Head.*.ts"
+  ],
   "parseCompilerOptions": {
     "strict": true,
     "moduleResolution": "NodeNext",
     "module": "NodeNext",
     "target": "ES2022"
+  },
+  "examplesCompilerOptions": {
+    "strict": true,
+    "moduleResolution": "Bundler",
+    "module": "ESNext",
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "paths": {
+      "@no-witness-labs/hydra-sdk": ["../../src/index.ts"]
+    }
   }
 }

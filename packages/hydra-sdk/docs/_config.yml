@@ -1,0 +1,9 @@
+remote_theme: markdown
+
+# Enable or disable the site search
+search_enabled: true
+
+# Aux links for the upper right navigation
+aux_links:
+'@no-witness-labs/hydra-sdk on GitHub':
+  - 'https://github.com/no-witness-labs/hydra-sdk'
