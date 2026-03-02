@@ -31,10 +31,10 @@
     "clean": "rm -rf dist .turbo .tsbuildinfo"
   },
   "devDependencies": {
-    "@babel/cli": "^7.28.0",
-    "@types/node": "^22.19.7",
+    "@babel/cli": "^7.28.6",
+    "@types/node": "^25.3.3",
     "@types/ws": "^8.18.1",
-    "babel-plugin-annotate-pure-calls": "^0.4.0",
+    "babel-plugin-annotate-pure-calls": "^0.5.0",
     "vitest-websocket-mock": "^0.5.0"
   },
   "dependencies": {
