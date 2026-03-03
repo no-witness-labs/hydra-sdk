@@ -1,3 +1,8 @@
+/**
+ * This module defines the `HydraHead` interface and related types for managing
+ * the lifecycle of a Hydra Head, including connection to hydra-node, command
+ * routing, and state management.
+ */
 import {
   Context,
   Data,
@@ -32,7 +37,7 @@ import { isServerOutput, makeHeadTransport } from "./Head.transport.js";
  * hydra-node over the WebSocket connection. The normal happy-path is:
  * `Idle → Initializing → Open → Closed → FanoutPossible → Final`.
  *
- * @category model
+ * @category Models
  */
 export type HeadStatus =
   | "Idle"
@@ -46,7 +51,7 @@ export type HeadStatus =
 /**
  * Connection and reconnection configuration for a Hydra Head.
  *
- * @category model
+ * @category Models
  */
 export interface HeadConfig {
   /** WebSocket URL of the hydra-node API (e.g. `"ws://localhost:9944"`). */
@@ -80,7 +85,7 @@ export interface HeadConfig {
  * Parameters for the `Init` command that opens a new Hydra Head on the L1
  * chain.
  *
- * @category model
+ * @category Models
  */
 export interface InitParams {
   // TODO(protocol-schema): Hydra websocket Init currently has no payload.
@@ -92,7 +97,7 @@ export interface InitParams {
 /**
  * A raw event envelope emitted by hydra-node over the WebSocket connection.
  *
- * @category model
+ * @category Models
  */
 export interface ServerOutput {
   /** Discriminating tag that identifies the hydra-node event type. */
@@ -105,7 +110,7 @@ export interface ServerOutput {
  * Discriminated union of all WebSocket command tags a client can send to
  * hydra-node.
  *
- * @category model
+ * @category Models
  */
 export type ClientInputTag =
   | "Init"
@@ -120,7 +125,7 @@ export type ClientInputTag =
 /**
  * Failure envelope returned by hydra-node when a client command is rejected.
  *
- * @category model
+ * @category Models
  */
 export interface ClientMessage {
   /** Discriminating tag that identifies which command failed. */
@@ -139,7 +144,7 @@ export interface ClientMessage {
  * carrying the current head state so the client can sync without replaying
  * history.
  *
- * @category model
+ * @category Models
  */
 export interface Greetings {
   /** The head state as known by hydra-node at the time of the greeting. */
@@ -150,7 +155,7 @@ export interface Greetings {
  * Rejection payload emitted when hydra-node cannot parse or route a client
  * message.
  *
- * @category model
+ * @category Models
  */
 export interface InvalidInput {
   /** Human-readable explanation of why the input was rejected. */
@@ -163,7 +168,7 @@ export interface InvalidInput {
  * Discriminated union of every event type that can arrive from hydra-node or
  * be generated internally by the SDK transport layer.
  *
- * @category model
+ * @category Models
  */
 export type ApiEvent =
   | { readonly _tag: "ServerOutput"; readonly output: ServerOutput }
@@ -174,7 +179,7 @@ export type ApiEvent =
 /**
  * Function type returned by `HydraHead.subscribe` to cancel the subscription.
  *
- * @category model
+ * @category Models
  */
 export type Unsubscribe = () => void;
 
@@ -182,7 +187,7 @@ export type Unsubscribe = () => void;
  * Tagged error type representing any failure that can occur during Hydra Head operations,
  * such as command rejections, timeouts, transport errors, or protocol violations.
  *
- * @category errors
+ * @category Errors
  */
 export class HeadError extends Data.TaggedError("HeadError")<{
   /** Human-readable description of what went wrong. */
@@ -195,7 +200,7 @@ export class HeadError extends Data.TaggedError("HeadError")<{
  * Primary interface representing a Hydra Head instance. Provides methods to execute
  * protocol commands, subscribe to server events, and manage the head lifecycle.
  *
- * @category model
+ * @category Models
  *
  * @example
  * ```ts
@@ -1002,7 +1007,7 @@ const createScopedEffect = (config: HeadConfig) =>
  * Effect runtime, as they integrate with Effect's structured concurrency,
  * resource management, and typed error channel.
  *
- * @category constructors
+ * @category Constructors
  *
  * @example
  * ```ts
@@ -1090,7 +1095,7 @@ export const effect = {
  * the WebSocket connection and internal resources. For automatic cleanup,
  * prefer `withHead`.
  *
- * @category constructors
+ * @category Constructors
  *
  * @param config - Connection and reconnection options.
  * @returns A `Promise` that resolves to a connected `HydraHead` instance.
@@ -1120,7 +1125,7 @@ export const create = (config: HeadConfig): Promise<HydraHead> =>
  * `head.dispose()`— even if `body` throws. Equivalent to
  * `Effect.acquireRelease`/ `using` for imperative async code.
  *
- * @category constructors
+ * @category Constructors
  *
  * @param config - Connection and reconnection options.
  * @param body   - Async callback that receives the connected head and returns
@@ -1167,7 +1172,7 @@ export const withHead = async <A>(
  * Use `layer` to construct a `Layer` that provides this service, then
  * use `Effect.provideLayer` or `Effect.provide` to wire it into your program.
  *
- * @category tags
+ * @category Tags
  *
  * @example
  * ```ts
