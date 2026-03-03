@@ -1,6 +1,7 @@
 {
   "name": "@no-witness-labs/hydra-sdk",
   "version": "0.0.3",
+  "homepage": "https://github.com/no-witness-labs/hydra-sdk",
   "type": "module",
   "publishConfig": {
     "access": "public"
@@ -28,6 +29,7 @@
     "type-check": "tsc --noEmit",
     "lint": "eslint src test",
     "test": "vitest run",
+    "docgen": "docgen",
     "clean": "rm -rf dist .turbo .tsbuildinfo"
   },
   "devDependencies": {

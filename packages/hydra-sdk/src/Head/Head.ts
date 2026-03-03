@@ -1,3 +1,8 @@
+/**
+ * This module defines the `HydraHead` interface and related types for managing
+ * the lifecycle of a Hydra Head, including connection to hydra-node, command
+ * routing, and state management.
+ */
 import {
   Context,
   Data,
@@ -25,6 +30,15 @@ import {
 } from "./Head.router.js";
 import { isServerOutput, makeHeadTransport } from "./Head.transport.js";
 
+/**
+ * All possible lifecycle states of a Hydra Head.
+ *
+ * Transitions are driven exclusively by server-side events emitted by
+ * hydra-node over the WebSocket connection. The normal happy-path is:
+ * `Idle → Initializing → Open → Closed → FanoutPossible → Final`.
+ *
+ * @category Models
+ */
 export type HeadStatus =
   | "Idle"
   | "Initializing"
@@ -34,30 +48,70 @@ export type HeadStatus =
   | "Final"
   | "Aborted";
 
+/**
+ * Connection and reconnection configuration for a Hydra Head.
+ *
+ * @category Models
+ */
 export interface HeadConfig {
+  /** WebSocket URL of the hydra-node API (e.g. `"ws://localhost:9944"`). */
   readonly url: string;
+  /**
+   * When `true`, the hydra-node will replay all past server outputs upon the
+   * initial WebSocket connection so the client can reconstruct current state.
+   */
   readonly historyOnConnect?: boolean;
+  /**
+   * When `true`, the hydra-node replays past server outputs after each
+   * automatic reconnection attempt.
+   */
   readonly historyOnReconnect?: boolean;
+  /** Optional exponential back-off parameters for automatic reconnection. */
   readonly reconnect?: {
+    /** Optional maximum number of reconnection attempts before giving up. */
     readonly maxRetries?: number;
+    /** Optional delay in milliseconds before the first reconnection attempt. */
     readonly initialDelayMs?: number;
+    /** Optional upper bound in milliseconds for the back-off delay. */
     readonly maxDelayMs?: number;
+    /** Optional multiplier applied to the delay after each failed attempt. */
     readonly factor?: number;
+    /** Optional random jitter factor in the range `[0, 1]` (inclusive) added to each delay to avoid thundering herd. The SDK does not perform runtime validation of this range and forwards the value to the underlying reconnection implementation; callers are responsible for only providing values within the documented range. */
     readonly jitter?: number;
   };
 }
 
+/**
+ * Parameters for the `Init` command that opens a new Hydra Head on the L1
+ * chain.
+ *
+ * @category Models
+ */
 export interface InitParams {
   // TODO(protocol-schema): Hydra websocket Init currently has no payload.
   // Keep this reserved field scaffold-only until protocol schema integration.
+  /** Optional contestation period in seconds; if provided, overrides the default configured in hydra-node. */
   readonly contestationPeriod?: number;
 }
 
+/**
+ * A raw event envelope emitted by hydra-node over the WebSocket connection.
+ *
+ * @category Models
+ */
 export interface ServerOutput {
+  /** Discriminating tag that identifies the hydra-node event type. */
   readonly tag: string;
+  /** Optional event-specific payload; shape varies by `tag`. */
   readonly payload?: unknown;
 }
 
+/**
+ * Discriminated union of all WebSocket command tags a client can send to
+ * hydra-node.
+ *
+ * @category Models
+ */
 export type ClientInputTag =
   | "Init"
   // TODO(protocol-schema): Commit is REST-based in Hydra; retained here as scaffold API surface.
@@ -68,55 +122,446 @@ export type ClientInputTag =
   | "Fanout"
   | "Abort";
 
+/**
+ * Failure envelope returned by hydra-node when a client command is rejected.
+ *
+ * @category Models
+ */
 export interface ClientMessage {
+  /** Discriminating tag that identifies which command failed. */
   readonly tag:
     | "CommandFailed"
     | "RejectedInputBecauseUnsynced"
     | "PostTxOnChainFailed";
+  /** Optional tag of the client command that triggered this failure, if applicable. */
   readonly clientInputTag?: ClientInputTag;
+  /** Optional human-readable explanation of why the command failed. */
   readonly reason?: string;
 }
 
+/**
+ * Initial greeting payload sent by hydra-node on every (re)connection,
+ * carrying the current head state so the client can sync without replaying
+ * history.
+ *
+ * @category Models
+ */
 export interface Greetings {
+  /** The head state as known by hydra-node at the time of the greeting. */
   readonly headStatus: HeadStatus;
 }
 
+/**
+ * Rejection payload emitted when hydra-node cannot parse or route a client
+ * message.
+ *
+ * @category Models
+ */
 export interface InvalidInput {
+  /** Human-readable explanation of why the input was rejected. */
   readonly reason: string;
+  /** The raw input string that was rejected, if available. */
   readonly input?: string;
 }
 
+/**
+ * Discriminated union of every event type that can arrive from hydra-node or
+ * be generated internally by the SDK transport layer.
+ *
+ * @category Models
+ */
 export type ApiEvent =
   | { readonly _tag: "ServerOutput"; readonly output: ServerOutput }
   | { readonly _tag: "ClientMessage"; readonly message: ClientMessage }
   | { readonly _tag: "Greetings"; readonly greetings: Greetings }
   | { readonly _tag: "InvalidInput"; readonly invalidInput: InvalidInput };
 
+/**
+ * Function type returned by `HydraHead.subscribe` to cancel the subscription.
+ *
+ * @category Models
+ */
 export type Unsubscribe = () => void;
 
+/**
+ * Tagged error type representing any failure that can occur during Hydra Head operations,
+ * such as command rejections, timeouts, transport errors, or protocol violations.
+ *
+ * @category Errors
+ */
 export class HeadError extends Data.TaggedError("HeadError")<{
+  /** Human-readable description of what went wrong. */
   readonly message: string;
+  /** Optional underlying cause (transport error, protocol violation, etc.). */
   readonly cause?: unknown;
 }> {}
 
+/**
+ * Primary interface representing a Hydra Head instance. Provides methods to execute
+ * protocol commands, subscribe to server events, and manage the head lifecycle.
+ *
+ * @category Models
+ *
+ * @example
+ * ```ts
+ * // Promise API — full lifecycle
+ * import { Head } from "@no-witness-labs/hydra-sdk";
+ *
+ * async function example() {
+ *   const head = await Head.create({ url: "ws://localhost:4001" });
+ *
+ *   await head.init();
+ *   await head.commit({ txHash: "abc...", txIx: 0 });
+ *   await head.close();
+ *   await head.fanout();
+ *   console.log(head.getState()); // "Final"
+ *
+ *   await head.dispose();
+ * }
+ * ```
+ *
+ * @example
+ * ```ts
+ * // Effect API — full lifecycle
+ * import { Effect } from "effect";
+ * import { Head } from "@no-witness-labs/hydra-sdk";
+ *
+ * const program = Effect.gen(function* () {
+ *   const head = yield* Head.effect.create({ url: "ws://localhost:4001" });
+ *
+ *   yield* head.effect.init();
+ *   yield* head.effect.commit({ txHash: "abc...", txIx: 0 });
+ *   yield* head.effect.close();
+ *   yield* head.effect.fanout();
+ *   console.log(head.getState()); // "Final"
+ *
+ *   yield* head.effect.dispose();
+ * });
+ * ```
+ */
 export interface HydraHead {
+  /**
+   * Current `HeadStatus` of this head, read synchronously from the
+   * in-memory FSM state.
+   */
   readonly state: HeadStatus;
+
+  /**
+   * Unique identifier for the Hydra Head.
+   *
+   * Set to a placeholder value after `init()` is acknowledged and reset to
+   * `null` after `dispose()`. Full extraction from the `HeadIsInitializing`
+   * payload is pending protocol-schema integration.
+   */
   readonly headId: string | null;
 
+  /**
+   * Returns the current `HeadStatus` synchronously.
+   *
+   * Equivalent to reading the `state` property; provided as a method for
+   * contexts that require a callable.
+   *
+   * @example Promise API
+   * ```ts
+   * import { Head } from "@no-witness-labs/hydra-sdk";
+   *
+   * const head = await Head.create({ url: "ws://localhost:9944" });
+   * console.log(head.getState()); // "Idle"
+   * ```
+   *
+   * @example Effect API
+   * ```ts
+   * import { Effect } from "effect";
+   * import { Head } from "@no-witness-labs/hydra-sdk";
+   *
+   * const program = Effect.gen(function* () {
+   *   const head = yield* Head.effect.create({ url: "ws://localhost:9944" });
+   *   // getState() is synchronous in both APIs
+   *   console.log(head.getState()); // "Idle"
+   * });
+   * ```
+   */
   getState(): HeadStatus;
 
+  /**
+   * Initialize a new Hydra Head on the L1 chain.
+   *
+   * Sends the `Init` command over the WebSocket and resolves once the
+   * hydra-node confirms `HeadIsInitializing`.
+   *
+   * @example Promise API
+   * ```ts
+   * const head = await Head.create({ url: "ws://localhost:4001" });
+   * await head.init();
+   * console.log(head.getState()); // "Initializing"
+   * ```
+   *
+   * @example Effect API
+   * ```ts
+   * const program = Effect.gen(function* () {
+   *   const head = yield* Head.effect.create({ url: "ws://localhost:4001" });
+   *   yield* head.effect.init();
+   * });
+   * ```
+   */
   init(params?: InitParams): Promise<void>;
+
+  /**
+   * Sends the `Commit` command to hydra-node to commit UTxOs into the head.
+   *
+   * Resolves once `HeadIsOpen` is received, indicating all participants have
+   * committed and the head is ready for off-chain transactions.
+   *
+   * > **Note:** Commit is REST-driven in the Hydra protocol. This WebSocket
+   * > scaffold signature is temporary and will be replaced when protocol-schema
+   * > integration lands.
+   *
+   * @param utxos - UTxO set to commit; type will be narrowed to the protocol
+   *   Transaction type in a future release.
+   *
+   * @example Promise API
+   * ```ts
+   * import { Head } from "@no-witness-labs/hydra-sdk";
+   *
+   * const head = await Head.create({ url: "ws://localhost:9944" });
+   * await head.init();
+   * await head.commit({ txHash: "abc...", txIx: 0 });
+   * console.log(head.getState()); // "Open"
+   * ```
+   *
+   * @example Effect API
+   * ```ts
+   * import { Effect } from "effect";
+   * import { Head } from "@no-witness-labs/hydra-sdk";
+   *
+   * const program = Effect.gen(function* () {
+   *   const head = yield* Head.effect.create({ url: "ws://localhost:9944" });
+   *   yield* head.effect.init();
+   *   yield* head.effect.commit({ txHash: "abc...", txIx: 0 });
+   * });
+   * ```
+   */
   // TODO(protocol-schema): replace unknown with protocol Transaction type.
   // Commit is REST-driven in Hydra and this scaffold signature is temporary.
   commit(utxos: unknown): Promise<void>;
+
+  /**
+   * Sends the `Close` command to request closing the Hydra Head on-chain.
+   *
+   * Resolves once the `HeadIsClosed` server output is received. After this
+   * point, the contestation period begins and `fanout` becomes
+   * available once it expires.
+   *
+   * @example Promise API
+   * ```ts
+   * import { Head } from "@no-witness-labs/hydra-sdk";
+   *
+   * const head = await Head.create({ url: "ws://localhost:9944" });
+   * // ... perform off-chain transactions ...
+   * await head.close();
+   * console.log(head.getState()); // "Closed"
+   * ```
+   *
+   * @example Effect API
+   * ```ts
+   * import { Effect } from "effect";
+   * import { Head } from "@no-witness-labs/hydra-sdk";
+   *
+   * const program = Effect.gen(function* () {
+   *   const head = yield* Head.effect.create({ url: "ws://localhost:9944" });
+   *   yield* head.effect.close();
+   * });
+   * ```
+   */
   close(): Promise<void>;
+
+  /**
+   * Sends the `SafeClose` command to request closing the Hydra Head on-chain.
+   *
+   * Resolves once the `HeadIsClosed` server output is received, similar to
+   * {@link close}. This is intended as a higher-level, "safer" close
+   * operation, but currently behaves like `close` from the perspective of
+   * lifecycle events.
+   *
+   * > **Note:** `SafeClose` is scaffold-only and not part of the hydra-node
+   * > WebSocket protocol today. Any future behavior where it waits for
+   * > `FanoutPossible` before initiating a close is not yet implemented.
+   *
+   * @example Promise API
+   * ```ts
+   * import { Head } from "@no-witness-labs/hydra-sdk";
+   *
+   * const head = await Head.create({ url: "ws://localhost:9944" });
+   * await head.safeClose(); // sends SafeClose and waits for HeadIsClosed
+   * ```
+   *
+   * @example Effect API
+   * ```ts
+   * import { Effect } from "effect";
+   * import { Head } from "@no-witness-labs/hydra-sdk";
+   *
+   * const program = Effect.gen(function* () {
+   *   const head = yield* Head.effect.create({ url: "ws://localhost:9944" });
+   *   yield* head.effect.safeClose();
+   * });
+   * ```
+   */
   safeClose(): Promise<void>;
+
+  /**
+   * Fans out the final UTxO set to the L1 chain after the contestation period
+   * expires.
+   *
+   * Internally calls `HydraHead.effect.awaitReadyToFanout` to wait for
+   * the `ReadyToFanout` event before sending the `Fanout` command. Resolves
+   * once `HeadIsFinalized` is received.
+   *
+   * @example Promise API
+   * ```ts
+   * import { Head } from "@no-witness-labs/hydra-sdk";
+   *
+   * const head = await Head.create({ url: "ws://localhost:9944" });
+   * await head.close();
+   * await head.fanout(); // waits for ReadyToFanout then fans out
+   * console.log(head.getState()); // "Final"
+   * ```
+   *
+   * @example Effect API
+   * ```ts
+   * import { Effect } from "effect";
+   * import { Head } from "@no-witness-labs/hydra-sdk";
+   *
+   * const program = Effect.gen(function* () {
+   *   const head = yield* Head.effect.create({ url: "ws://localhost:9944" });
+   *   yield* head.effect.close();
+   *   yield* head.effect.fanout();
+   * });
+   * ```
+   */
   fanout(): Promise<void>;
+
+  /**
+   * Aborts the head initialization before it is finalized on-chain. Sends the
+   * `Abort` command and resolves once `HeadIsAborted` is received, returning the
+   * head to the `Aborted` state.
+   *
+   * @example Promise API
+   * ```ts
+   * import { Head } from "@no-witness-labs/hydra-sdk";
+   *
+   * const head = await Head.create({ url: "ws://localhost:9944" });
+   * await head.init();
+   * await head.abort(); // cancel before any funds are committed
+   * console.log(head.getState()); // "Aborted"
+   * ```
+   *
+   * @example Effect API
+   * ```ts
+   * import { Effect } from "effect";
+   * import { Head } from "@no-witness-labs/hydra-sdk";
+   *
+   * const program = Effect.gen(function* () {
+   *   const head = yield* Head.effect.create({ url: "ws://localhost:9944" });
+   *   yield* head.effect.init();
+   *   yield* head.effect.abort();
+   * });
+   * ```
+   */
   abort(): Promise<void>;
+
+  /**
+   * Registers a callback that is invoked for every `ServerOutput` event
+   * published by the head.
+   *
+   * Returns an `Unsubscribe` function. The subscription is backed by an
+   * internal PubSub with a sliding strategy (capacity 256), so slow consumers
+   * may miss events if they fall behind.
+   *
+   * @param callback - Function called with each incoming `ServerOutput`.
+   * @returns A function that cancels the subscription when called.
+   *
+   * @example
+   * ```ts
+   * import { Head } from "@no-witness-labs/hydra-sdk";
+   *
+   * const head = await Head.create({ url: "ws://localhost:9944" });
+   *
+   * const unsubscribe = head.subscribe((output) => {
+   *   console.log("event:", output.tag, output.payload);
+   * });
+   *
+   * await head.init();
+   *
+   * // Stop listening when done
+   * unsubscribe();
+   * await head.dispose();
+   * ```
+   */
   subscribe(callback: (event: ServerOutput) => void): Unsubscribe;
+
+  /**
+   * Returns an async iterator that yields each `ServerOutput` event in
+   * arrival order.
+   *
+   * The iterator holds a PubSub subscription open until the loop exits or
+   * the iterator is abandoned (via `return()` / garbage collection with
+   * `finally` cleanup).
+   *
+   * @example
+   * ```ts
+   * import { Head } from "@no-witness-labs/hydra-sdk";
+   *
+   * const head = await Head.create({ url: "ws://localhost:9944" });
+   *
+   * // Consume events until the head is finalized
+   * for await (const output of head.subscribeEvents()) {
+   *   console.log("event:", output.tag);
+   *   if (output.tag === "HeadIsFinalized") break;
+   * }
+   *
+   * await head.dispose();
+   * ```
+   */
   subscribeEvents(): AsyncIterableIterator<ServerOutput>;
+
+  /**
+   * Tears down the head instance: interrupts the projector fiber, shuts down
+   * the internal queues and PubSub hub, and closes the WebSocket transport.
+   *
+   * Calling `dispose` more than once is safe (idempotent). After disposal,
+   * all further operations will reject with a `HeadError`.
+   *
+   * @example Promise API
+   * ```ts
+   * import { Head } from "@no-witness-labs/hydra-sdk";
+   *
+   * const head = await Head.create({ url: "ws://localhost:9944" });
+   * await head.init();
+   * // ... do work ...
+   * await head.dispose();
+   * ```
+   *
+   * @example Effect API
+   * ```ts
+   * import { Effect } from "effect";
+   * import { Head } from "@no-witness-labs/hydra-sdk";
+   *
+   * const program = Effect.gen(function* () {
+   *   const head = yield* Head.effect.create({ url: "ws://localhost:9944" });
+   *   yield* head.effect.init();
+   *   yield* head.effect.dispose();
+   * });
+   * ```
+   */
   dispose(): Promise<void>;
 
+  /**
+   * Effect-native counterparts of every Promise API method, plus additional
+   * Effect-only operations (`events`, `awaitReadyToFanout`).
+   *
+   * All methods return `Effect.Effect<void, HeadError>` unless noted
+   * otherwise, making them composable with the full Effect ecosystem.
+   */
   readonly effect: {
     init(params?: InitParams): Effect.Effect<void, HeadError>;
     // TODO(protocol-schema): replace unknown with protocol Transaction type.
@@ -125,6 +570,28 @@ export interface HydraHead {
     close(): Effect.Effect<void, HeadError>;
     safeClose(): Effect.Effect<void, HeadError>;
     fanout(): Effect.Effect<void, HeadError>;
+    /**
+     * Waits for the head to reach the `FanoutPossible` state:
+     * - Returns immediately if the head is already in `FanoutPossible`.
+     * - Suspends until the `ReadyToFanout` event is received otherwise.
+     * - Fails immediately if the head is already `Final`.
+     *
+     * Call this before `fanout` when you need explicit control over the
+     * waiting step.
+     *
+     * @example
+     * ```ts
+     * import { Effect } from "effect";
+     * import { Head } from "@no-witness-labs/hydra-sdk";
+     *
+     * const program = Effect.gen(function* () {
+     *   const head = yield* Head.effect.create({ url: "ws://localhost:9944" });
+     *   yield* head.effect.close();
+     *   yield* head.effect.awaitReadyToFanout(); // suspends until contestation ends
+     *   yield* head.effect.fanout();
+     * });
+     * ```
+     */
     awaitReadyToFanout(): Effect.Effect<void, HeadError>;
     abort(): Effect.Effect<void, HeadError>;
     events(): Stream.Stream<ServerOutput>;
@@ -178,6 +645,12 @@ const matchServerTag = (
 // Core factory
 // ---------------------------------------------------------------------------
 
+/**
+ * Creates a new `HydraHead` instance based on the provided configuration.
+ *
+ * @param config configuration for the head, including WebSocket URL and reconnection settings.
+ * @returns An effect that, when run, yields a `HydraHead` instance or fails with a `HeadError`.
+ */
 const createEffect = (
   config: HeadConfig,
 ): Effect.Effect<HydraHead, HeadError> =>
@@ -512,20 +985,174 @@ const createEffect = (
 // ---------------------------------------------------------------------------
 // Scoped / Layer / convenience
 // ---------------------------------------------------------------------------
-
+/**
+ * Creates a scoped `Effect` that acquires a `HydraHead` and automatically
+ * disposes it when the scope closes.
+ *
+ * Intended for use with `Effect.scoped` or inside a scoped layer. For manual
+ * lifecycle management, prefer `effect.create`.
+ *
+ * @param config - Connection configuration.
+ * @returns An `Effect` that yields a `HydraHead` and ensures cleanup on scope exit.
+ */
 const createScopedEffect = (config: HeadConfig) =>
   Effect.acquireRelease(createEffect(config), (head) =>
     head.effect.dispose().pipe(Effect.orDie),
   );
 
+/**
+ * Effect-native factory functions for creating `HydraHead` instances.
+ *
+ * Prefer these over `create`/ `withHead` when composing with the
+ * Effect runtime, as they integrate with Effect's structured concurrency,
+ * resource management, and typed error channel.
+ *
+ * @category Constructors
+ *
+ * @example
+ * ```ts
+ * // effect.create — manual lifecycle
+ * import { Effect } from "effect";
+ * import { Head } from "@no-witness-labs/hydra-sdk";
+ *
+ * const program = Effect.gen(function* () {
+ *   const head = yield* Head.effect.create({ url: "ws://localhost:9944" });
+ *   yield* head.effect.init();
+ *   // ... do work ...
+ *   yield* head.effect.dispose();
+ * });
+ * ```
+ *
+ * @example
+ * ```ts
+ * // effect.createScoped — automatic disposal
+ * import { Effect } from "effect";
+ * import { Head } from "@no-witness-labs/hydra-sdk";
+ *
+ * const program = Effect.scoped(
+ *   Effect.gen(function* () {
+ *     const head = yield* Head.effect.createScoped({ url: "ws://localhost:9944" });
+ *     yield* head.effect.init();
+ *   }),
+ * );
+ * ```
+ */
 export const effect = {
+  /**
+   * Creates a `HydraHead` as an `Effect`.
+   *
+   * Caller is responsible for calling `head.effect.dispose()` when done.
+   * For automatic resource cleanup, prefer `effect.createScoped`.
+   *
+   * @param config - Connection configuration.
+   *
+   * @example
+   * ```ts
+   * import { Effect } from "effect";
+   * import { Head } from "@no-witness-labs/hydra-sdk";
+   *
+   * const program = Effect.gen(function* () {
+   *   const head = yield* Head.effect.create({ url: "ws://localhost:9944" });
+   *   yield* head.effect.init();
+   *   yield* head.effect.dispose();
+   * });
+   * ```
+   */
   create: createEffect,
+
+  /**
+   * Creates a `HydraHead` as a scoped `Effect` that automatically calls
+   * `head.effect.dispose()` when the enclosing `Scope` is closed.
+   *
+   * Intended to be used with `Effect.scoped` or inside a scoped layer.
+   *
+   * @param config - Connection configuration.
+   *
+   * @example
+   * ```ts
+   * import { Effect } from "effect";
+   * import { Head } from "@no-witness-labs/hydra-sdk";
+   *
+   * const program = Effect.scoped(
+   *   Effect.gen(function* () {
+   *     const head = yield* Head.effect.createScoped({ url: "ws://localhost:9944" });
+   *     yield* head.effect.init();
+   *     // dispose() runs automatically when Effect.scoped closes
+   *   }),
+   * );
+   *
+   * await Effect.runPromise(program);
+   * ```
+   */
   createScoped: createScopedEffect,
 };
 
+/**
+ * Creates a `HydraHead` connected to the given `config` and returns it
+ * as a `Promise`.
+ *
+ * You are responsible for calling `head.dispose()` when finished to release
+ * the WebSocket connection and internal resources. For automatic cleanup,
+ * prefer `withHead`.
+ *
+ * @category Constructors
+ *
+ * @param config - Connection and reconnection options.
+ * @returns A `Promise` that resolves to a connected `HydraHead` instance.
+ *
+ * @example
+ * ```ts
+ * import { Head } from "@no-witness-labs/hydra-sdk";
+ *
+ * async function example() {
+ *   const head = await Head.create({ url: "ws://localhost:9944" });
+ *   console.log(head.getState()); // "Idle"
+ *
+ *   await head.init();
+ *   console.log(head.getState()); // "Initializing"
+ *
+ *   await head.dispose();
+ * }
+ * ```
+ */
 export const create = (config: HeadConfig): Promise<HydraHead> =>
   Effect.runPromise(createEffect(config));
 
+/**
+ * Resource-safe bracket pattern for the Promise API.
+ *
+ * Creates a `HydraHead`, runs `body` with it, then unconditionally calls
+ * `head.dispose()`— even if `body` throws. Equivalent to
+ * `Effect.acquireRelease`/ `using` for imperative async code.
+ *
+ * @category Constructors
+ *
+ * @param config - Connection and reconnection options.
+ * @param body   - Async callback that receives the connected head and returns
+ *   a result value `A`.
+ * @returns A `Promise` that resolves to the value returned by `body`.
+ *
+ * @example
+ * ```ts
+ * import { Head } from "@no-witness-labs/hydra-sdk";
+ *
+ * async function example() {
+ *   const result = await Head.withHead(
+ *     { url: "ws://localhost:9944" },
+ *     async (head) => {
+ *       await head.init();
+ *       // ... do work ...
+ *       await head.close();
+ *       await head.fanout();
+ *       return head.getState(); // "Final"
+ *     },
+ *   );
+ *
+ *   console.log(result); // "Final"
+ *   // head.dispose() was called automatically
+ * }
+ * ```
+ */
 export const withHead = async <A>(
   config: HeadConfig,
   body: (head: HydraHead) => Promise<A>,
@@ -538,11 +1165,84 @@ export const withHead = async <A>(
   }
 };
 
+/**
+ * Effect `Context.Tag` for dependency-injecting a `HydraHead` through
+ * the Effect service layer.
+ *
+ * Use `layer` to construct a `Layer` that provides this service, then
+ * use `Effect.provideLayer` or `Effect.provide` to wire it into your program.
+ *
+ * @category Tags
+ *
+ * @example
+ * ```ts
+ * import { Effect } from "effect";
+ * import { Head } from "@no-witness-labs/hydra-sdk";
+ *
+ * const program = Effect.gen(function* () {
+ *   const head = yield* Head.HydraHeadService;
+ *   yield* head.effect.init();
+ *   console.log(head.getState()); // "Initializing"
+ * });
+ *
+ * const runnable = program.pipe(
+ *   Effect.provide(Head.layer({ url: "ws://localhost:9944" })),
+ * );
+ * ```
+ */
 export class HydraHeadService extends Context.Tag("HydraHeadService")<
   HydraHeadService,
   HydraHead
 >() {}
 
+/**
+ * Constructs an Effect `Layer` that provides a scoped `HydraHead`
+ * instance via the `HydraHeadService` tag.
+ *
+ * The head is created when the layer is built and automatically disposed when
+ * the layer's scope is released, making it safe for use with
+ * `ManagedRuntime` or application-level lifecycle management.
+ *
+ * @category layers
+ *
+ * @param config - Connection and reconnection options for the head.
+ * @returns A `Layer` providing `HydraHeadService`, failing with
+ *   `HeadError` on connection error.
+ *
+ * @example
+ * ```ts
+ * import { Effect, Layer } from "effect";
+ * import { Head } from "@no-witness-labs/hydra-sdk";
+ *
+ * const HeadLayer = Head.layer({ url: "ws://localhost:9944" });
+ *
+ * const program = Effect.gen(function* () {
+ *   const head = yield* Head.HydraHeadService;
+ *   yield* head.effect.init();
+ * });
+ *
+ * const runnable = program.pipe(Effect.provide(HeadLayer));
+ * ```
+ *
+ * @example
+ * ```ts
+ * // Composing with other layers
+ * import { Effect, Layer } from "effect";
+ * import { Head } from "@no-witness-labs/hydra-sdk";
+ *
+ * const AppLayer = Layer.mergeAll(
+ *   Head.layer({ url: "ws://localhost:9944" }),
+ *   // ... other service layers ...
+ * );
+ *
+ * const program = Effect.gen(function* () {
+ *   const head = yield* Head.HydraHeadService;
+ *   yield* head.effect.init();
+ * });
+ *
+ * const runnable = program.pipe(Effect.provide(AppLayer));
+ * ```
+ */
 export const layer = (
   config: HeadConfig,
 ): Layer.Layer<HydraHeadService, HeadError> =>
