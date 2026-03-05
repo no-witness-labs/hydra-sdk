@@ -11,6 +11,7 @@ import {
 } from "@evolution-sdk/evolution";
 import { makeTxBuilder } from "@evolution-sdk/evolution/sdk/builders/TransactionBuilder";
 import { Head, Provider } from "@no-witness-labs/hydra-sdk";
+import { Effect } from "effect";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 type HeadStatus = Head.HeadStatus;
@@ -38,7 +39,7 @@ function formatAda(lovelace: bigint): string {
   });
 }
 
-const { toHydraUtxoMap, fromHydraUtxoMap } = Provider;
+const { toHydraUtxoMap } = Provider;
 
 async function buildBlueprintTxCbor(
   selected: ReadonlyArray<UTxO.UTxO>,
@@ -77,17 +78,10 @@ function resolveHttpUrl(wsUrl: string): string {
   return import.meta.env.DEV ? "/hydra" : wsToHttp(wsUrl);
 }
 
-const ALLOWED: Record<string, ReadonlySet<HeadStatus>> = {
-  init: new Set(["Idle"]),
-  commit: new Set(["Initializing"]),
-  close: new Set(["Open"]),
-  fanout: new Set(["FanoutPossible"]),
-  abort: new Set(["Idle", "Initializing"]),
-};
-
 export default function HydraCommit({ walletApi }: Props) {
   const [url, setUrl] = useState(HYDRA_URL ?? "");
   const [head, setHead] = useState<Head.HydraHead | null>(null);
+  const [hydraProvider, setHydraProvider] = useState<Provider.HydraProvider | null>(null);
   const [status, setStatus] = useState<HeadStatus>("Idle");
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -124,13 +118,9 @@ export default function HydraCommit({ walletApi }: Props) {
   // -- Fetch L2 UTxOs ---------------------------------------------------------
 
   const fetchL2Utxos = useCallback(async () => {
-    const httpUrl = resolveHttpUrl(url);
-    const res = await fetch(`${httpUrl}/snapshot/utxo`);
-    if (!res.ok) {
-      throw new Error(`GET /snapshot/utxo failed (${res.status})`);
-    }
-    const utxoMap = await res.json();
-    const parsed = fromHydraUtxoMap(utxoMap);
+    if (!hydraProvider) throw new Error("HydraProvider not initialized");
+
+    const parsed = await hydraProvider.getSnapshotUtxos();
     setL2Utxos(parsed);
     const total = parsed.reduce(
       (sum, u) => sum + Assets.lovelaceOf(u.assets),
@@ -138,17 +128,17 @@ export default function HydraCommit({ walletApi }: Props) {
     );
     setL2Balance(total);
     appendLog("FetchedL2UTxOs", { count: parsed.length, totalAda: formatAda(total) });
-  }, [url, appendLog]);
+  }, [hydraProvider, appendLog]);
 
-  // Auto-fetch L2 UTxOs when head becomes Open
+  // Auto-fetch L2 UTxOs when head becomes Open; clear on other states
   useEffect(() => {
-    if (status === "Open") {
+    if (status === "Open" && hydraProvider) {
       fetchL2Utxos().catch(() => {});
-    } else {
+    } else if (status !== "Open") {
       setL2Utxos([]);
       setL2Balance(null);
     }
-  }, [status, fetchL2Utxos]);
+  }, [status, hydraProvider, fetchL2Utxos]);
 
   // -- Connect / Disconnect ---------------------------------------------------
 
@@ -156,34 +146,30 @@ export default function HydraCommit({ walletApi }: Props) {
     setError(null);
     try {
       const h = await Head.create({ url });
+      const httpUrl = resolveHttpUrl(url);
+      const provider = new Provider.HydraProvider({ head: h, httpUrl });
+
       headRef.current = h;
       setHead(h);
+      setHydraProvider(provider);
       setStatus(h.getState());
       appendLog("Connected", { url });
 
       h.subscribe((event) => {
         appendLog(event.tag, event.payload);
         setStatus(h.getState());
-
-        // Auto-refresh L2 UTxOs on snapshot events
-        if (
-          event.tag === "SnapshotConfirmed" ||
-          event.tag === "TxValid" ||
-          event.tag === "HeadIsOpen"
-        ) {
-          fetchL2Utxos().catch(() => {});
-        }
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [url, appendLog, fetchL2Utxos]);
+  }, [url, appendLog]);
 
   const handleDisconnect = useCallback(async () => {
     if (!headRef.current) return;
     await headRef.current.dispose();
     headRef.current = null;
     setHead(null);
+    setHydraProvider(null);
     setStatus("Idle");
     setUtxos(null);
     setL2Utxos([]);
@@ -235,12 +221,9 @@ export default function HydraCommit({ walletApi }: Props) {
   const handleL2Send = useCallback(
     () =>
       fireAction(async () => {
-        if (!head) throw new Error("Head not connected");
+        if (!hydraProvider) throw new Error("HydraProvider not initialized");
         const lovelace = BigInt(Math.round(parseFloat(sendAda) * 1_000_000));
         if (lovelace <= 0n) throw new Error("Amount must be > 0");
-
-        const httpUrl = resolveHttpUrl(url);
-        const hydraProvider = new Provider.HydraProvider({ head, httpUrl });
 
         // Resolve wallet address for change output
         const usedAddrs = await walletApi.getUsedAddresses();
@@ -249,20 +232,10 @@ export default function HydraCommit({ walletApi }: Props) {
         if (!addrHex) throw new Error("Wallet returned no addresses");
         const changeAddress = Address.fromHex(addrHex);
 
-        // Filter L2 UTxOs by wallet address (compare bech32 strings to avoid
-        // structural mismatch between Address.fromHex and Address.fromBech32)
-        const walletBech32 = Address.toBech32(changeAddress);
-        appendLog("L2Send:debug", {
-          walletHex: addrHex,
-          walletBech32,
-          l2Addresses: [...new Set(l2Utxos.map((u) => Address.toBech32(u.address)))],
-        });
-        const availableUtxos = l2Utxos.filter(
-          (u) => Address.toBech32(u.address) === walletBech32,
-        );
-        if (availableUtxos.length === 0) {
+        // L2 UTxOs already filtered by wallet address via fetchL2Utxos
+        if (l2Utxos.length === 0) {
           throw new Error(
-            `No L2 UTxOs found for ${walletBech32.slice(0, 20)}...`,
+            `No L2 UTxOs found for ${Address.toBech32(changeAddress).slice(0, 20)}...`,
           );
         }
 
@@ -284,7 +257,7 @@ export default function HydraCommit({ walletApi }: Props) {
             assets: Assets.fromLovelace(lovelace),
           })
           .addSigner({ keyHash: paymentCred as KeyHash.KeyHash })
-          .build({ changeAddress, availableUtxos, drainTo: 0 });
+          .build({ changeAddress, availableUtxos: l2Utxos, drainTo: 0 });
 
         const unsignedTx = await built.toTransaction();
         const unsignedCbor = Transaction.toCBORHex(unsignedTx);
@@ -301,7 +274,7 @@ export default function HydraCommit({ walletApi }: Props) {
         setSendAddr("");
         setSendAda("");
       }),
-    [head, url, sendAddr, sendAda, walletApi, l2Utxos, fireAction, appendLog],
+    [hydraProvider, sendAddr, sendAda, walletApi, l2Utxos, fireAction, appendLog],
   );
 
   // -- Fetch Wallet UTxOs -----------------------------------------------------
@@ -344,10 +317,7 @@ export default function HydraCommit({ walletApi }: Props) {
     () =>
       fireAction(async () => {
         const walletUtxos = utxos ?? [];
-        const httpBase = wsToHttp(url);
-        const commitUrl = import.meta.env.DEV
-          ? "/hydra/commit"
-          : `${httpBase}/commit`;
+        const httpUrl = resolveHttpUrl(url);
 
         const selected = walletUtxos.filter((_, i) => selectedUtxos.has(i));
         const hasWalletUtxos = selected.length > 0;
@@ -381,19 +351,9 @@ export default function HydraCommit({ walletApi }: Props) {
           commitBody = {};
         }
 
-        const res = await fetch(commitUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(commitBody),
-        });
-
-        if (!res.ok) {
-          throw new Error(
-            `POST /commit failed (${res.status}): ${await res.text()}`,
-          );
-        }
-
-        const draftTx = (await res.json()) as { cborHex: string; txId: string };
+        const draftTx = (await Effect.runPromise(
+          Provider.postCommit(httpUrl, commitBody),
+        )) as { cborHex: string; txId: string };
         appendLog("DraftTxReceived", { txId: draftTx.txId });
 
         let finalTxHex = draftTx.cborHex;
@@ -430,7 +390,13 @@ export default function HydraCommit({ walletApi }: Props) {
 
   // -- Render -----------------------------------------------------------------
 
-  const can = (action: string) => !submitting && head && ALLOWED[action]?.has(status);
+  // The SDK guards commands internally and throws on invalid state transitions.
+  // These checks are purely for UI button enable/disable.
+  const canInit = !submitting && head && status === "Idle";
+  const canCommit = !submitting && head && status === "Initializing";
+  const canClose = !submitting && head && status === "Open";
+  const canFanout = !submitting && head && status === "FanoutPossible";
+  const canAbort = !submitting && head && (status === "Idle" || status === "Initializing");
   const isOpen = status === "Open";
 
   return (
@@ -507,7 +473,7 @@ export default function HydraCommit({ walletApi }: Props) {
         <div className="flex flex-wrap gap-2">
           <button
             onClick={handleInit}
-            disabled={!can("init")}
+            disabled={!canInit}
             className="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium hover:bg-blue-700 disabled:opacity-30"
           >
             Init
@@ -521,28 +487,28 @@ export default function HydraCommit({ walletApi }: Props) {
           </button>
           <button
             onClick={handleCommit}
-            disabled={!can("commit")}
+            disabled={!canCommit}
             className="rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium hover:bg-emerald-700 disabled:opacity-30"
           >
             Commit{selectedUtxos.size > 0 ? ` (${selectedUtxos.size})` : ""}
           </button>
           <button
             onClick={handleClose}
-            disabled={!can("close")}
+            disabled={!canClose}
             className="rounded bg-amber-600 px-3 py-1.5 text-sm font-medium hover:bg-amber-700 disabled:opacity-30"
           >
             Close
           </button>
           <button
             onClick={handleFanout}
-            disabled={!can("fanout")}
+            disabled={!canFanout}
             className="rounded bg-purple-600 px-3 py-1.5 text-sm font-medium hover:bg-purple-700 disabled:opacity-30"
           >
             Fanout
           </button>
           <button
             onClick={handleAbort}
-            disabled={!can("abort")}
+            disabled={!canAbort}
             className="rounded bg-gray-600 px-3 py-1.5 text-sm font-medium hover:bg-gray-700 disabled:opacity-30"
           >
             Abort

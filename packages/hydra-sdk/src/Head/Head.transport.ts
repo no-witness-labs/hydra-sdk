@@ -259,13 +259,24 @@ const parseApiEvent = (raw: string): Effect.Effect<ApiEvent, HeadError> =>
         const inputTag =
           parseClientInputTag(clientInput?.tag) ??
           parseChainTxTag(postChainTx?.tag);
+
+        // PostTxOnChainFailed carries details in postTxError, not reason.
+        let reason: string | undefined;
+        if (typeof parsed.reason === "string") {
+          reason = parsed.reason;
+        } else if (
+          tag === "PostTxOnChainFailed" &&
+          parsed.postTxError != null
+        ) {
+          reason = `PostTxOnChainFailed: ${JSON.stringify(parsed.postTxError)}`;
+        }
+
         return {
           _tag: "ClientMessage",
           message: {
             tag,
             clientInputTag: inputTag,
-            reason:
-              typeof parsed.reason === "string" ? parsed.reason : undefined,
+            reason,
           },
         } satisfies ApiEvent;
       }

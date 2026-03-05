@@ -123,6 +123,12 @@ export class HydraProvider implements Provider {
     };
   }
 
+  /**
+   * Return every UTxO in the current L2 snapshot without address filtering.
+   */
+  getSnapshotUtxos = (): Promise<Array<UTxO.UTxO>> =>
+    Effect.runPromise(getAllUtxos(this.httpUrl));
+
   // Promise-based wrappers
   getProtocolParameters = () =>
     Effect.runPromise(this.Effect.getProtocolParameters());
