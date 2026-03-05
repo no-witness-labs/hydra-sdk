@@ -1,6 +1,27 @@
 import { useCardano } from "@cardano-foundation/cardano-connect-with-wallet";
 import { NetworkType } from "@cardano-foundation/cardano-connect-with-wallet-core";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
+
+/** Decode lovelace from a CIP-30 getBalance() CBOR hex string. */
+function decodeCborCoin(hex: string): bigint {
+  const bytes = new Uint8Array(
+    hex.match(/.{2}/g)!.map((b) => parseInt(b, 16)),
+  );
+  // Major type 4 (array) means multi-asset Value — first element is lovelace
+  const offset = (bytes[0]! >> 5) === 4 ? 1 : 0;
+  return readCborUint(bytes, offset);
+}
+
+function readCborUint(bytes: Uint8Array, offset: number): bigint {
+  const info = bytes[offset]! & 0x1f;
+  if (info <= 23) return BigInt(info);
+  const view = new DataView(bytes.buffer, bytes.byteOffset + offset + 1);
+  if (info === 24) return BigInt(view.getUint8(0));
+  if (info === 25) return BigInt(view.getUint16(0));
+  if (info === 26) return BigInt(view.getUint32(0));
+  if (info === 27) return view.getBigUint64(0);
+  return 0n;
+}
 
 interface Props {
   onApiReady: (api: CardanoWalletApi | null) => void;
@@ -12,16 +33,18 @@ export default function WalletConnect({ onApiReady }: Props) {
     isConnecting,
     enabledWallet,
     stakeAddress,
-    accountBalance,
     installedExtensions,
     connect,
     disconnect,
   } = useCardano({ limitNetwork: NetworkType.TESTNET });
 
+  const [balance, setBalance] = useState<bigint | null>(null);
+
   // When the wallet connects, enable the CIP-30 API and lift it to the parent
   useEffect(() => {
     if (!isConnected || !enabledWallet) {
       onApiReady(null);
+      setBalance(null);
       return;
     }
 
@@ -29,8 +52,11 @@ export default function WalletConnect({ onApiReady }: Props) {
 
     window.cardano?.[enabledWallet]
       ?.enable()
-      .then((api) => {
-        if (!cancelled) onApiReady(api);
+      .then(async (api) => {
+        if (cancelled) return;
+        onApiReady(api);
+        const balHex = await api.getBalance();
+        if (!cancelled) setBalance(decodeCborCoin(balHex));
       })
       .catch((err) => {
         console.error("Failed to enable wallet API:", err);
@@ -77,7 +103,9 @@ export default function WalletConnect({ onApiReady }: Props) {
 
           <p className="text-sm text-gray-400">
             <span className="text-gray-500">Balance:</span>{" "}
-            {(accountBalance / 1_000_000).toFixed(6)} ADA
+            {balance !== null
+              ? `${(Number(balance) / 1_000_000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })} ADA`
+              : "Loading…"}
           </p>
 
           <button

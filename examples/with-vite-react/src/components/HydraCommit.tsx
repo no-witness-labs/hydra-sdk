@@ -29,27 +29,17 @@ interface LogEntry {
 
 const HYDRA_URL = import.meta.env.VITE_HYDRA_NODE_URL as string | undefined;
 
-/** Derive the HTTP base URL from a ws:// or wss:// URL. */
 function wsToHttp(wsUrl: string): string {
   return wsUrl.replace(/^ws(s?):\/\//, "http$1://");
 }
 
-/** Check if url uses mock transport. */
-function isMock(wsUrl: string): boolean {
-  return wsUrl.startsWith("mock://");
-}
-
-
-/** Format lovelace as ADA with 6 decimal places. */
 function formatAda(lovelace: bigint): string {
-  const ada = Number(lovelace) / 1_000_000;
-  return ada.toLocaleString(undefined, {
+  return (Number(lovelace) / 1_000_000).toLocaleString(undefined, {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   });
 }
 
-/** Build a Hydra-compatible UTxO map from evolution-sdk UTxOs. */
 function buildHydraUtxoMap(
   selected: ReadonlyArray<UTxO.UTxO>,
 ): Record<string, Record<string, unknown>> {
@@ -59,7 +49,6 @@ function buildHydraUtxoMap(
     const key = `${txHash}#${u.index}`;
     const bech32Addr = Address.toBech32(u.address);
 
-    // Build value object
     const lovelace = Assets.lovelaceOf(u.assets);
     const value: Record<string, unknown> = { lovelace: Number(lovelace) };
     for (const [pid, name, qty] of Assets.flatten(u.assets)) {
@@ -69,7 +58,6 @@ function buildHydraUtxoMap(
       (value[pidHex] as Record<string, number>)[nameHex] = Number(qty);
     }
 
-    // Datum info
     let datumHash: string | null = null;
     let inlineDatumCbor: string | null = null;
     if (u.datumOption) {
@@ -95,7 +83,6 @@ function buildHydraUtxoMap(
   return utxoMap;
 }
 
-/** Build a blueprint transaction CBOR hex using evolution-sdk's transaction builder. */
 async function buildBlueprintTxCbor(
   selected: ReadonlyArray<UTxO.UTxO>,
   walletApi: CardanoWalletApi,
@@ -120,13 +107,6 @@ async function buildBlueprintTxCbor(
   return Transaction.toCBORHex(tx);
 }
 
-/**
- * Sign a draft commit transaction from hydra-node using the CIP-30 wallet.
- *
- * Uses byte-level witness merging (like CML): the wallet's vkey witnesses
- * are spliced directly into the raw transaction CBOR. Body, redeemers,
- * datums, scripts, and all other bytes are preserved verbatim.
- */
 async function signDraftCommitTx(
   draftTxHex: string,
   walletApi: CardanoWalletApi,
@@ -135,10 +115,6 @@ async function signDraftCommitTx(
   return Transaction.addVKeyWitnessesHex(draftTxHex, walletWitnessHex);
 }
 
-/**
- * Valid actions per FSM state. Buttons are disabled unless the current
- * state is listed for the action.
- */
 const ALLOWED: Record<string, ReadonlySet<HeadStatus>> = {
   init: new Set(["Idle"]),
   commit: new Set(["Initializing"]),
@@ -148,19 +124,15 @@ const ALLOWED: Record<string, ReadonlySet<HeadStatus>> = {
 };
 
 export default function HydraCommit({ walletApi }: Props) {
-  const [url, setUrl] = useState(HYDRA_URL ?? "mock://test");
+  const [url, setUrl] = useState(HYDRA_URL ?? "");
   const [head, setHead] = useState<Head.HydraHead | null>(null);
   const [status, setStatus] = useState<HeadStatus>("Idle");
-  const [logs, setLogs] = useState<Array<LogEntry>>([]);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [utxos, setUtxos] = useState<ReadonlyArray<UTxO.UTxO> | null>(null);
   const [selectedUtxos, setSelectedUtxos] = useState<Set<number>>(new Set());
-  const [busy, setBusy] = useState(false);
-  const [busyLabel, setBusyLabel] = useState<string | null>(null);
-  const [contestationDeadline, setContestationDeadline] = useState<Date | null>(
-    null,
-  );
-  const [countdown, setCountdown] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [walletBalance, setWalletBalance] = useState<bigint | null>(null);
 
   const headRef = useRef<Head.HydraHead | null>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
@@ -170,69 +142,34 @@ export default function HydraCommit({ walletApi }: Props) {
     logEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [logs]);
 
-  // Countdown timer for contestation period
-  useEffect(() => {
-    if (!contestationDeadline) return;
-    const tick = () => {
-      const remaining = contestationDeadline.getTime() - Date.now();
-      if (remaining <= 0) {
-        setCountdown(null);
-        setContestationDeadline(null);
-        return;
-      }
-      const mins = Math.floor(remaining / 60_000);
-      const secs = Math.floor((remaining % 60_000) / 1000);
-      setCountdown(`${mins}:${secs.toString().padStart(2, "0")}`);
-    };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [contestationDeadline]);
-
   const appendLog = useCallback((tag: string, payload?: unknown) => {
     setLogs((prev) => [...prev, { ts: Date.now(), tag, payload }]);
   }, []);
 
-  // -- Connect / Disconnect to Hydra node ------------------------------------
+  // Poll status every 500ms as backup to subscription
+  useEffect(() => {
+    if (!head) return;
+    const id = setInterval(() => setStatus(head.getState()), 500);
+    return () => clearInterval(id);
+  }, [head]);
+
+  // -- Connect / Disconnect ---------------------------------------------------
 
   const handleConnect = useCallback(async () => {
     setError(null);
-    setBusy(true);
     try {
       const h = await Head.create({ url });
       headRef.current = h;
       setHead(h);
+      setStatus(h.getState());
       appendLog("Connected", { url });
 
-      // Subscribe to future events.
       h.subscribe((event) => {
         appendLog(event.tag, event.payload);
         setStatus(h.getState());
-
-        // Capture contestation deadline from HeadIsClosed event
-        const p = event.payload as Record<string, unknown> | undefined;
-        if (event.tag === "HeadIsClosed" && p?.contestationDeadline) {
-          setContestationDeadline(new Date(p.contestationDeadline as string));
-        }
-        // Clear deadline when head transitions past Closed
-        if (event.tag === "ReadyToFanout" || event.tag === "HeadIsFinalized") {
-          setContestationDeadline(null);
-          setCountdown(null);
-        }
       });
-
-      // Poll getState() until it changes from Idle (Greetings syncs the real
-      // state) or until we've waited long enough.
-      for (let i = 0; i < 10; i++) {
-        await new Promise((r) => setTimeout(r, 200));
-        const s = h.getState();
-        setStatus(s);
-        if (s !== "Idle") break;
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
     }
   }, [url, appendLog]);
 
@@ -246,58 +183,95 @@ export default function HydraCommit({ walletApi }: Props) {
     appendLog("Disconnected");
   }, [appendLog]);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      headRef.current?.dispose();
-    };
+  useEffect(() => () => {
+    headRef.current?.dispose();
   }, []);
 
-  // -- Lifecycle actions ------------------------------------------------------
+  // -- Fire-and-forget actions ------------------------------------------------
 
-  const run = useCallback(async (label: string, fn: () => Promise<void>) => {
-    setError(null);
-    setBusy(true);
-    setBusyLabel(label);
-    try {
-      await fn();
-      if (headRef.current) setStatus(headRef.current.getState());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-      setBusyLabel(null);
-    }
-  }, []);
+  const fireAction = useCallback(
+    (fn: () => Promise<void>) => {
+      setError(null);
+      setSubmitting(true);
+      fn()
+        .catch((err) => {
+          setError(err instanceof Error ? err.message : String(err));
+        })
+        .finally(() => setSubmitting(false));
+    },
+    [],
+  );
 
   const handleInit = useCallback(
-    () => run("Initializing head on L1...", () => head!.init()),
-    [head, run],
+    () => fireAction(() => head!.init()),
+    [head, fireAction],
   );
+
+  const handleClose = useCallback(
+    () => fireAction(() => head!.close()),
+    [head, fireAction],
+  );
+
+  const handleFanout = useCallback(
+    () => fireAction(() => head!.fanout()),
+    [head, fireAction],
+  );
+
+  const handleAbort = useCallback(
+    () => fireAction(() => head!.abort()),
+    [head, fireAction],
+  );
+
+  // -- Fetch UTxOs ------------------------------------------------------------
+
+  const fetchUtxos = useCallback(async () => {
+    const blockfrostKey = import.meta.env
+      .VITE_BLOCKFROST_KEY_PREPROD as string;
+    const client = createClient({
+      network: "preprod",
+      provider: {
+        type: "blockfrost",
+        baseUrl: "https://cardano-preprod.blockfrost.io/api/v0",
+        projectId: blockfrostKey,
+      },
+      wallet: { type: "api" as const, api: walletApi as never },
+    });
+    const result = await client.getWalletUtxos();
+    setUtxos(result);
+    setSelectedUtxos(new Set());
+    const totalLovelace = result.reduce(
+      (sum, u) => sum + Assets.lovelaceOf(u.assets),
+      0n,
+    );
+    setWalletBalance(totalLovelace);
+    appendLog("FetchedUTxOs", { count: result.length });
+  }, [walletApi, appendLog]);
+
+  const handleFetchUtxos = useCallback(async () => {
+    setError(null);
+    try {
+      await fetchUtxos();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, [fetchUtxos]);
+
+  // -- Commit -----------------------------------------------------------------
 
   const handleCommit = useCallback(
     () =>
-      run("Committing to head...", async () => {
+      fireAction(async () => {
         const walletUtxos = utxos ?? [];
-
-        if (isMock(url)) {
-          await head!.commit(walletUtxos);
-          return;
-        }
-
         const httpBase = wsToHttp(url);
         const commitUrl = import.meta.env.DEV
           ? "/hydra/commit"
           : `${httpBase}/commit`;
 
-        // Build commit payload from selected UTxOs
         const selected = walletUtxos.filter((_, i) => selectedUtxos.has(i));
         const hasWalletUtxos = selected.length > 0;
 
-        // Build blueprint commit request body
         let commitBody: unknown;
         if (hasWalletUtxos) {
-          // Pick an unselected UTxO with >= 2 ADA as a fee UTxO (like the reference impl)
           const feeUtxo = walletUtxos.find(
             (u, i) =>
               !selectedUtxos.has(i) &&
@@ -305,18 +279,11 @@ export default function HydraCommit({ walletApi }: Props) {
           );
           if (!feeUtxo) {
             throw new Error(
-              "No unselected UTxO with >= 2 ADA available for fee coverage. " +
-                "Please deselect one UTxO to use for fees.",
+              "No unselected UTxO with >= 2 ADA available for fee coverage.",
             );
           }
 
           const allUtxos = [...selected, feeUtxo];
-          const feeHash = TransactionHash.toHex(feeUtxo.transactionId);
-          appendLog("BuildingBlueprintTx", {
-            commitUtxos: selected.length,
-            feeUtxo: `${feeHash.slice(0, 8)}...#${feeUtxo.index}`,
-          });
-
           const blueprintCbor = await buildBlueprintTxCbor(allUtxos, walletApi);
           const utxoMap = buildHydraUtxoMap(allUtxos);
 
@@ -329,23 +296,9 @@ export default function HydraCommit({ walletApi }: Props) {
             utxo: utxoMap,
           };
         } else {
-          // Empty commit (no UTxOs)
           commitBody = {};
         }
 
-        // Log full commit request for debugging
-        console.log(
-          "[Commit] Full request body:",
-          JSON.stringify(commitBody, null, 2),
-        );
-
-        appendLog("CommitRequest", {
-          endpoint: commitUrl,
-          utxoCount: selected.length,
-          format: hasWalletUtxos ? "blueprint" : "empty",
-        });
-
-        // 1. POST blueprint commit to Hydra → draft commit tx
         const res = await fetch(commitUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -353,77 +306,27 @@ export default function HydraCommit({ walletApi }: Props) {
         });
 
         if (!res.ok) {
-          const body = await res.text();
-          throw new Error(`POST /commit failed (${res.status}): ${body}`);
+          throw new Error(
+            `POST /commit failed (${res.status}): ${await res.text()}`,
+          );
         }
 
         const draftTx = (await res.json()) as { cborHex: string; txId: string };
         appendLog("DraftTxReceived", { txId: draftTx.txId });
 
         let finalTxHex = draftTx.cborHex;
-
         if (hasWalletUtxos) {
-          // 2. Sign draft tx with wallet and assemble
-          appendLog("RequestingWalletSignature");
           finalTxHex = await signDraftCommitTx(draftTx.cborHex, walletApi);
-          appendLog("TxSigned");
         }
 
-        // 4. Submit the final tx to Cardano L1
-        appendLog("SubmittingTx", { txLen: finalTxHex.length });
-        try {
-          const submittedTxId = await walletApi.submitTx(finalTxHex);
-          appendLog("TxSubmitted", { txId: submittedTxId });
-        } catch (submitErr: unknown) {
-          appendLog("SubmitFailed", {
-            error: String(submitErr),
-            detail: JSON.stringify(submitErr),
-          });
-          throw submitErr;
-        }
+        const submittedTxId = await walletApi.submitTx(finalTxHex);
+        appendLog("TxSubmitted", { txId: submittedTxId });
+
+        // Refresh UTxOs after commit (Blockfrost may lag a few seconds)
+        setTimeout(() => fetchUtxos().catch(() => {}), 3000);
       }),
-    [head, url, utxos, selectedUtxos, walletApi, run, appendLog],
+    [url, utxos, selectedUtxos, walletApi, fireAction, appendLog, fetchUtxos],
   );
-
-  const handleClose = useCallback(
-    () => run("Closing head on L1...", () => head!.close()),
-    [head, run],
-  );
-
-  const handleFanout = useCallback(
-    () => run("Fanning out on L1...", () => head!.fanout()),
-    [head, run],
-  );
-
-  const handleAbort = useCallback(
-    () => run("Aborting head on L1...", () => head!.abort()),
-    [head, run],
-  );
-
-  // -- Fetch UTxOs from wallet ------------------------------------------------
-
-  const handleFetchUtxos = useCallback(async () => {
-    setError(null);
-    try {
-      const blockfrostKey = import.meta.env
-        .VITE_BLOCKFROST_KEY_PREPROD as string;
-      const client = createClient({
-        network: "preprod",
-        provider: {
-          type: "blockfrost",
-          baseUrl: "https://cardano-preprod.blockfrost.io/api/v0",
-          projectId: blockfrostKey,
-        },
-        wallet: { type: "api" as const, api: walletApi as never },
-      });
-      const result = await client.getWalletUtxos();
-      setUtxos(result);
-      setSelectedUtxos(new Set());
-      appendLog("FetchedUTxOs", { count: result.length });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-  }, [walletApi, appendLog]);
 
   const toggleUtxo = useCallback((idx: number) => {
     setSelectedUtxos((prev) => {
@@ -443,19 +346,11 @@ export default function HydraCommit({ walletApi }: Props) {
 
   // -- Render -----------------------------------------------------------------
 
-  const can = (action: string) => !busy && head && ALLOWED[action]?.has(status);
+  const can = (action: string) => !submitting && head && ALLOWED[action]?.has(status);
 
   return (
     <section className="space-y-4 rounded-lg border border-gray-800 bg-gray-900 p-5">
       <h2 className="text-lg font-medium">Hydra Head</h2>
-
-      {/* Note about commit */}
-      <p className="rounded bg-yellow-900/30 px-3 py-2 text-xs text-yellow-300">
-        <strong>Note:</strong> With <code>mock://</code> the full lifecycle
-        works instantly. With a real <code>ws://</code> node, Commit calls{" "}
-        <code>POST /commit</code>, then asks your wallet to sign &amp; submit
-        the draft tx on-chain.
-      </p>
 
       {/* Connection */}
       {!head ? (
@@ -468,13 +363,13 @@ export default function HydraCommit({ walletApi }: Props) {
               type="text"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="ws://localhost:4001 or mock://test"
+              placeholder="ws://localhost:4001"
               className="w-full rounded border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm focus:border-indigo-500 focus:outline-none"
             />
           </label>
           <button
             onClick={handleConnect}
-            disabled={busy || !url}
+            disabled={!url}
             className="rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
           >
             Connect
@@ -497,41 +392,19 @@ export default function HydraCommit({ walletApi }: Props) {
         </div>
       )}
 
-      {/* Status + Loading */}
+      {/* Status */}
       {head && (
         <div className="flex items-center gap-3">
           <span className="text-sm text-gray-400">State:</span>
           <span className="rounded bg-gray-800 px-2 py-0.5 text-sm font-mono font-medium">
             {status}
           </span>
-          {countdown &&
-            (status === "Closed" || status === "FanoutPossible") && (
-              <span className="rounded bg-amber-900/40 px-2 py-0.5 text-sm font-mono text-amber-300">
-                Fanout in {countdown}
-              </span>
-            )}
-          {busyLabel && (
-            <span className="flex items-center gap-2 text-sm text-yellow-300">
-              <svg
-                className="h-4 w-4 animate-spin"
-                viewBox="0 0 24 24"
-                fill="none"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                />
-              </svg>
-              {busyLabel}
+          {submitting && (
+            <span className="text-sm text-yellow-300">Submitting…</span>
+          )}
+          {walletBalance !== null && (
+            <span className="ml-auto text-sm text-gray-400">
+              Wallet: <span className="text-emerald-400 font-medium">{formatAda(walletBalance)} ADA</span>
             </span>
           )}
         </div>
@@ -549,7 +422,7 @@ export default function HydraCommit({ walletApi }: Props) {
           </button>
           <button
             onClick={handleFetchUtxos}
-            disabled={busy}
+            disabled={submitting}
             className="rounded bg-teal-600 px-3 py-1.5 text-sm font-medium hover:bg-teal-700 disabled:opacity-30"
           >
             Fetch UTxOs ({utxos?.length ?? "–"})
