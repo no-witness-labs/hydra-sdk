@@ -3,11 +3,13 @@ import {
   Address,
   Assets,
   createClient,
+  KeyHash,
   PolicyId,
   AssetName,
   Transaction,
   TransactionHash,
 } from "@evolution-sdk/evolution";
+import { makeTxBuilder } from "@evolution-sdk/evolution/sdk/builders/TransactionBuilder";
 import { Head, Provider } from "@no-witness-labs/hydra-sdk";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -97,6 +99,8 @@ export default function HydraCommit({ walletApi }: Props) {
   // L2 state
   const [l2Utxos, setL2Utxos] = useState<ReadonlyArray<UTxO.UTxO>>([]);
   const [l2Balance, setL2Balance] = useState<bigint | null>(null);
+  const [sendAddr, setSendAddr] = useState("");
+  const [sendAda, setSendAda] = useState("");
 
   const headRef = useRef<Head.HydraHead | null>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
@@ -224,6 +228,80 @@ export default function HydraCommit({ walletApi }: Props) {
   const handleAbort = useCallback(
     () => fireAction(() => head!.abort()),
     [head, fireAction],
+  );
+
+  // -- L2 Send ----------------------------------------------------------------
+
+  const handleL2Send = useCallback(
+    () =>
+      fireAction(async () => {
+        if (!head) throw new Error("Head not connected");
+        const lovelace = BigInt(Math.round(parseFloat(sendAda) * 1_000_000));
+        if (lovelace <= 0n) throw new Error("Amount must be > 0");
+
+        const httpUrl = resolveHttpUrl(url);
+        const hydraProvider = new Provider.HydraProvider({ head, httpUrl });
+
+        // Resolve wallet address for change output
+        const usedAddrs = await walletApi.getUsedAddresses();
+        const unusedAddrs = await walletApi.getUnusedAddresses();
+        const addrHex = usedAddrs[0] ?? unusedAddrs[0];
+        if (!addrHex) throw new Error("Wallet returned no addresses");
+        const changeAddress = Address.fromHex(addrHex);
+
+        // Filter L2 UTxOs by wallet address (compare bech32 strings to avoid
+        // structural mismatch between Address.fromHex and Address.fromBech32)
+        const walletBech32 = Address.toBech32(changeAddress);
+        appendLog("L2Send:debug", {
+          walletHex: addrHex,
+          walletBech32,
+          l2Addresses: [...new Set(l2Utxos.map((u) => Address.toBech32(u.address)))],
+        });
+        const availableUtxos = l2Utxos.filter(
+          (u) => Address.toBech32(u.address) === walletBech32,
+        );
+        if (availableUtxos.length === 0) {
+          throw new Error(
+            `No L2 UTxOs found for ${walletBech32.slice(0, 20)}...`,
+          );
+        }
+
+        // Extract payment key hash so the wallet knows it must sign
+        const paymentCred = changeAddress.paymentCredential;
+        if (paymentCred._tag !== "KeyHash") {
+          throw new Error("Script addresses are not supported for L2 sends");
+        }
+
+        // Build unsigned tx (drainTo merges leftover into output instead of
+        // requiring a separate change output — important on L2 where fees=0
+        // and the user may be sending their full balance)
+        const built = await makeTxBuilder({
+          provider: hydraProvider,
+          network: "Preprod",
+        })
+          .payToAddress({
+            address: Address.fromBech32(sendAddr),
+            assets: Assets.fromLovelace(lovelace),
+          })
+          .addSigner({ keyHash: paymentCred as KeyHash.KeyHash })
+          .build({ changeAddress, availableUtxos, drainTo: 0 });
+
+        const unsignedTx = await built.toTransaction();
+        const unsignedCbor = Transaction.toCBORHex(unsignedTx);
+
+        // Sign with CIP-30 wallet (partialSign=true)
+        const witnessHex = await walletApi.signTx(unsignedCbor, true);
+        const signedCbor = Transaction.addVKeyWitnessesHex(unsignedCbor, witnessHex);
+        const signedTx = Transaction.fromCBORHex(signedCbor);
+
+        // Submit to Hydra head via provider (NewTx over WebSocket)
+        const txHash = await hydraProvider.submitTx(signedTx);
+
+        appendLog("L2TxSubmitted", { txHash: TransactionHash.toHex(txHash) });
+        setSendAddr("");
+        setSendAda("");
+      }),
+    [head, url, sendAddr, sendAda, walletApi, l2Utxos, fireAction, appendLog],
   );
 
   // -- Fetch Wallet UTxOs -----------------------------------------------------
@@ -509,48 +587,77 @@ export default function HydraCommit({ walletApi }: Props) {
               <span className="mb-1 block text-xs text-gray-500">
                 UTxOs ({l2Utxos.length})
               </span>
-              <div className="max-h-40 overflow-y-auto rounded border border-cyan-900/30 bg-gray-950 p-2 text-xs">
+              <div className="max-h-60 overflow-y-auto rounded border border-cyan-900/30 bg-gray-950 p-2 text-xs">
                 {l2Utxos.map((u, i) => {
                   const txHash = TransactionHash.toHex(u.transactionId);
                   const lovelace = Assets.lovelaceOf(u.assets);
                   const tokens = Assets.flatten(u.assets);
+                  const addr = Address.toBech32(u.address);
                   return (
                     <div
                       key={i}
-                      className="flex items-start gap-2 rounded px-2 py-1 hover:bg-gray-800"
+                      className="space-y-0.5 rounded px-2 py-1.5 hover:bg-gray-800"
                     >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-gray-400">
-                            {txHash.slice(0, 8)}...
-                            {txHash.slice(-8)}#{Number(u.index)}
-                          </span>
-                          <span className="font-medium text-cyan-400">
-                            {formatAda(lovelace)} ADA
-                          </span>
-                        </div>
-                        {tokens.length > 0 && (
-                          <div className="mt-0.5 flex flex-wrap gap-1">
-                            {tokens.map(([pid, name, qty], j) => {
-                              const pidHex = PolicyId.toHex(pid);
-                              const nameHex = AssetName.toHex(name);
-                              return (
-                                <span
-                                  key={j}
-                                  className="inline-block rounded bg-cyan-900/40 px-1.5 py-0.5 text-cyan-300"
-                                  title={`${pidHex}.${nameHex}`}
-                                >
-                                  {nameHex || pidHex.slice(0, 8)}
-                                  {qty > 1n ? ` x${qty.toString()}` : ""}
-                                </span>
-                              );
-                            })}
-                          </div>
-                        )}
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-gray-400 break-all">
+                          {txHash}#{Number(u.index)}
+                        </span>
+                        <span className="shrink-0 font-medium text-cyan-400">
+                          {formatAda(lovelace)} ADA
+                        </span>
                       </div>
+                      <div className="font-mono text-gray-500 break-all">
+                        {addr}
+                      </div>
+                      {tokens.length > 0 && (
+                        <div className="mt-0.5 flex flex-wrap gap-1">
+                          {tokens.map(([pid, name, qty], j) => {
+                            const pidHex = PolicyId.toHex(pid);
+                            const nameHex = AssetName.toHex(name);
+                            return (
+                              <span
+                                key={j}
+                                className="inline-block rounded bg-cyan-900/40 px-1.5 py-0.5 text-cyan-300"
+                                title={`${pidHex}.${nameHex}`}
+                              >
+                                {nameHex || pidHex.slice(0, 8)}
+                                {qty > 1n ? ` x${qty.toString()}` : ""}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
+              </div>
+            </div>
+
+            {/* L2 Send */}
+            <div className="space-y-2">
+              <span className="block text-xs text-gray-500">Send on L2</span>
+              <input
+                type="text"
+                value={sendAddr}
+                onChange={(e) => setSendAddr(e.target.value)}
+                placeholder="Recipient address (addr_test1...)"
+                className="w-full rounded border border-cyan-900/40 bg-gray-950 px-3 py-1.5 text-sm focus:border-cyan-500 focus:outline-none"
+              />
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={sendAda}
+                  onChange={(e) => setSendAda(e.target.value)}
+                  placeholder="Amount (ADA)"
+                  className="flex-1 rounded border border-cyan-900/40 bg-gray-950 px-3 py-1.5 text-sm focus:border-cyan-500 focus:outline-none"
+                />
+                <button
+                  onClick={handleL2Send}
+                  disabled={submitting || !sendAddr || !sendAda}
+                  className="rounded bg-cyan-600 px-4 py-1.5 text-sm font-medium hover:bg-cyan-700 disabled:opacity-30"
+                >
+                  Send
+                </button>
               </div>
             </div>
           </div>

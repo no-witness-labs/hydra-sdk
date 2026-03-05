@@ -170,34 +170,55 @@ export class HydraProvider implements Provider {
 // Effect implementations
 // ---------------------------------------------------------------------------
 
+/**
+ * Safely extract a lovelace value from a field that may be either a flat
+ * number/bigint or an object with a `lovelace` property (hydra-node v1.2.0
+ * returns flat numbers).
+ */
+const lovelaceOf = (v: unknown): bigint => {
+  if (typeof v === "bigint") return v;
+  if (typeof v === "number") return BigInt(v);
+  if (typeof v === "object" && v !== null && "lovelace" in v)
+    return BigInt((v as { lovelace: number }).lovelace);
+  return 0n;
+};
+
 const getProtocolParametersEffect = (
   httpUrl: string,
 ): Effect.Effect<ProtocolParameters, ProviderError> =>
   wrapError(
     getProtocolParametersHttp(httpUrl).pipe(
-      Effect.map((pp) => ({
-        minFeeA: pp.txFeePerByte,
-        minFeeB: pp.txFeeFixed.lovelace,
-        maxTxSize: pp.maxTxSize,
-        maxValSize: pp.maxValueSize,
-        keyDeposit: BigInt(pp.stakeAddressDeposit.lovelace),
-        poolDeposit: BigInt(pp.stakePoolDeposit.lovelace),
-        drepDeposit: 0n,
-        govActionDeposit: 0n,
-        priceMem: extractPriceMem(pp.executionUnitPrices),
-        priceStep: extractPriceStep(pp.executionUnitPrices),
-        maxTxExMem: BigInt(pp.maxTxExecutionUnits.memory),
-        maxTxExSteps: BigInt(pp.maxTxExecutionUnits.cpu),
-        coinsPerUtxoByte: BigInt(pp.utxoConstPerByte.lovelace),
-        collateralPercentage: pp.collateralPercentage,
-        maxCollateralInputs: pp.maxCollateralInputs,
-        minFeeRefScriptCostPerByte: 0,
-        costModels: {
-          PlutusV1: arrayToIndexedRecord(pp.costModels.PlutusV1),
-          PlutusV2: arrayToIndexedRecord(pp.costModels.PlutusV2),
-          PlutusV3: arrayToIndexedRecord(pp.costModels.PlutusV3),
-        },
-      })),
+      Effect.map((pp) => {
+        const raw = pp as Record<string, unknown>;
+        const execUnits = pp.maxTxExecutionUnits as Record<string, unknown>;
+        return {
+          minFeeA: pp.txFeePerByte,
+          minFeeB: Number(lovelaceOf(raw.txFeeFixed)),
+          maxTxSize: pp.maxTxSize,
+          maxValSize: pp.maxValueSize ?? (raw.maxValueSize as number) ?? 5000,
+          keyDeposit: lovelaceOf(raw.stakeAddressDeposit),
+          poolDeposit: lovelaceOf(raw.stakePoolDeposit),
+          drepDeposit: 0n,
+          govActionDeposit: 0n,
+          priceMem: extractPriceMem(pp.executionUnitPrices),
+          priceStep: extractPriceStep(pp.executionUnitPrices),
+          maxTxExMem: BigInt(execUnits.memory as number),
+          maxTxExSteps: BigInt(
+            (execUnits.steps ?? execUnits.cpu) as number,
+          ),
+          coinsPerUtxoByte: lovelaceOf(
+            raw.utxoCostPerByte ?? raw.utxoConstPerByte,
+          ),
+          collateralPercentage: pp.collateralPercentage,
+          maxCollateralInputs: pp.maxCollateralInputs,
+          minFeeRefScriptCostPerByte: 0,
+          costModels: {
+            PlutusV1: arrayToIndexedRecord(pp.costModels.PlutusV1),
+            PlutusV2: arrayToIndexedRecord(pp.costModels.PlutusV2),
+            PlutusV3: arrayToIndexedRecord(pp.costModels.PlutusV3),
+          },
+        };
+      }),
     ),
     "Failed to fetch protocol parameters",
   );
