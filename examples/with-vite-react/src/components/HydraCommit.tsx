@@ -1,4 +1,3 @@
-import * as CML from "@dcspark/cardano-multiplatform-lib-browser";
 import type { InlineDatum, UTxO } from "@evolution-sdk/evolution";
 import {
   Address,
@@ -124,55 +123,16 @@ async function buildBlueprintTxCbor(
 /**
  * Sign a draft commit transaction from hydra-node using the CIP-30 wallet.
  *
- * Uses CML (Cardano Multiplatform Library) to parse and re-serialize the
- * transaction. CML preserves the exact byte encoding of the tx body and
- * witness set, which is critical because the scriptDataHash depends on the
- * raw redeemer CBOR bytes.
+ * Uses byte-level witness merging (like CML): the wallet's vkey witnesses
+ * are spliced directly into the raw transaction CBOR. Body, redeemers,
+ * datums, scripts, and all other bytes are preserved verbatim.
  */
 async function signDraftCommitTx(
   draftTxHex: string,
   walletApi: CardanoWalletApi,
 ): Promise<string> {
-  // 1. Ask wallet to sign (partial=true, hydra-node already constructed the tx)
   const walletWitnessHex = await walletApi.signTx(draftTxHex, true);
-
-  // 2. Parse both with CML (preserves CBOR byte encoding)
-  const tx = CML.Transaction.from_cbor_hex(draftTxHex);
-  const walletWitnessSet = CML.TransactionWitnessSet.from_cbor_hex(walletWitnessHex);
-
-  // 3. Merge vkey witnesses
-  const witnesses = CML.VkeywitnessList.new();
-  const draftWitnessSet = tx.witness_set();
-  const existingVkeys = draftWitnessSet.vkeywitnesses();
-  if (existingVkeys) {
-    for (let i = 0; i < existingVkeys.len(); i++) {
-      witnesses.add(existingVkeys.get(i));
-    }
-  }
-  const walletVkeys = walletWitnessSet.vkeywitnesses();
-  if (walletVkeys) {
-    for (let i = 0; i < walletVkeys.len(); i++) {
-      witnesses.add(walletVkeys.get(i));
-    }
-  }
-
-  console.log("[signDraftCommitTx] existing vkeys:", existingVkeys?.len() ?? 0);
-  console.log("[signDraftCommitTx] wallet vkeys:", walletVkeys?.len() ?? 0);
-  console.log("[signDraftCommitTx] merged vkeys:", witnesses.len());
-
-  // 4. Build new Transaction (WASM getters clone, so mutation doesn't affect tx)
-  draftWitnessSet.set_vkeywitnesses(witnesses);
-  const signedTx = CML.Transaction.new(
-    tx.body(),
-    draftWitnessSet,
-    tx.is_valid(),
-    tx.auxiliary_data(),
-  );
-
-  console.log("[signDraftCommitTx] final vkeys:", signedTx.witness_set().vkeywitnesses()?.len() ?? 0);
-
-  // 5. Serialize back
-  return signedTx.to_cbor_hex();
+  return Transaction.addVKeyWitnessesHex(draftTxHex, walletWitnessHex);
 }
 
 /**

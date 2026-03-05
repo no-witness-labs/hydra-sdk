@@ -1,11 +1,9 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import wasm from "vite-plugin-wasm";
-import topLevelAwait from "vite-plugin-top-level-await";
 import path from "path";
 
 export default defineConfig({
-  plugins: [react(), wasm(), topLevelAwait()],
+  plugins: [react()],
   resolve: {
     alias: {
       ws: path.resolve(__dirname, "src/ws-shim.ts"),
@@ -13,6 +11,7 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ["effect", "@effect/platform"],
+    exclude: ["@evolution-sdk/evolution"],
   },
   server: {
     proxy: {

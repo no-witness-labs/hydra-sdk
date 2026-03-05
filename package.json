@@ -56,5 +56,10 @@
   "dependencies": {
     "@effect/docgen": "^0.5.2",
     "@effect/platform": "^0.94.2"
+  },
+  "pnpm": {
+    "overrides": {
+      "@evolution-sdk/evolution": "file:/Users/hoangvu/hade/no-witness-labs/evolution-sdk/packages/evolution"
+    }
   }
 }
