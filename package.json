@@ -59,7 +59,7 @@
   },
   "pnpm": {
     "overrides": {
-      "@evolution-sdk/evolution": "file:/Users/hoangvu/hade/no-witness-labs/evolution-sdk/packages/evolution"
+      "@evolution-sdk/evolution": "^0.3.22"
     }
   }
 }
