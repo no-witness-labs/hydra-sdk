@@ -1,0 +1,182 @@
+---
+title: Provider/HydraProvider.ts
+nav_order: 2
+parent: Modules
+---
+
+## HydraProvider overview
+
+`HydraProvider` is an `@evolution-sdk/evolution` `Provider` implementation that
+targets a Hydra L2 head instead of a Cardano L1 node.
+
+Users can swap any L1 provider (e.g. `BlockfrostProvider`) for `HydraProvider`
+and use the same evolution-sdk transaction-building API against a Hydra Head.
+
+---
+
+<h2 class="text-delta">Table of contents</h2>
+
+- [Usage](#usage)
+  - [Basic usage](#basic-usage)
+  - [Provider swap pattern](#provider-swap-pattern)
+  - [Effect API](#effect-api)
+  - [UTxO conversion helpers](#utxo-conversion-helpers)
+- [API Reference](#api-reference)
+  - [HydraProviderConfig (interface)](#hydraproviderconfig-interface)
+  - [HydraProvider (class)](#hydraprovider-class)
+- [L2-specific behaviour](#l2-specific-behaviour)
+
+---
+
+# Usage
+
+## Basic usage
+
+```ts
+import { Head, Provider } from "@no-witness-labs/hydra-sdk"
+
+const head = await Head.create({ url: "ws://localhost:4001" })
+
+const provider = new Provider.HydraProvider({
+  head,
+  httpUrl: "http://localhost:4001",
+})
+
+// Query UTxOs in the head
+const utxos = await provider.getUtxos(address)
+
+// Submit a signed transaction
+const txHash = await provider.submitTx(signedTx)
+
+// Wait for confirmation
+const confirmed = await provider.awaitTx(txHash)
+```
+
+## Provider swap pattern
+
+`HydraProvider` implements the same `Provider` interface as evolution-sdk's L1
+providers. Swap providers to switch between L1 and L2:
+
+```ts
+import * as Hydra from "@no-witness-labs/hydra-sdk"
+import { Blockfrost } from "@evolution-sdk/evolution/sdk/provider/Blockfrost"
+
+// L1 provider
+const l1Provider = new Blockfrost("preview", apiKey)
+
+// L2 provider — same interface
+const head = await Hydra.Head.create({ url: "ws://localhost:4001" })
+const l2Provider = new Hydra.Provider.HydraProvider({
+  head,
+  httpUrl: "http://localhost:4001",
+})
+
+// Both work identically
+const l1Utxos = await l1Provider.getUtxos(address)
+const l2Utxos = await l2Provider.getUtxos(address)
+```
+
+The subpath import is also available:
+
+```ts
+import { HydraProvider } from "@no-witness-labs/hydra-sdk/provider"
+```
+
+## Effect API
+
+Every method is available as an Effect via the `.Effect` sub-namespace:
+
+```ts
+import { Effect } from "effect"
+import { Head, Provider } from "@no-witness-labs/hydra-sdk"
+
+const program = Effect.gen(function* () {
+  const head = yield* Head.effect.create({ url: "ws://localhost:4001" })
+  const provider = new Provider.HydraProvider({
+    head,
+    httpUrl: "http://localhost:4001",
+  })
+
+  const utxos = yield* provider.Effect.getUtxos(address)
+  const txHash = yield* provider.Effect.submitTx(signedTx)
+  const confirmed = yield* provider.Effect.awaitTx(txHash)
+})
+```
+
+## UTxO conversion helpers
+
+Bidirectional converters between hydra-node wire format and evolution-sdk UTxOs:
+
+```ts
+import { Provider } from "@no-witness-labs/hydra-sdk"
+
+// Hydra → evolution-sdk
+const utxo = Provider.fromHydraUtxo("txhash#0", hydraTxOut)
+const utxos = Provider.fromHydraUtxoMap(hydraUtxoMap)
+
+// evolution-sdk → Hydra
+const [key, txOut] = Provider.toHydraUtxo(evolutionUtxo)
+const hydraMap = Provider.toHydraUtxoMap(evolutionUtxos)
+```
+
+---
+
+# API Reference
+
+## HydraProviderConfig (interface)
+
+**Signature**
+
+```ts
+export interface HydraProviderConfig {
+  /** A connected HydraHead instance (for submitting transactions via WS). */
+  readonly head: HydraHead
+  /**
+   * HTTP base URL of the hydra-node API (e.g. "http://localhost:4001").
+   * Typically the same host/port as the WebSocket URL with http:// instead of ws://.
+   */
+  readonly httpUrl: string
+}
+```
+
+## HydraProvider (class)
+
+Implements `@evolution-sdk/evolution`'s `Provider` interface.
+
+**Signature**
+
+```ts
+export class HydraProvider implements Provider {
+  readonly Effect: ProviderEffect
+  constructor(config: HydraProviderConfig)
+}
+```
+
+**Provider method mapping**
+
+| Method | Implementation |
+|---|---|
+| `getProtocolParameters()` | `GET /protocol-parameters` → transformed to evolution-sdk format |
+| `getUtxos(addr)` | `GET /snapshot/utxo` → filter by address/credential |
+| `getUtxosWithUnit(addr, unit)` | Same as `getUtxos` + filter by unit |
+| `getUtxoByUnit(unit)` | `GET /snapshot/utxo` → find first matching unit |
+| `getUtxosByOutRef(inputs)` | `GET /snapshot/utxo` → filter by tx hash + index |
+| `submitTx(tx)` | Send `NewTx` via WebSocket |
+| `awaitTx(txHash)` | Subscribe to head events, await `TxValid`/`TxInvalid` |
+| `getDelegation()` | Returns `{ poolId: null, rewards: 0n }` (not applicable on L2) |
+| `getDatum(hash)` | Scan snapshot UTxOs for inline datum with matching hash |
+| `evaluateTx()` | Throws `ProviderError` (not supported on Hydra L2) |
+
+---
+
+# L2-specific behaviour
+
+- **No fees**: Hydra heads do not charge transaction fees. Protocol parameters
+  are returned from the head but fee fields reflect the head's configuration.
+- **Instant finality**: Transactions are confirmed as soon as all head
+  participants validate them. `awaitTx` resolves on the `TxValid` event.
+- **No delegation**: Staking is not applicable on L2. `getDelegation()` returns
+  empty delegation rather than throwing, to avoid breaking evolution-sdk client
+  code that calls it during setup.
+- **No script evaluation**: `evaluateTx()` throws `ProviderError`. Hydra heads
+  do not expose a Plutus evaluation endpoint via the provider API.
