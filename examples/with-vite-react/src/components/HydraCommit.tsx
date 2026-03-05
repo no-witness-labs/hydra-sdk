@@ -1,18 +1,13 @@
-import type { InlineDatum, UTxO } from "@evolution-sdk/evolution";
+import type { UTxO } from "@evolution-sdk/evolution";
 import {
-  Address,
-  AssetName,
   Assets,
   createClient,
-  Data,
-  DatumHash,
-  DatumOption,
   PolicyId,
-  Script,
+  AssetName,
   Transaction,
   TransactionHash,
 } from "@evolution-sdk/evolution";
-import { Head } from "@no-witness-labs/hydra-sdk";
+import { Head, Provider } from "@no-witness-labs/hydra-sdk";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 type HeadStatus = Head.HeadStatus;
@@ -40,48 +35,7 @@ function formatAda(lovelace: bigint): string {
   });
 }
 
-function buildHydraUtxoMap(
-  selected: ReadonlyArray<UTxO.UTxO>,
-): Record<string, Record<string, unknown>> {
-  const utxoMap: Record<string, Record<string, unknown>> = {};
-  for (const u of selected) {
-    const txHash = TransactionHash.toHex(u.transactionId);
-    const key = `${txHash}#${u.index}`;
-    const bech32Addr = Address.toBech32(u.address);
-
-    const lovelace = Assets.lovelaceOf(u.assets);
-    const value: Record<string, unknown> = { lovelace: Number(lovelace) };
-    for (const [pid, name, qty] of Assets.flatten(u.assets)) {
-      const pidHex = PolicyId.toHex(pid);
-      const nameHex = AssetName.toHex(name);
-      if (!value[pidHex]) value[pidHex] = {};
-      (value[pidHex] as Record<string, number>)[nameHex] = Number(qty);
-    }
-
-    let datumHash: string | null = null;
-    let inlineDatumCbor: string | null = null;
-    if (u.datumOption) {
-      if (DatumOption.isDatumHash(u.datumOption)) {
-        datumHash = DatumHash.toHex(u.datumOption);
-      } else if (DatumOption.isInlineDatum(u.datumOption)) {
-        inlineDatumCbor = Data.toCBORHex(
-          (u.datumOption as InlineDatum.InlineDatum).data,
-        );
-      }
-    }
-
-    utxoMap[key] = {
-      address: bech32Addr,
-      datum: null,
-      inlineDatum: null,
-      inlineDatumRaw: inlineDatumCbor,
-      inlineDatumhash: datumHash,
-      referenceScript: u.scriptRef ? Script.toCBORHex(u.scriptRef) : null,
-      value,
-    };
-  }
-  return utxoMap;
-}
+const { toHydraUtxoMap } = Provider;
 
 async function buildBlueprintTxCbor(
   selected: ReadonlyArray<UTxO.UTxO>,
@@ -285,7 +239,7 @@ export default function HydraCommit({ walletApi }: Props) {
 
           const allUtxos = [...selected, feeUtxo];
           const blueprintCbor = await buildBlueprintTxCbor(allUtxos, walletApi);
-          const utxoMap = buildHydraUtxoMap(allUtxos);
+          const utxoMap = toHydraUtxoMap(allUtxos);
 
           commitBody = {
             blueprintTx: {
