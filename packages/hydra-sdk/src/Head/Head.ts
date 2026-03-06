@@ -116,6 +116,7 @@ export type ClientInputTag =
   | "Init"
   // TODO(protocol-schema): Commit is REST-based in Hydra; retained here as scaffold API surface.
   | "Commit"
+  | "NewTx"
   | "Close"
   // TODO(protocol-schema): SafeClose is scaffold-only and not part of Hydra websocket commands.
   | "SafeClose"
@@ -470,6 +471,29 @@ export interface HydraHead {
   abort(): Promise<void>;
 
   /**
+   * Submits a new transaction to the open Hydra Head. Sends `NewTx` via
+   * WebSocket and resolves once `TxValid` is received for this transaction.
+   *
+   * @param transaction - The Cardano transaction in hydra-node envelope format.
+   *
+   * @example Promise API
+   * ```ts
+   * await head.newTx({
+   *   type: "Tx ConwayEra",
+   *   description: "Ledger Cddl Format",
+   *   cborHex: "84a400...",
+   *   txId: "abc123...",
+   * });
+   * ```
+   */
+  newTx(transaction: {
+    type: string;
+    description: string;
+    cborHex: string;
+    txId: string;
+  }): Promise<void>;
+
+  /**
    * Registers a callback that is invoked for every `ServerOutput` event
    * published by the head.
    *
@@ -594,6 +618,12 @@ export interface HydraHead {
      */
     awaitReadyToFanout(): Effect.Effect<void, HeadError>;
     abort(): Effect.Effect<void, HeadError>;
+    newTx(transaction: {
+      type: string;
+      description: string;
+      cborHex: string;
+      txId: string;
+    }): Effect.Effect<void, HeadError>;
     events(): Stream.Stream<ServerOutput>;
     dispose(): Effect.Effect<void, HeadError>;
   };
@@ -835,6 +865,64 @@ const createEffect = (
         30_000,
       );
 
+    const newTxEffect = (transaction: {
+      type: string;
+      description: string;
+      cborHex: string;
+      txId: string;
+    }): Effect.Effect<void, HeadError> =>
+      Effect.gen(function* () {
+        yield* assertNotDisposed;
+        // NewTx is allowed only when the head is Open
+        const currentState = yield* Ref.get(fsm.status);
+        if (currentState !== "Open") {
+          return yield* Effect.fail(
+            new HeadError({
+              message: `NewTx is only allowed when head is Open, current state: ${currentState}`,
+            }),
+          );
+        }
+
+        yield* router.sendAndAwait(
+          transport.send("NewTx", transaction),
+          (event) => {
+            if (
+              event._tag === "ServerOutput" &&
+              event.output.tag === "TxValid"
+            ) {
+              const payload = event.output.payload as
+                | { transactionId?: string }
+                | undefined;
+              if (payload?.transactionId === transaction.txId) {
+                return matchSuccess(undefined);
+              }
+            }
+            if (
+              event._tag === "ServerOutput" &&
+              event.output.tag === "TxInvalid"
+            ) {
+              const payload = event.output.payload as
+                | {
+                    transaction?: { txId?: string };
+                    validationError?: { reason?: string };
+                  }
+                | undefined;
+              if (payload?.transaction?.txId === transaction.txId) {
+                return matchFailure(
+                  new HeadError({
+                    message:
+                      payload.validationError?.reason ??
+                      `Transaction ${transaction.txId} was invalid`,
+                  }),
+                );
+              }
+            }
+            return isCommandFailure(event, "NewTx");
+          },
+          30_000,
+        );
+      });
+
     // -----------------------------------------------------------------------
     // Event streams – derived from PubSub, no manual bookkeeping
     // -----------------------------------------------------------------------
@@ -952,6 +1040,7 @@ const createEffect = (
       fanout: fanoutEffect,
       awaitReadyToFanout: awaitReadyToFanoutEffect,
       abort: abortEffect,
+      newTx: newTxEffect,
       events: eventsStream,
       dispose: disposeEffect,
     };
@@ -972,6 +1061,7 @@ const createEffect = (
       safeClose: () => runEffect(effectApi.safeClose()),
       fanout: () => runEffect(effectApi.fanout()),
       abort: () => runEffect(effectApi.abort()),
+      newTx: (transaction) => runEffect(effectApi.newTx(transaction)),
       subscribe,
       subscribeEvents,
       dispose: () => runEffect(effectApi.dispose()),

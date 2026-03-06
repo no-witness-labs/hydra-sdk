@@ -93,6 +93,16 @@ const commandToEvents = (
       // This mock-only event path exists to keep scaffold tests deterministic until
       // REST integration is implemented in the Head module.
       return [toServerOutput("HeadIsOpen", payload)];
+    case "NewTx": {
+      const txPayload = payload as
+        | { txId?: string }
+        | undefined;
+      return [
+        toServerOutput("TxValid", {
+          transactionId: txPayload?.txId ?? "unknown",
+        }),
+      ];
+    }
     case "Close":
       return [toServerOutput("HeadIsClosed"), toServerOutput("ReadyToFanout")];
     case "SafeClose":
@@ -166,6 +176,7 @@ const parseClientInputTag = (value: unknown): ClientInputTag | undefined => {
   switch (value) {
     case "Init":
     case "Commit":
+    case "NewTx":
     case "Close":
     case "SafeClose":
     case "Fanout":
@@ -248,13 +259,24 @@ const parseApiEvent = (raw: string): Effect.Effect<ApiEvent, HeadError> =>
         const inputTag =
           parseClientInputTag(clientInput?.tag) ??
           parseChainTxTag(postChainTx?.tag);
+
+        // PostTxOnChainFailed carries details in postTxError, not reason.
+        let reason: string | undefined;
+        if (typeof parsed.reason === "string") {
+          reason = parsed.reason;
+        } else if (
+          tag === "PostTxOnChainFailed" &&
+          parsed.postTxError != null
+        ) {
+          reason = `PostTxOnChainFailed: ${JSON.stringify(parsed.postTxError)}`;
+        }
+
         return {
           _tag: "ClientMessage",
           message: {
             tag,
             clientInputTag: inputTag,
-            reason:
-              typeof parsed.reason === "string" ? parsed.reason : undefined,
+            reason,
           },
         } satisfies ApiEvent;
       }
@@ -290,6 +312,8 @@ const encodeClientInput = (
         case "Fanout":
         case "Abort":
           return JSON.stringify({ tag });
+        case "NewTx":
+          return JSON.stringify({ tag, transaction: _payload });
         case "Commit":
           throw new Error(
             'Unsupported client input "Commit": must be sent via REST API, not websocket',
@@ -502,7 +526,7 @@ export const makeHeadTransport = (
           return yield* Effect.fail(
             new HeadError({
               message:
-                "Commit is scaffold-only in mock transport and must use REST API in real transport",
+                "Commit must use REST API, not websocket transport",
             }),
           );
         }

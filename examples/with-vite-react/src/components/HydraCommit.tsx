@@ -1,18 +1,17 @@
-import type { InlineDatum, UTxO } from "@evolution-sdk/evolution";
+import type { UTxO } from "@evolution-sdk/evolution";
 import {
   Address,
-  AssetName,
   Assets,
   createClient,
-  Data,
-  DatumHash,
-  DatumOption,
+  KeyHash,
   PolicyId,
-  Script,
+  AssetName,
   Transaction,
   TransactionHash,
 } from "@evolution-sdk/evolution";
-import { Head } from "@no-witness-labs/hydra-sdk";
+import { makeTxBuilder } from "@evolution-sdk/evolution/sdk/builders/TransactionBuilder";
+import { Head, Provider } from "@no-witness-labs/hydra-sdk";
+import { Effect } from "effect";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 type HeadStatus = Head.HeadStatus;
@@ -40,48 +39,7 @@ function formatAda(lovelace: bigint): string {
   });
 }
 
-function buildHydraUtxoMap(
-  selected: ReadonlyArray<UTxO.UTxO>,
-): Record<string, Record<string, unknown>> {
-  const utxoMap: Record<string, Record<string, unknown>> = {};
-  for (const u of selected) {
-    const txHash = TransactionHash.toHex(u.transactionId);
-    const key = `${txHash}#${u.index}`;
-    const bech32Addr = Address.toBech32(u.address);
-
-    const lovelace = Assets.lovelaceOf(u.assets);
-    const value: Record<string, unknown> = { lovelace: Number(lovelace) };
-    for (const [pid, name, qty] of Assets.flatten(u.assets)) {
-      const pidHex = PolicyId.toHex(pid);
-      const nameHex = AssetName.toHex(name);
-      if (!value[pidHex]) value[pidHex] = {};
-      (value[pidHex] as Record<string, number>)[nameHex] = Number(qty);
-    }
-
-    let datumHash: string | null = null;
-    let inlineDatumCbor: string | null = null;
-    if (u.datumOption) {
-      if (DatumOption.isDatumHash(u.datumOption)) {
-        datumHash = DatumHash.toHex(u.datumOption);
-      } else if (DatumOption.isInlineDatum(u.datumOption)) {
-        inlineDatumCbor = Data.toCBORHex(
-          (u.datumOption as InlineDatum.InlineDatum).data,
-        );
-      }
-    }
-
-    utxoMap[key] = {
-      address: bech32Addr,
-      datum: null,
-      inlineDatum: null,
-      inlineDatumRaw: inlineDatumCbor,
-      inlineDatumhash: datumHash,
-      referenceScript: u.scriptRef ? Script.toCBORHex(u.scriptRef) : null,
-      value,
-    };
-  }
-  return utxoMap;
-}
+const { toHydraUtxoMap } = Provider;
 
 async function buildBlueprintTxCbor(
   selected: ReadonlyArray<UTxO.UTxO>,
@@ -115,17 +73,15 @@ async function signDraftCommitTx(
   return Transaction.addVKeyWitnessesHex(draftTxHex, walletWitnessHex);
 }
 
-const ALLOWED: Record<string, ReadonlySet<HeadStatus>> = {
-  init: new Set(["Idle"]),
-  commit: new Set(["Initializing"]),
-  close: new Set(["Open"]),
-  fanout: new Set(["FanoutPossible"]),
-  abort: new Set(["Idle", "Initializing"]),
-};
+/** Resolve the HTTP base URL, using the vite proxy in dev mode. */
+function resolveHttpUrl(wsUrl: string): string {
+  return import.meta.env.DEV ? "/hydra" : wsToHttp(wsUrl);
+}
 
 export default function HydraCommit({ walletApi }: Props) {
   const [url, setUrl] = useState(HYDRA_URL ?? "");
   const [head, setHead] = useState<Head.HydraHead | null>(null);
+  const [hydraProvider, setHydraProvider] = useState<Provider.HydraProvider | null>(null);
   const [status, setStatus] = useState<HeadStatus>("Idle");
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -133,6 +89,12 @@ export default function HydraCommit({ walletApi }: Props) {
   const [selectedUtxos, setSelectedUtxos] = useState<Set<number>>(new Set());
   const [submitting, setSubmitting] = useState(false);
   const [walletBalance, setWalletBalance] = useState<bigint | null>(null);
+
+  // L2 state
+  const [l2Utxos, setL2Utxos] = useState<ReadonlyArray<UTxO.UTxO>>([]);
+  const [l2Balance, setL2Balance] = useState<bigint | null>(null);
+  const [sendAddr, setSendAddr] = useState("");
+  const [sendAda, setSendAda] = useState("");
 
   const headRef = useRef<Head.HydraHead | null>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
@@ -153,14 +115,43 @@ export default function HydraCommit({ walletApi }: Props) {
     return () => clearInterval(id);
   }, [head]);
 
+  // -- Fetch L2 UTxOs ---------------------------------------------------------
+
+  const fetchL2Utxos = useCallback(async () => {
+    if (!hydraProvider) throw new Error("HydraProvider not initialized");
+
+    const parsed = await hydraProvider.getSnapshotUtxos();
+    setL2Utxos(parsed);
+    const total = parsed.reduce(
+      (sum, u) => sum + Assets.lovelaceOf(u.assets),
+      0n,
+    );
+    setL2Balance(total);
+    appendLog("FetchedL2UTxOs", { count: parsed.length, totalAda: formatAda(total) });
+  }, [hydraProvider, appendLog]);
+
+  // Auto-fetch L2 UTxOs when head becomes Open; clear on other states
+  useEffect(() => {
+    if (status === "Open" && hydraProvider) {
+      fetchL2Utxos().catch(() => {});
+    } else if (status !== "Open") {
+      setL2Utxos([]);
+      setL2Balance(null);
+    }
+  }, [status, hydraProvider, fetchL2Utxos]);
+
   // -- Connect / Disconnect ---------------------------------------------------
 
   const handleConnect = useCallback(async () => {
     setError(null);
     try {
       const h = await Head.create({ url });
+      const httpUrl = resolveHttpUrl(url);
+      const provider = new Provider.HydraProvider({ head: h, httpUrl });
+
       headRef.current = h;
       setHead(h);
+      setHydraProvider(provider);
       setStatus(h.getState());
       appendLog("Connected", { url });
 
@@ -178,8 +169,11 @@ export default function HydraCommit({ walletApi }: Props) {
     await headRef.current.dispose();
     headRef.current = null;
     setHead(null);
+    setHydraProvider(null);
     setStatus("Idle");
     setUtxos(null);
+    setL2Utxos([]);
+    setL2Balance(null);
     appendLog("Disconnected");
   }, [appendLog]);
 
@@ -222,7 +216,68 @@ export default function HydraCommit({ walletApi }: Props) {
     [head, fireAction],
   );
 
-  // -- Fetch UTxOs ------------------------------------------------------------
+  // -- L2 Send ----------------------------------------------------------------
+
+  const handleL2Send = useCallback(
+    () =>
+      fireAction(async () => {
+        if (!hydraProvider) throw new Error("HydraProvider not initialized");
+        const lovelace = BigInt(Math.round(parseFloat(sendAda) * 1_000_000));
+        if (lovelace <= 0n) throw new Error("Amount must be > 0");
+
+        // Resolve wallet address for change output
+        const usedAddrs = await walletApi.getUsedAddresses();
+        const unusedAddrs = await walletApi.getUnusedAddresses();
+        const addrHex = usedAddrs[0] ?? unusedAddrs[0];
+        if (!addrHex) throw new Error("Wallet returned no addresses");
+        const changeAddress = Address.fromHex(addrHex);
+
+        // L2 UTxOs already filtered by wallet address via fetchL2Utxos
+        if (l2Utxos.length === 0) {
+          throw new Error(
+            `No L2 UTxOs found for ${Address.toBech32(changeAddress).slice(0, 20)}...`,
+          );
+        }
+
+        // Extract payment key hash so the wallet knows it must sign
+        const paymentCred = changeAddress.paymentCredential;
+        if (paymentCred._tag !== "KeyHash") {
+          throw new Error("Script addresses are not supported for L2 sends");
+        }
+
+        // Build unsigned tx (drainTo merges leftover into output instead of
+        // requiring a separate change output — important on L2 where fees=0
+        // and the user may be sending their full balance)
+        const built = await makeTxBuilder({
+          provider: hydraProvider,
+          network: "Preprod",
+        })
+          .payToAddress({
+            address: Address.fromBech32(sendAddr),
+            assets: Assets.fromLovelace(lovelace),
+          })
+          .addSigner({ keyHash: paymentCred as KeyHash.KeyHash })
+          .build({ changeAddress, availableUtxos: l2Utxos, drainTo: 0 });
+
+        const unsignedTx = await built.toTransaction();
+        const unsignedCbor = Transaction.toCBORHex(unsignedTx);
+
+        // Sign with CIP-30 wallet (partialSign=true)
+        const witnessHex = await walletApi.signTx(unsignedCbor, true);
+        const signedCbor = Transaction.addVKeyWitnessesHex(unsignedCbor, witnessHex);
+        const signedTx = Transaction.fromCBORHex(signedCbor);
+
+        // Submit to Hydra head via provider (NewTx over WebSocket)
+        const txHash = await hydraProvider.submitTx(signedTx);
+
+        appendLog("L2TxSubmitted", { txHash: TransactionHash.toHex(txHash) });
+        setSendAddr("");
+        setSendAda("");
+      }),
+    [hydraProvider, sendAddr, sendAda, walletApi, l2Utxos, fireAction, appendLog],
+  );
+
+  // -- Fetch Wallet UTxOs -----------------------------------------------------
 
   const fetchUtxos = useCallback(async () => {
     const blockfrostKey = import.meta.env
@@ -262,10 +317,7 @@ export default function HydraCommit({ walletApi }: Props) {
     () =>
       fireAction(async () => {
         const walletUtxos = utxos ?? [];
-        const httpBase = wsToHttp(url);
-        const commitUrl = import.meta.env.DEV
-          ? "/hydra/commit"
-          : `${httpBase}/commit`;
+        const httpUrl = resolveHttpUrl(url);
 
         const selected = walletUtxos.filter((_, i) => selectedUtxos.has(i));
         const hasWalletUtxos = selected.length > 0;
@@ -285,7 +337,7 @@ export default function HydraCommit({ walletApi }: Props) {
 
           const allUtxos = [...selected, feeUtxo];
           const blueprintCbor = await buildBlueprintTxCbor(allUtxos, walletApi);
-          const utxoMap = buildHydraUtxoMap(allUtxos);
+          const utxoMap = toHydraUtxoMap(allUtxos);
 
           commitBody = {
             blueprintTx: {
@@ -299,19 +351,9 @@ export default function HydraCommit({ walletApi }: Props) {
           commitBody = {};
         }
 
-        const res = await fetch(commitUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(commitBody),
-        });
-
-        if (!res.ok) {
-          throw new Error(
-            `POST /commit failed (${res.status}): ${await res.text()}`,
-          );
-        }
-
-        const draftTx = (await res.json()) as { cborHex: string; txId: string };
+        const draftTx = (await Effect.runPromise(
+          Provider.postCommit(httpUrl, commitBody),
+        )) as { cborHex: string; txId: string };
         appendLog("DraftTxReceived", { txId: draftTx.txId });
 
         let finalTxHex = draftTx.cborHex;
@@ -327,6 +369,8 @@ export default function HydraCommit({ walletApi }: Props) {
       }),
     [url, utxos, selectedUtxos, walletApi, fireAction, appendLog, fetchUtxos],
   );
+
+  // -- UTxO selection ---------------------------------------------------------
 
   const toggleUtxo = useCallback((idx: number) => {
     setSelectedUtxos((prev) => {
@@ -346,7 +390,14 @@ export default function HydraCommit({ walletApi }: Props) {
 
   // -- Render -----------------------------------------------------------------
 
-  const can = (action: string) => !submitting && head && ALLOWED[action]?.has(status);
+  // The SDK guards commands internally and throws on invalid state transitions.
+  // These checks are purely for UI button enable/disable.
+  const canInit = !submitting && head && status === "Idle";
+  const canCommit = !submitting && head && status === "Initializing";
+  const canClose = !submitting && head && status === "Open";
+  const canFanout = !submitting && head && status === "FanoutPossible";
+  const canAbort = !submitting && head && (status === "Idle" || status === "Initializing");
+  const isOpen = status === "Open";
 
   return (
     <section className="space-y-4 rounded-lg border border-gray-800 bg-gray-900 p-5">
@@ -400,13 +451,20 @@ export default function HydraCommit({ walletApi }: Props) {
             {status}
           </span>
           {submitting && (
-            <span className="text-sm text-yellow-300">Submitting…</span>
+            <span className="text-sm text-yellow-300">Submitting...</span>
           )}
-          {walletBalance !== null && (
-            <span className="ml-auto text-sm text-gray-400">
-              Wallet: <span className="text-emerald-400 font-medium">{formatAda(walletBalance)} ADA</span>
-            </span>
-          )}
+          <div className="ml-auto flex items-center gap-4 text-sm text-gray-400">
+            {walletBalance !== null && (
+              <span>
+                L1: <span className="text-emerald-400 font-medium">{formatAda(walletBalance)} ADA</span>
+              </span>
+            )}
+            {l2Balance !== null && (
+              <span>
+                L2: <span className="text-cyan-400 font-medium">{formatAda(l2Balance)} ADA</span>
+              </span>
+            )}
+          </div>
         </div>
       )}
 
@@ -415,7 +473,7 @@ export default function HydraCommit({ walletApi }: Props) {
         <div className="flex flex-wrap gap-2">
           <button
             onClick={handleInit}
-            disabled={!can("init")}
+            disabled={!canInit}
             className="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium hover:bg-blue-700 disabled:opacity-30"
           >
             Init
@@ -425,40 +483,154 @@ export default function HydraCommit({ walletApi }: Props) {
             disabled={submitting}
             className="rounded bg-teal-600 px-3 py-1.5 text-sm font-medium hover:bg-teal-700 disabled:opacity-30"
           >
-            Fetch UTxOs ({utxos?.length ?? "–"})
+            Fetch UTxOs ({utxos?.length ?? "-"})
           </button>
           <button
             onClick={handleCommit}
-            disabled={!can("commit")}
+            disabled={!canCommit}
             className="rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium hover:bg-emerald-700 disabled:opacity-30"
           >
             Commit{selectedUtxos.size > 0 ? ` (${selectedUtxos.size})` : ""}
           </button>
           <button
             onClick={handleClose}
-            disabled={!can("close")}
+            disabled={!canClose}
             className="rounded bg-amber-600 px-3 py-1.5 text-sm font-medium hover:bg-amber-700 disabled:opacity-30"
           >
             Close
           </button>
           <button
             onClick={handleFanout}
-            disabled={!can("fanout")}
+            disabled={!canFanout}
             className="rounded bg-purple-600 px-3 py-1.5 text-sm font-medium hover:bg-purple-700 disabled:opacity-30"
           >
             Fanout
           </button>
           <button
             onClick={handleAbort}
-            disabled={!can("abort")}
+            disabled={!canAbort}
             className="rounded bg-gray-600 px-3 py-1.5 text-sm font-medium hover:bg-gray-700 disabled:opacity-30"
           >
             Abort
           </button>
+          {isOpen && (
+            <button
+              onClick={() => fetchL2Utxos().catch((err) => setError(err instanceof Error ? err.message : String(err)))}
+              disabled={submitting}
+              className="rounded bg-cyan-600 px-3 py-1.5 text-sm font-medium hover:bg-cyan-700 disabled:opacity-30"
+            >
+              Refresh L2 ({l2Utxos.length})
+            </button>
+          )}
         </div>
       )}
 
-      {/* UTxO Selector */}
+      {/* L2 Section */}
+      {isOpen && l2Utxos.length > 0 && (() => {
+        const l2Addresses = [...new Set(l2Utxos.map((u) => Address.toBech32(u.address)))];
+
+        return (
+          <div className="space-y-3 rounded border border-cyan-900/40 bg-gray-950/50 p-4">
+            <h3 className="text-sm font-medium text-cyan-400">L2 Head</h3>
+
+            {/* L2 Addresses */}
+            <div>
+              <span className="text-xs text-gray-500">
+                {l2Addresses.length === 1 ? "Address" : "Addresses"}
+              </span>
+              {l2Addresses.map((addr) => (
+                <p
+                  key={addr}
+                  className="mt-0.5 break-all font-mono text-xs text-gray-300"
+                >
+                  {addr}
+                </p>
+              ))}
+            </div>
+
+            {/* L2 UTxOs */}
+            <div>
+              <span className="mb-1 block text-xs text-gray-500">
+                UTxOs ({l2Utxos.length})
+              </span>
+              <div className="max-h-60 overflow-y-auto rounded border border-cyan-900/30 bg-gray-950 p-2 text-xs">
+                {l2Utxos.map((u, i) => {
+                  const txHash = TransactionHash.toHex(u.transactionId);
+                  const lovelace = Assets.lovelaceOf(u.assets);
+                  const tokens = Assets.flatten(u.assets);
+                  const addr = Address.toBech32(u.address);
+                  return (
+                    <div
+                      key={i}
+                      className="space-y-0.5 rounded px-2 py-1.5 hover:bg-gray-800"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-gray-400 break-all">
+                          {txHash}#{Number(u.index)}
+                        </span>
+                        <span className="shrink-0 font-medium text-cyan-400">
+                          {formatAda(lovelace)} ADA
+                        </span>
+                      </div>
+                      <div className="font-mono text-gray-500 break-all">
+                        {addr}
+                      </div>
+                      {tokens.length > 0 && (
+                        <div className="mt-0.5 flex flex-wrap gap-1">
+                          {tokens.map(([pid, name, qty], j) => {
+                            const pidHex = PolicyId.toHex(pid);
+                            const nameHex = AssetName.toHex(name);
+                            return (
+                              <span
+                                key={j}
+                                className="inline-block rounded bg-cyan-900/40 px-1.5 py-0.5 text-cyan-300"
+                                title={`${pidHex}.${nameHex}`}
+                              >
+                                {nameHex || pidHex.slice(0, 8)}
+                                {qty > 1n ? ` x${qty.toString()}` : ""}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* L2 Send */}
+            <div className="space-y-2">
+              <span className="block text-xs text-gray-500">Send on L2</span>
+              <input
+                type="text"
+                value={sendAddr}
+                onChange={(e) => setSendAddr(e.target.value)}
+                placeholder="Recipient address (addr_test1...)"
+                className="w-full rounded border border-cyan-900/40 bg-gray-950 px-3 py-1.5 text-sm focus:border-cyan-500 focus:outline-none"
+              />
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={sendAda}
+                  onChange={(e) => setSendAda(e.target.value)}
+                  placeholder="Amount (ADA)"
+                  className="flex-1 rounded border border-cyan-900/40 bg-gray-950 px-3 py-1.5 text-sm focus:border-cyan-500 focus:outline-none"
+                />
+                <button
+                  onClick={handleL2Send}
+                  disabled={submitting || !sendAddr || !sendAda}
+                  className="rounded bg-cyan-600 px-4 py-1.5 text-sm font-medium hover:bg-cyan-700 disabled:opacity-30"
+                >
+                  Send
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Wallet UTxO Selector */}
       {head && utxos && utxos.length > 0 && (
         <div>
           <div className="mb-2 flex items-center justify-between">
