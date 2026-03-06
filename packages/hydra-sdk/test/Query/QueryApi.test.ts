@@ -390,7 +390,7 @@ describe("Query streaming subscriptions (mock)", () => {
       ]);
 
       const iter = query.subscribeSnapshots(head);
-      const { value, done } = await iter.next();
+      const { done, value } = await iter.next();
 
       expect(done).toBe(false);
       expect(value?.number).toBe(42);
@@ -442,7 +442,7 @@ describe("Query streaming subscriptions (mock)", () => {
       ]);
 
       const iter = query.subscribeTransactions(head);
-      const { value, done } = await iter.next();
+      const { done, value } = await iter.next();
 
       expect(done).toBe(false);
       expect(value?.transactionId).toBe("deadbeef1234");
