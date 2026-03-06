@@ -79,11 +79,14 @@ export const ConfirmedSnapshotSchema = Schema.Union(
       number: Schema.Int,
       confirmed: Schema.Array(TransactionMessageSchema),
       utxo: UTxOSchema,
-      utxoToCommit: Schema.optional(UTxOSchema),
-      utxoToDecommit: Schema.optional(UTxOSchema),
+      utxoToCommit: Schema.optional(Schema.NullOr(UTxOSchema)),
+      utxoToDecommit: Schema.optional(Schema.NullOr(UTxOSchema)),
     }),
     signatures: Schema.Struct({
-      multiSignature: Schema.String,
+      multiSignature: Schema.Union(
+        Schema.String,
+        Schema.Array(Schema.String),
+      ),
     }),
   }),
 );
