@@ -1,6 +1,5 @@
 /**
  * Query module unit tests. Uses mock:// URLs and stubbed fetch — no real HTTP.
- * For integration tests against a real Hydra node, see QueryIntegration.test.ts.
  */
 import { Head, Query } from "@no-witness-labs/hydra-sdk";
 import { Effect, Stream } from "effect";

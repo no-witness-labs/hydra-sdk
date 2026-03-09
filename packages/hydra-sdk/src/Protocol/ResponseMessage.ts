@@ -725,13 +725,13 @@ const ChainPointSchema = Schema.Struct({
 
 /**
  * chainState can be a string or object with recordedAt and spendableUTxO (see sample.json).
- * 
+ *
  * @category schemas
  */
 const ChainStateSchema = Schema.Union(
   Schema.String,
   Schema.Struct({
-    recordedAt: ChainPointSchema,
+    recordedAt: Schema.NullOr(ChainPointSchema),
     spendableUTxO: UTxOSchema,
   }),
 );
@@ -786,14 +786,14 @@ export const HeadResponseSchema = Schema.Union(
         allTxs: StringRecordSchema,
         confirmedSnapshot: Common.ConfirmedSnapshotSchema,
         seenSnapshot: Common.SeenSnapshotSchema,
-        pendingDeposits: StringRecordSchema,
+        pendingDeposits: Schema.optional(StringRecordSchema),
         currentDepositTxId: Schema.NullOr(StringRecordSchema),
         decommitTx: Schema.NullOr(Common.TransactionMessageSchema),
         version: Schema.Int,
       }),
       chainState: ChainStateSchema,
       headId: Schema.String,
-      currentSlot: Schema.Int,
+      currentSlot: Schema.optional(Schema.Int),
       headSeed: Schema.String,
     }),
   }),
