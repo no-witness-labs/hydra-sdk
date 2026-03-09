@@ -33,7 +33,7 @@ import {
 } from "../Protocol/ResponseMessage.js";
 import type { UTxO } from "../Protocol/Types.js";
 import { UTxOSchema } from "../Protocol/Types.js";
-import { fetchJson, withCause } from "./Query.http.js";
+import { withCause } from "./Query.http.js";
 
 /**
  * Tagged error type for Query operations (HTTP fetch failures, decode errors, etc.).
@@ -44,9 +44,6 @@ export class QueryError extends Data.TaggedError("QueryError")<{
   readonly message: string;
   readonly cause?: unknown;
 }> {}
-
-const makeQueryError = (message: string, cause?: unknown): QueryError =>
-  new QueryError({ message, cause });
 
 // ---------------------------------------------------------------------------
 // Types
@@ -354,12 +351,7 @@ const streamToAsyncIterator = async function* <A>(
 // Factory
 // ---------------------------------------------------------------------------
 
-/** Base URL with no trailing slash, same as Head/HydraStateMachine. */
-const normalizeBaseUrl = (url: string): string => url.replace(/\/+$/, "");
-
 const createImpl = (config: QueryConfig): HydraQuery => {
-  const httpUrl = normalizeBaseUrl(config.httpUrl);
-
   const getUTxOEffect = (address?: string): Effect.Effect<UTxO, QueryError> =>
     fetchUTxO(config).pipe(
       Effect.map((utxo) => (address ? filterByAddress(utxo, address) : utxo)),
@@ -373,7 +365,7 @@ const createImpl = (config: QueryConfig): HydraQuery => {
     fetchHeadState(config).pipe(Effect.provide(FetchHttpClient.layer));
 
   const effectApi = {
-    getUTxO: getUTxOEffect,
+    getUTxO: () => getUTxOEffect(),
     getSnapshot: getSnapshotEffect,
     getHeadState: getHeadStateEffect,
     subscribeUTxO: subscribeUTxOStream,
@@ -381,30 +373,13 @@ const createImpl = (config: QueryConfig): HydraQuery => {
     subscribeTransactions: subscribeTransactionsStream,
   };
 
+  const runEffect = <A>(op: Effect.Effect<A, QueryError>): Promise<A> =>
+    Effect.runPromise(op);
+
   return {
-    getUTxO: async (address?: string) => {
-      const utxo = await fetchJson(
-        `${httpUrl}/snapshot/utxo`,
-        UTxOSchema,
-        "Failed to fetch UTxO",
-        makeQueryError,
-      );
-      return address ? filterByAddress(utxo, address) : utxo;
-    },
-    getSnapshot: () =>
-      fetchJson(
-        `${httpUrl}/snapshot`,
-        SnapshotResponseSchema,
-        "Failed to fetch snapshot",
-        makeQueryError,
-      ),
-    getHeadState: () =>
-      fetchJson(
-        `${httpUrl}/head`,
-        HeadResponseSchema as Schema.Schema<HeadResponse>,
-        "Failed to fetch head state",
-        makeQueryError,
-      ),
+    getUTxO: () => runEffect(effectApi.getUTxO()),
+    getSnapshot: () => runEffect(effectApi.getSnapshot()),
+    getHeadState: () => runEffect(effectApi.getHeadState()),
     subscribeUTxO: (head: HydraHead) =>
       streamToAsyncIterator(subscribeUTxOStream(head)),
     subscribeSnapshots: (head: HydraHead) =>
