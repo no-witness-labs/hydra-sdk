@@ -193,6 +193,9 @@ importers:
       '@no-witness-labs/hydra-sdk':
         specifier: workspace:*
         version: link:../../packages/hydra-sdk
+      '@noble/hashes':
+        specifier: ^1.7.0
+        version: 1.8.0
       effect:
         specifier: ^3.19.15
         version: 3.19.16
