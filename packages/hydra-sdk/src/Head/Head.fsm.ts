@@ -47,10 +47,8 @@ const transitions: Record<TransitionKey, HeadStatus> = {
 
 const commandAllowedFrom: Record<ClientInputTag, ReadonlySet<HeadStatus>> = {
   Init: new Set(["Idle"]),
-  Commit: new Set(["Initializing"]),
   NewTx: new Set(["Open"]),
   Close: new Set(["Open"]),
-  // TODO(protocol-schema): SafeClose is scaffold-only until protocol integration.
   SafeClose: new Set(["Open"]),
   Fanout: new Set(["FanoutPossible"]),
   // Abort is valid from Initializing per the Hydra spec.
