@@ -27,6 +27,7 @@ import {
 } from "./Head.router.js";
 import { isServerOutput, makeHeadTransport } from "./Head.transport.js";
 import { postCommit } from "../Provider/http.js";
+import type { UTxO } from "../Protocol/Types.js";
 
 /** Derive an HTTP URL from a WebSocket URL. */
 const wsToHttp = (wsUrl: string): string =>
@@ -98,6 +99,25 @@ export interface HeadConfig {
 export interface InitParams {
   /** Optional contestation period in seconds; if provided, overrides the default configured in hydra-node. */
   readonly contestationPeriod?: number;
+}
+
+/**
+ * Request body for the Hydra Head REST `/commit` endpoint.
+ *
+ * Pass an empty object `{}` for an empty commit, or provide a blueprint
+ * transaction together with the UTxO set to commit into the head.
+ *
+ * @category Models
+ */
+export interface CommitRequest {
+  /** Blueprint transaction that references the UTxOs to commit. */
+  readonly blueprintTx?: {
+    readonly type: string;
+    readonly description: string;
+    readonly cborHex: string;
+  };
+  /** UTxO map (keyed by `"txHash#index"`) to commit into the head. */
+  readonly utxo?: UTxO;
 }
 
 /**
@@ -346,7 +366,7 @@ export interface HydraHead {
    * });
    * ```
    */
-  commit(body: unknown): Promise<void>;
+  commit(body: CommitRequest): Promise<void>;
 
   /**
    * Sends the `Close` command to request closing the Hydra Head on-chain.
@@ -851,7 +871,7 @@ const createEffect = (
 
     const isMock = config.url.startsWith("mock://");
 
-    const commitEffect = (body: unknown): Effect.Effect<void, HeadError> =>
+    const commitEffect = (body: CommitRequest): Effect.Effect<void, HeadError> =>
       Effect.gen(function* () {
         yield* assertNotDisposed;
 
@@ -1215,7 +1235,7 @@ const createEffect = (
       getState: () => Effect.runSync(Ref.get(fsm.status)),
 
       init: (params?: InitParams) => runEffect(effectApi.init(params)),
-      commit: (utxos: unknown) => runEffect(effectApi.commit(utxos)),
+      commit: (body: CommitRequest) => runEffect(effectApi.commit(body)),
       close: () => runEffect(effectApi.close()),
       safeClose: () => runEffect(effectApi.safeClose()),
       fanout: () => runEffect(effectApi.fanout()),

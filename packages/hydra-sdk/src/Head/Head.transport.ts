@@ -20,6 +20,11 @@ import {
   FanoutMessageSchema,
   SafeCloseMessageSchema,
 } from "../Protocol/RequestMessage.js";
+import {
+  GreetingsMessageSchema,
+  CommandFailedMessageSchema,
+  PostTxOnChainFailedMessageSchema,
+} from "../Protocol/ResponseMessage.js";
 
 export interface HeadTransport {
   readonly events: {
@@ -232,16 +237,36 @@ const parseChainTxTag = (value: unknown): ClientInputTag | undefined => {
   }
 };
 
+/** Try synchronous schema decode, returning null on failure. */
+const tryDecode = <A, I>(
+  schema: Schema.Schema<A, I>,
+  value: unknown,
+): A | null => {
+  try {
+    return Schema.decodeUnknownSync(schema)(value);
+  } catch {
+    return null;
+  }
+};
+
 const parseApiEvent = (raw: string): Effect.Effect<ApiEvent, HeadError> =>
   Effect.try({
     try: (): ApiEvent => {
       const parsed = JSON.parse(raw) as Record<string, unknown>;
 
-      // 1. Greetings — identified by headStatus + me/hydraNodeVersion
+      // 1. Greetings — decode with GreetingsMessageSchema
       if (
         typeof parsed.headStatus === "string" &&
         ("me" in parsed || "hydraNodeVersion" in parsed)
       ) {
+        const decoded = tryDecode(GreetingsMessageSchema, parsed);
+        if (decoded) {
+          return {
+            _tag: "Greetings",
+            greetings: { headStatus: decoded.headStatus },
+          };
+        }
+        // Fallback: extract headStatus manually
         const status = parseHeadStatus(parsed.headStatus);
         if (status === null) {
           throw new Error(`Unsupported head status: ${parsed.headStatus}`);
@@ -249,12 +274,16 @@ const parseApiEvent = (raw: string): Effect.Effect<ApiEvent, HeadError> =>
         return { _tag: "Greetings", greetings: { headStatus: status } };
       }
 
-      // 2. InvalidInput — identified by reason field (no tag)
-      if (typeof parsed.reason === "string" && !("tag" in parsed)) {
+      // 2. InvalidInput — reason without tag (legacy) or tag: "InvalidInput"
+      if (
+        parsed.tag === "InvalidInput" ||
+        (typeof parsed.reason === "string" && !("tag" in parsed))
+      ) {
         return {
           _tag: "InvalidInput",
           invalidInput: {
-            reason: parsed.reason,
+            reason:
+              typeof parsed.reason === "string" ? parsed.reason : "Unknown",
             input: typeof parsed.input === "string" ? parsed.input : undefined,
           },
         };
@@ -265,39 +294,52 @@ const parseApiEvent = (raw: string): Effect.Effect<ApiEvent, HeadError> =>
         throw new Error("Missing event tag");
       }
 
-      // 3. Client failure messages
-      if (
-        tag === "CommandFailed" ||
-        tag === "RejectedInputBecauseUnsynced" ||
-        tag === "PostTxOnChainFailed"
-      ) {
-        const clientInput = parsed.clientInput as
-          | { tag?: unknown }
-          | undefined;
-        const postChainTx = parsed.postChainTx as
-          | { tag?: unknown }
-          | undefined;
-        const inputTag =
-          parseClientInputTag(clientInput?.tag) ??
-          parseChainTxTag(postChainTx?.tag);
-
-        let reason: string | undefined;
-        if (typeof parsed.reason === "string") {
-          reason = parsed.reason;
-        } else if (
-          tag === "PostTxOnChainFailed" &&
-          parsed.postTxError != null
-        ) {
-          reason = `PostTxOnChainFailed: ${JSON.stringify(parsed.postTxError)}`;
-        }
-
+      // 3. CommandFailed — decode with CommandFailedMessageSchema
+      if (tag === "CommandFailed") {
+        const decoded = tryDecode(CommandFailedMessageSchema, parsed);
         return {
           _tag: "ClientMessage",
-          message: { tag, clientInputTag: inputTag, reason },
+          message: {
+            tag: "CommandFailed",
+            clientInputTag: decoded
+              ? parseClientInputTag(decoded.clientInput.tag)
+              : parseClientInputTag(
+                  (parsed.clientInput as { tag?: unknown } | undefined)?.tag,
+                ),
+          },
         };
       }
 
-      // 4. All other server outputs — pass through with full payload
+      // 4. PostTxOnChainFailed — decode with PostTxOnChainFailedMessageSchema
+      if (tag === "PostTxOnChainFailed") {
+        const decoded = tryDecode(PostTxOnChainFailedMessageSchema, parsed);
+        return {
+          _tag: "ClientMessage",
+          message: {
+            tag: "PostTxOnChainFailed",
+            clientInputTag: decoded
+              ? parseChainTxTag(decoded.postChainTx.tag)
+              : parseChainTxTag(
+                  (parsed.postChainTx as { tag?: unknown } | undefined)?.tag,
+                ),
+            reason: decoded
+              ? `PostTxOnChainFailed: ${JSON.stringify(decoded.postTxError)}`
+              : typeof parsed.postTxError === "object"
+                ? `PostTxOnChainFailed: ${JSON.stringify(parsed.postTxError)}`
+                : undefined,
+          },
+        };
+      }
+
+      // 5. RejectedInputBecauseUnsynced
+      if (tag === "RejectedInputBecauseUnsynced") {
+        return {
+          _tag: "ClientMessage",
+          message: { tag: "RejectedInputBecauseUnsynced" },
+        };
+      }
+
+      // 6. All other server outputs — pass through with raw payload
       return { _tag: "ServerOutput", output: { tag, payload: parsed } };
     },
     catch: (cause) =>
