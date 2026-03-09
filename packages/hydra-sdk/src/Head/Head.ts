@@ -644,9 +644,7 @@ export interface HydraHead {
    */
   readonly effect: {
     init(params?: InitParams): Effect.Effect<void, HeadError>;
-    // TODO(protocol-schema): replace unknown with protocol Transaction type.
-    // Commit is REST-driven in Hydra and this scaffold signature is temporary.
-    commit(utxos: unknown): Effect.Effect<void, HeadError>;
+    commit(body: CommitRequest): Effect.Effect<void, HeadError>;
     close(): Effect.Effect<void, HeadError>;
     safeClose(): Effect.Effect<void, HeadError>;
     fanout(): Effect.Effect<void, HeadError>;
@@ -885,7 +883,7 @@ const createEffect = (
               _tag: "ServerOutput",
               output: { tag: "HeadIsOpen", payload: body },
             }),
-            (event) => matchServerTag(event, "HeadIsOpen", "Init"),
+            (event) => matchServerTag(event, "HeadIsOpen", "Commit"),
             30_000,
           );
         } else {
@@ -902,7 +900,7 @@ const createEffect = (
           );
 
           yield* router.awaitMatch(
-            (event) => matchServerTag(event, "HeadIsOpen", "Init"),
+            (event) => matchServerTag(event, "HeadIsOpen", "Commit"),
             30_000,
           );
         }

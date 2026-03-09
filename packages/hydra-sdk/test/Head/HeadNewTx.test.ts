@@ -7,7 +7,7 @@ describe("Head / NewTx command", () => {
 
     // Move to Open: Init → Commit → Open
     await head.init();
-    await head.commit([]);
+    await head.commit({});
     expect(head.getState()).toBe("Open");
 
     await head.newTx({
@@ -43,7 +43,7 @@ describe("Head / NewTx command", () => {
     const head = await Head.create({ url: "mock://localhost:4001" });
 
     await head.init();
-    await head.commit([]);
+    await head.commit({});
 
     const events: Array<{ tag: string; payload?: unknown }> = [];
     const unsub = head.subscribe((event) => {

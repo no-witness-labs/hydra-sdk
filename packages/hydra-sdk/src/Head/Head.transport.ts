@@ -195,6 +195,7 @@ const parseHeadStatus = (value: unknown): HeadStatus | null => {
     case "Closed":
     case "FanoutPossible":
     case "Final":
+    case "Aborted":
       return value;
     default:
       return null;
