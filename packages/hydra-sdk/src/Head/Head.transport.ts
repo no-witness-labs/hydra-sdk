@@ -94,9 +94,7 @@ const commandToEvents = (
       // REST integration is implemented in the Head module.
       return [toServerOutput("HeadIsOpen", payload)];
     case "NewTx": {
-      const txPayload = payload as
-        | { txId?: string }
-        | undefined;
+      const txPayload = payload as { txId?: string } | undefined;
       return [
         toServerOutput("TxValid", {
           transactionId: txPayload?.txId ?? "unknown",
@@ -111,6 +109,24 @@ const commandToEvents = (
       return [toServerOutput("HeadIsFinalized")];
     case "Abort":
       return [toServerOutput("HeadIsAborted")];
+    case "Recover": {
+      const recoverPayload = payload as { recoverTxId?: string } | undefined;
+      return [
+        toServerOutput("CommitRecovered", {
+          recoveredTxId: recoverPayload?.recoverTxId ?? "unknown",
+        }),
+      ];
+    }
+    case "Decommit": {
+      const decommitPayload = payload as { txId?: string } | undefined;
+      return [
+        toServerOutput("DecommitApproved", {
+          decommitTxId: decommitPayload?.txId ?? "unknown",
+        }),
+      ];
+    }
+    case "Contest":
+      return [toServerOutput("HeadIsContested")];
     default:
       return [
         {
@@ -181,6 +197,9 @@ const parseClientInputTag = (value: unknown): ClientInputTag | undefined => {
     case "SafeClose":
     case "Fanout":
     case "Abort":
+    case "Recover":
+    case "Decommit":
+    case "Contest":
       return value;
     default:
       return undefined;
@@ -199,6 +218,10 @@ const parseChainTxTag = (value: unknown): ClientInputTag | undefined => {
       return "Fanout";
     case "AbortTx":
       return "Abort";
+    case "RecoverTx":
+      return "Recover";
+    case "ContestTx":
+      return "Contest";
     default:
       return undefined;
   }
@@ -253,9 +276,7 @@ const parseApiEvent = (raw: string): Effect.Effect<ApiEvent, HeadError> =>
         // CommandFailed uses clientInput.tag, PostTxOnChainFailed uses
         // postChainTx.tag (e.g. "CloseTx" → "Close"). Try both sources.
         const clientInput = parsed.clientInput as { tag?: unknown } | undefined;
-        const postChainTx = parsed.postChainTx as
-          | { tag?: unknown }
-          | undefined;
+        const postChainTx = parsed.postChainTx as { tag?: unknown } | undefined;
         const inputTag =
           parseClientInputTag(clientInput?.tag) ??
           parseChainTxTag(postChainTx?.tag);
@@ -311,9 +332,17 @@ const encodeClientInput = (
         case "SafeClose":
         case "Fanout":
         case "Abort":
+        case "Contest":
           return JSON.stringify({ tag });
         case "NewTx":
           return JSON.stringify({ tag, transaction: _payload });
+        case "Recover":
+          return JSON.stringify({
+            tag,
+            recoverTxId: (_payload as { recoverTxId?: string })?.recoverTxId,
+          });
+        case "Decommit":
+          return JSON.stringify({ tag, decommitTx: _payload });
         case "Commit":
           throw new Error(
             'Unsupported client input "Commit": must be sent via REST API, not websocket',
@@ -525,8 +554,7 @@ export const makeHeadTransport = (
         if (tag === "Commit") {
           return yield* Effect.fail(
             new HeadError({
-              message:
-                "Commit must use REST API, not websocket transport",
+              message: "Commit must use REST API, not websocket transport",
             }),
           );
         }

@@ -17,10 +17,7 @@ import {
   Stream,
 } from "effect";
 
-import {
-  makeHeadFsm,
-  outputTagFromStatus,
-} from "./Head.fsm.js";
+import { makeHeadFsm, outputTagFromStatus } from "./Head.fsm.js";
 import type { MatchResult } from "./Head.router.js";
 import {
   makeCommandRouter,
@@ -121,7 +118,10 @@ export type ClientInputTag =
   // TODO(protocol-schema): SafeClose is scaffold-only and not part of Hydra websocket commands.
   | "SafeClose"
   | "Fanout"
-  | "Abort";
+  | "Abort"
+  | "Recover"
+  | "Decommit"
+  | "Contest";
 
 /**
  * Failure envelope returned by hydra-node when a client command is rejected.
@@ -494,6 +494,39 @@ export interface HydraHead {
   }): Promise<void>;
 
   /**
+   * Recovers a failed incremental commit deposit by transaction ID.
+   *
+   * Sends the `Recover` command and resolves once `CommitRecovered` is
+   * received for the specified transaction.
+   *
+   * @param recoverTxId - The transaction ID of the deposit to recover.
+   */
+  recover(recoverTxId: string): Promise<void>;
+
+  /**
+   * Requests a decommit of UTxOs from the open Hydra Head back to L1.
+   *
+   * Sends the `Decommit` command and resolves once `DecommitApproved` is
+   * received. Fails if the decommit is invalid.
+   *
+   * @param decommitTx - The decommit transaction in hydra-node envelope format.
+   */
+  decommit(decommitTx: {
+    type: string;
+    description: string;
+    cborHex: string;
+    txId: string;
+  }): Promise<void>;
+
+  /**
+   * Contests the closure of the Hydra Head with a more recent snapshot.
+   *
+   * Sends the `Contest` command and resolves once `HeadIsContested` is
+   * received. Only allowed when the head is in `Closed` state.
+   */
+  contest(): Promise<void>;
+
+  /**
    * Registers a callback that is invoked for every `ServerOutput` event
    * published by the head.
    *
@@ -624,6 +657,14 @@ export interface HydraHead {
       cborHex: string;
       txId: string;
     }): Effect.Effect<void, HeadError>;
+    recover(recoverTxId: string): Effect.Effect<void, HeadError>;
+    decommit(decommitTx: {
+      type: string;
+      description: string;
+      cborHex: string;
+      txId: string;
+    }): Effect.Effect<void, HeadError>;
+    contest(): Effect.Effect<void, HeadError>;
     events(): Stream.Stream<ServerOutput>;
     dispose(): Effect.Effect<void, HeadError>;
   };
@@ -751,9 +792,7 @@ const createEffect = (
     ).pipe(
       Effect.flatMap((disposed) =>
         disposed
-          ? Effect.fail(
-              new HeadError({ message: "Head has been disposed" }),
-            )
+          ? Effect.fail(new HeadError({ message: "Head has been disposed" }))
           : Effect.void,
       ),
     );
@@ -923,6 +962,91 @@ const createEffect = (
         );
       });
 
+    const recoverEffect = (
+      recoverTxId: string,
+    ): Effect.Effect<void, HeadError> =>
+      Effect.gen(function* () {
+        yield* assertNotDisposed;
+        yield* fsm.assertCommandAllowed("Recover");
+
+        yield* router.sendAndAwait(
+          transport.send("Recover", { recoverTxId }),
+          (event) => {
+            if (
+              event._tag === "ServerOutput" &&
+              event.output.tag === "CommitRecovered"
+            ) {
+              const payload = event.output.payload as
+                | { recoveredTxId?: string }
+                | undefined;
+              if (payload?.recoveredTxId === recoverTxId) {
+                return matchSuccess(undefined);
+              }
+            }
+            return isCommandFailure(event, "Recover");
+          },
+          60_000,
+        );
+      });
+
+    const decommitEffect = (decommitTx: {
+      type: string;
+      description: string;
+      cborHex: string;
+      txId: string;
+    }): Effect.Effect<void, HeadError> =>
+      Effect.gen(function* () {
+        yield* assertNotDisposed;
+        yield* fsm.assertCommandAllowed("Decommit");
+
+        yield* router.sendAndAwait(
+          transport.send("Decommit", decommitTx),
+          (event) => {
+            if (
+              event._tag === "ServerOutput" &&
+              event.output.tag === "DecommitApproved"
+            ) {
+              const payload = event.output.payload as
+                | { decommitTxId?: string }
+                | undefined;
+              if (payload?.decommitTxId === decommitTx.txId) {
+                return matchSuccess(undefined);
+              }
+            }
+            if (
+              event._tag === "ServerOutput" &&
+              event.output.tag === "DecommitInvalid"
+            ) {
+              const payload = event.output.payload as
+                | {
+                    decommitTx?: { txId?: string };
+                    decommitInvalidReason?: { tag?: string };
+                  }
+                | undefined;
+              if (payload?.decommitTx?.txId === decommitTx.txId) {
+                return matchFailure(
+                  new HeadError({
+                    message:
+                      payload.decommitInvalidReason?.tag ??
+                      `Decommit transaction ${decommitTx.txId} was invalid`,
+                  }),
+                );
+              }
+            }
+            return isCommandFailure(event, "Decommit");
+          },
+          60_000,
+        );
+      });
+
+    const contestEffect = (): Effect.Effect<void, HeadError> =>
+      execute(
+        "Contest",
+        undefined,
+        (event) => matchServerTag(event, "HeadIsContested", "Contest"),
+        60_000,
+      );
+
     // -----------------------------------------------------------------------
     // Event streams – derived from PubSub, no manual bookkeeping
     // -----------------------------------------------------------------------
@@ -972,9 +1096,7 @@ const createEffect = (
             const dequeue = yield* PubSub.subscribe(hub);
             yield* Effect.forever(
               Queue.take(dequeue).pipe(
-                Effect.tap((output) =>
-                  Effect.sync(() => callback(output)),
-                ),
+                Effect.tap((output) => Effect.sync(() => callback(output))),
               ),
             );
           }),
@@ -1015,9 +1137,7 @@ const createEffect = (
           }
         } finally {
           // Close scope → PubSub unsubscribes → dequeue shuts down
-          await Effect.runPromise(
-            Scope.close(scope, Exit.void),
-          );
+          await Effect.runPromise(Scope.close(scope, Exit.void));
         }
       };
 
@@ -1041,6 +1161,9 @@ const createEffect = (
       awaitReadyToFanout: awaitReadyToFanoutEffect,
       abort: abortEffect,
       newTx: newTxEffect,
+      recover: recoverEffect,
+      decommit: decommitEffect,
+      contest: contestEffect,
       events: eventsStream,
       dispose: disposeEffect,
     };
@@ -1062,6 +1185,9 @@ const createEffect = (
       fanout: () => runEffect(effectApi.fanout()),
       abort: () => runEffect(effectApi.abort()),
       newTx: (transaction) => runEffect(effectApi.newTx(transaction)),
+      recover: (recoverTxId) => runEffect(effectApi.recover(recoverTxId)),
+      decommit: (decommitTx) => runEffect(effectApi.decommit(decommitTx)),
+      contest: () => runEffect(effectApi.contest()),
       subscribe,
       subscribeEvents,
       dispose: () => runEffect(effectApi.dispose()),

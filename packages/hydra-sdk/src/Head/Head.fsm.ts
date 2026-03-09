@@ -27,6 +27,9 @@ const transitions: Record<TransitionKey, HeadStatus> = {
   // Open → Aborted (emergency abort while head is open)
   "Open:HeadIsAborted": "Aborted",
 
+  // Closed → Closed via Contest (contestation deadline extended)
+  "Closed:HeadIsContested": "Closed",
+
   // Closed → FanoutPossible when contestation period ends
   "Closed:ReadyToFanout": "FanoutPossible",
 
@@ -54,6 +57,12 @@ const commandAllowedFrom: Record<ClientInputTag, ReadonlySet<HeadStatus>> = {
   // Idle is included as a no-harm guard: aborting before any on-chain
   // activity is a no-op rather than an error.
   Abort: new Set(["Idle", "Initializing"]),
+  // Recover a failed incremental commit deposit (only while head is Open)
+  Recover: new Set(["Open"]),
+  // Decommit UTxOs from the head back to L1 (only while head is Open)
+  Decommit: new Set(["Open"]),
+  // Contest the closure with a more recent snapshot (only while head is Closed)
+  Contest: new Set(["Closed"]),
 };
 
 // ---------------------------------------------------------------------------
