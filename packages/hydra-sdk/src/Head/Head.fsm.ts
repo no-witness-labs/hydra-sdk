@@ -47,6 +47,7 @@ const transitions: Record<TransitionKey, HeadStatus> = {
 
 const commandAllowedFrom: Record<ClientInputTag, ReadonlySet<HeadStatus>> = {
   Init: new Set(["Idle"]),
+  Commit: new Set(["Initializing"]),
   NewTx: new Set(["Open"]),
   Close: new Set(["Open"]),
   SafeClose: new Set(["Open"]),

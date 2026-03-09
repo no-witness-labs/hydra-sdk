@@ -204,6 +204,7 @@ const parseHeadStatus = (value: unknown): HeadStatus | null => {
 const parseClientInputTag = (value: unknown): ClientInputTag | undefined => {
   switch (value) {
     case "Init":
+    case "Commit":
     case "NewTx":
     case "Close":
     case "SafeClose":
@@ -222,6 +223,8 @@ const parseChainTxTag = (value: unknown): ClientInputTag | undefined => {
   switch (value) {
     case "InitTx":
       return "Init";
+    case "CommitTx":
+      return "Commit";
     case "CloseTx":
       return "Close";
     case "FanoutTx":
@@ -381,6 +384,12 @@ const buildRequestMessage = (
         tag: "Decommit",
         decommitTx: payload as { type: "Tx ConwayEra" | "Unwitnessed Tx ConwayEra" | "Witnessed Tx ConwayEra"; description: string; cborHex: string; txId: string },
       });
+    case "Commit":
+      return Effect.fail(
+        new HeadError({
+          message: "Commit uses REST API, not WebSocket transport",
+        }),
+      );
     default: {
       const _exhaustive: never = tag;
       return Effect.fail(

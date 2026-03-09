@@ -133,13 +133,14 @@ export interface ServerOutput {
 }
 
 /**
- * Discriminated union of all WebSocket command tags a client can send to
- * hydra-node.
+ * Discriminated union of all command tags a client can send to hydra-node.
+ * Most are WebSocket commands; `Commit` is routed through the REST API.
  *
  * @category Models
  */
 export type ClientInputTag =
   | "Init"
+  | "Commit"
   | "NewTx"
   | "Close"
   | "SafeClose"
@@ -874,6 +875,7 @@ const createEffect = (
     const commitEffect = (body: CommitRequest): Effect.Effect<void, HeadError> =>
       Effect.gen(function* () {
         yield* assertNotDisposed;
+        yield* fsm.assertCommandAllowed("Commit");
 
         if (isMock) {
           // In mock mode, use sendAndAwait pattern: subscribe first, then
