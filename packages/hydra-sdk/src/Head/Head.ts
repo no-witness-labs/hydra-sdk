@@ -912,15 +912,7 @@ const createEffect = (
     }): Effect.Effect<void, HeadError> =>
       Effect.gen(function* () {
         yield* assertNotDisposed;
-        // NewTx is allowed only when the head is Open
-        const currentState = yield* Ref.get(fsm.status);
-        if (currentState !== "Open") {
-          return yield* Effect.fail(
-            new HeadError({
-              message: `NewTx is only allowed when head is Open, current state: ${currentState}`,
-            }),
-          );
-        }
+        yield* fsm.assertCommandAllowed("NewTx");
 
         yield* router.sendAndAwait(
           transport.send("NewTx", transaction),

@@ -34,7 +34,7 @@ describe("Head / NewTx command", () => {
         cborHex: "84a400d9010280018002000300a0f5f6",
         txId: "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
       }),
-    ).rejects.toThrow("NewTx is only allowed when head is Open");
+    ).rejects.toThrow("Command NewTx is not allowed while head is Idle");
 
     await head.dispose();
   });
