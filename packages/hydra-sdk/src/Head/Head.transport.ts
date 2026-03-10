@@ -236,6 +236,12 @@ const parseChainTxTag = (value: unknown): ClientInputTag | undefined => {
       return "Recover";
     case "ContestTx":
       return "Contest";
+    case "CollectComTx":
+      return "Commit";
+    case "IncrementTx":
+      return "Commit";
+    case "DecrementTx":
+      return "Decommit";
     default:
       return undefined;
   }
@@ -335,15 +341,7 @@ const parseApiEvent = (raw: string): Effect.Effect<ApiEvent, HeadError> =>
         };
       }
 
-      // 5. RejectedInputBecauseUnsynced
-      if (tag === "RejectedInputBecauseUnsynced") {
-        return {
-          _tag: "ClientMessage",
-          message: { tag: "RejectedInputBecauseUnsynced" },
-        };
-      }
-
-      // 6. All other server outputs — pass through with raw payload
+      // 5. All other server outputs — pass through with raw payload
       return { _tag: "ServerOutput", output: { tag, payload: parsed } };
     },
     catch: (cause) =>

@@ -157,10 +157,7 @@ export type ClientInputTag =
  */
 export interface ClientMessage {
   /** Discriminating tag that identifies which command failed. */
-  readonly tag:
-    | "CommandFailed"
-    | "RejectedInputBecauseUnsynced"
-    | "PostTxOnChainFailed";
+  readonly tag: "CommandFailed" | "PostTxOnChainFailed";
   /** Optional tag of the client command that triggered this failure, if applicable. */
   readonly clientInputTag?: ClientInputTag;
   /** Optional human-readable explanation of why the command failed. */
@@ -363,11 +360,11 @@ export interface HydraHead {
    * const program = Effect.gen(function* () {
    *   const head = yield* Head.effect.create({ url: "ws://localhost:9944" });
    *   yield* head.effect.init();
-   *   yield* head.effect.commit({ blueprintTx: { ... }, utxo: { ... } });
+   *   const draftTx = yield* head.effect.commit({ blueprintTx: { ... }, utxo: { ... } });
    * });
    * ```
    */
-  commit(body: CommitRequest): Promise<void>;
+  commit(body: CommitRequest): Promise<unknown>;
 
   /**
    * Sends the `Close` command to request closing the Hydra Head on-chain.
@@ -644,7 +641,7 @@ export interface HydraHead {
    */
   readonly effect: {
     init(params?: InitParams): Effect.Effect<void, HeadError>;
-    commit(body: CommitRequest): Effect.Effect<void, HeadError>;
+    commit(body: CommitRequest): Effect.Effect<unknown, HeadError>;
     close(): Effect.Effect<void, HeadError>;
     safeClose(): Effect.Effect<void, HeadError>;
     fanout(): Effect.Effect<void, HeadError>;
@@ -870,14 +867,16 @@ const createEffect = (
 
     const isMock = config.url.startsWith("mock://");
 
-    const commitEffect = (body: CommitRequest): Effect.Effect<void, HeadError> =>
+    const commitEffect = (
+      body: CommitRequest,
+    ): Effect.Effect<unknown, HeadError> =>
       Effect.gen(function* () {
         yield* assertNotDisposed;
         yield* fsm.assertCommandAllowed("Commit");
 
         if (isMock) {
-          // In mock mode, use sendAndAwait pattern: subscribe first, then
-          // simulate the REST commit by publishing HeadIsOpen.
+          // In mock mode, subscribe first then simulate the REST commit
+          // by publishing HeadIsOpen directly.
           yield* router.sendAndAwait(
             transport.events.publish({
               _tag: "ServerOutput",
@@ -886,10 +885,19 @@ const createEffect = (
             (event) => matchServerTag(event, "HeadIsOpen", "Commit"),
             30_000,
           );
-        } else {
-          // POST to hydra-node REST /commit endpoint, then await HeadIsOpen
-          // over WebSocket (once all participants have committed).
-          yield* postCommit(httpUrl, body).pipe(
+          return undefined;
+        }
+
+        // Use sendAndAwait to subscribe *before* POSTing, preventing the
+        // race where a fast HeadIsOpen arrives before the listener is ready.
+        let draftTx: unknown;
+        yield* router.sendAndAwait(
+          postCommit(httpUrl, body).pipe(
+            Effect.tap((result) =>
+              Effect.sync(() => {
+                draftTx = result;
+              }),
+            ),
             Effect.mapError(
               (err) =>
                 new HeadError({
@@ -897,13 +905,13 @@ const createEffect = (
                   cause: err.cause,
                 }),
             ),
-          );
+            Effect.asVoid,
+          ),
+          (event) => matchServerTag(event, "HeadIsOpen", "Commit"),
+          30_000,
+        );
 
-          yield* router.awaitMatch(
-            (event) => matchServerTag(event, "HeadIsOpen", "Commit"),
-            30_000,
-          );
-        }
+        return draftTx;
       });
 
     const closeEffect = (): Effect.Effect<void, HeadError> =>
