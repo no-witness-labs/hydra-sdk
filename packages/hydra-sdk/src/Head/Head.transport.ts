@@ -1,6 +1,22 @@
 import { Socket } from "@effect/platform";
-import { Effect, Fiber, Layer, Queue, Ref, Schedule } from "effect";
+import { Effect, Fiber, Layer, Queue, Ref, Schedule, Schema } from "effect";
 
+import {
+  AbortMessageSchema,
+  CloseMessageSchema,
+  ContestMessageSchema,
+  DecommitMessageSchema,
+  FanoutMessageSchema,
+  InitMessageSchema,
+  NewTxMessageSchema,
+  RecoverMessageSchema,
+  SafeCloseMessageSchema,
+} from "../Protocol/RequestMessage.js";
+import {
+  CommandFailedMessageSchema,
+  GreetingsMessageSchema,
+  PostTxOnChainFailedMessageSchema,
+} from "../Protocol/ResponseMessage.js";
 import {
   type ApiEvent,
   type ClientInputTag,
@@ -87,12 +103,12 @@ const commandToEvents = (
 ): Array<ApiEvent> => {
   switch (tag) {
     case "Init":
-      return [toServerOutput("HeadIsInitializing")];
-    case "Commit":
-      // TODO(protocol-schema): Commit is a Hydra REST operation, not a websocket command.
-      // This mock-only event path exists to keep scaffold tests deterministic until
-      // REST integration is implemented in the Head module.
-      return [toServerOutput("HeadIsOpen", payload)];
+      return [
+        toServerOutput("HeadIsInitializing", {
+          headId: "mock-head-id",
+          parties: [],
+        }),
+      ];
     case "NewTx": {
       const txPayload = payload as { txId?: string } | undefined;
       return [
@@ -179,6 +195,7 @@ const parseHeadStatus = (value: unknown): HeadStatus | null => {
     case "Closed":
     case "FanoutPossible":
     case "Final":
+    case "Aborted":
       return value;
     default:
       return null;
@@ -186,9 +203,6 @@ const parseHeadStatus = (value: unknown): HeadStatus | null => {
 };
 
 const parseClientInputTag = (value: unknown): ClientInputTag | undefined => {
-  // TODO(protocol-schema): Commit and SafeClose are scaffold-only tags.
-  // Keep parsing them for backward-compatible mock/error plumbing until
-  // REST commit integration and websocket command alignment are completed.
   switch (value) {
     case "Init":
     case "Commit":
@@ -222,45 +236,67 @@ const parseChainTxTag = (value: unknown): ClientInputTag | undefined => {
       return "Recover";
     case "ContestTx":
       return "Contest";
+    case "CollectComTx":
+      return "Commit";
+    case "IncrementTx":
+      return "Commit";
+    case "DecrementTx":
+      return "Decommit";
     default:
       return undefined;
   }
 };
 
+/** Try synchronous schema decode, returning null on failure. */
+const tryDecode = <A, I>(
+  schema: Schema.Schema<A, I>,
+  value: unknown,
+): A | null => {
+  try {
+    return Schema.decodeUnknownSync(schema)(value);
+  } catch {
+    return null;
+  }
+};
+
 const parseApiEvent = (raw: string): Effect.Effect<ApiEvent, HeadError> =>
   Effect.try({
-    try: () => {
-      // TODO(protocol-schema): Replace this hand-written parser with Effect Schema decoders
-      // from `origin/protocol-module`:
-      // - packages/hydra-sdk/src/Protocol/ResponseMessage.ts
-      // - packages/hydra-sdk/src/Protocol/CommonMessage.ts
+    try: (): ApiEvent => {
       const parsed = JSON.parse(raw) as Record<string, unknown>;
 
+      // 1. Greetings — decode with GreetingsMessageSchema
       if (
         typeof parsed.headStatus === "string" &&
         ("me" in parsed || "hydraNodeVersion" in parsed)
       ) {
+        const decoded = tryDecode(GreetingsMessageSchema, parsed);
+        if (decoded) {
+          return {
+            _tag: "Greetings",
+            greetings: { headStatus: decoded.headStatus },
+          };
+        }
+        // Fallback: extract headStatus manually
         const status = parseHeadStatus(parsed.headStatus);
         if (status === null) {
           throw new Error(`Unsupported head status: ${parsed.headStatus}`);
         }
-
-        return {
-          _tag: "Greetings",
-          greetings: {
-            headStatus: status,
-          },
-        } satisfies ApiEvent;
+        return { _tag: "Greetings", greetings: { headStatus: status } };
       }
 
-      if (typeof parsed.reason === "string") {
+      // 2. InvalidInput — reason without tag (legacy) or tag: "InvalidInput"
+      if (
+        parsed.tag === "InvalidInput" ||
+        (typeof parsed.reason === "string" && !("tag" in parsed))
+      ) {
         return {
           _tag: "InvalidInput",
           invalidInput: {
-            reason: parsed.reason,
+            reason:
+              typeof parsed.reason === "string" ? parsed.reason : "Unknown",
             input: typeof parsed.input === "string" ? parsed.input : undefined,
           },
-        } satisfies ApiEvent;
+        };
       }
 
       const tag = typeof parsed.tag === "string" ? parsed.tag : undefined;
@@ -268,47 +304,45 @@ const parseApiEvent = (raw: string): Effect.Effect<ApiEvent, HeadError> =>
         throw new Error("Missing event tag");
       }
 
-      if (
-        tag === "CommandFailed" ||
-        tag === "RejectedInputBecauseUnsynced" ||
-        tag === "PostTxOnChainFailed"
-      ) {
-        // CommandFailed uses clientInput.tag, PostTxOnChainFailed uses
-        // postChainTx.tag (e.g. "CloseTx" → "Close"). Try both sources.
-        const clientInput = parsed.clientInput as { tag?: unknown } | undefined;
-        const postChainTx = parsed.postChainTx as { tag?: unknown } | undefined;
-        const inputTag =
-          parseClientInputTag(clientInput?.tag) ??
-          parseChainTxTag(postChainTx?.tag);
-
-        // PostTxOnChainFailed carries details in postTxError, not reason.
-        let reason: string | undefined;
-        if (typeof parsed.reason === "string") {
-          reason = parsed.reason;
-        } else if (
-          tag === "PostTxOnChainFailed" &&
-          parsed.postTxError != null
-        ) {
-          reason = `PostTxOnChainFailed: ${JSON.stringify(parsed.postTxError)}`;
-        }
-
+      // 3. CommandFailed — decode with CommandFailedMessageSchema
+      if (tag === "CommandFailed") {
+        const decoded = tryDecode(CommandFailedMessageSchema, parsed);
         return {
           _tag: "ClientMessage",
           message: {
-            tag,
-            clientInputTag: inputTag,
-            reason,
+            tag: "CommandFailed",
+            clientInputTag: decoded
+              ? parseClientInputTag(decoded.clientInput.tag)
+              : parseClientInputTag(
+                  (parsed.clientInput as { tag?: unknown } | undefined)?.tag,
+                ),
           },
-        } satisfies ApiEvent;
+        };
       }
 
-      return {
-        _tag: "ServerOutput",
-        output: {
-          tag,
-          payload: parsed,
-        },
-      } satisfies ApiEvent;
+      // 4. PostTxOnChainFailed — decode with PostTxOnChainFailedMessageSchema
+      if (tag === "PostTxOnChainFailed") {
+        const decoded = tryDecode(PostTxOnChainFailedMessageSchema, parsed);
+        return {
+          _tag: "ClientMessage",
+          message: {
+            tag: "PostTxOnChainFailed",
+            clientInputTag: decoded
+              ? parseChainTxTag(decoded.postChainTx.tag)
+              : parseChainTxTag(
+                  (parsed.postChainTx as { tag?: unknown } | undefined)?.tag,
+                ),
+            reason: decoded
+              ? `PostTxOnChainFailed: ${JSON.stringify(decoded.postTxError)}`
+              : typeof parsed.postTxError === "object"
+                ? `PostTxOnChainFailed: ${JSON.stringify(parsed.postTxError)}`
+                : undefined,
+          },
+        };
+      }
+
+      // 5. All other server outputs — pass through with raw payload
+      return { _tag: "ServerOutput", output: { tag, payload: parsed } };
     },
     catch: (cause) =>
       new HeadError({
@@ -317,48 +351,67 @@ const parseApiEvent = (raw: string): Effect.Effect<ApiEvent, HeadError> =>
       }),
   });
 
+const buildRequestMessage = (
+  tag: ClientInputTag,
+  payload?: unknown,
+): Effect.Effect<unknown, unknown> => {
+  switch (tag) {
+    case "Init":
+      return Schema.encode(InitMessageSchema)({ tag: "Init" });
+    case "Abort":
+      return Schema.encode(AbortMessageSchema)({ tag: "Abort" });
+    case "Close":
+      return Schema.encode(CloseMessageSchema)({ tag: "Close" });
+    case "SafeClose":
+      return Schema.encode(SafeCloseMessageSchema)({ tag: "SafeClose" });
+    case "Fanout":
+      return Schema.encode(FanoutMessageSchema)({ tag: "Fanout" });
+    case "Contest":
+      return Schema.encode(ContestMessageSchema)({ tag: "Contest" });
+    case "NewTx":
+      return Schema.encode(NewTxMessageSchema)({
+        tag: "NewTx",
+        transaction: payload as { type: "Tx ConwayEra" | "Unwitnessed Tx ConwayEra" | "Witnessed Tx ConwayEra"; description: string; cborHex: string; txId: string },
+      });
+    case "Recover":
+      return Schema.encode(RecoverMessageSchema)({
+        tag: "Recover",
+        recoverTxId: (payload as { recoverTxId?: string })?.recoverTxId ?? "",
+      });
+    case "Decommit":
+      return Schema.encode(DecommitMessageSchema)({
+        tag: "Decommit",
+        decommitTx: payload as { type: "Tx ConwayEra" | "Unwitnessed Tx ConwayEra" | "Witnessed Tx ConwayEra"; description: string; cborHex: string; txId: string },
+      });
+    case "Commit":
+      return Effect.fail(
+        new HeadError({
+          message: "Commit uses REST API, not WebSocket transport",
+        }),
+      );
+    default: {
+      const _exhaustive: never = tag;
+      return Effect.fail(
+        new HeadError({ message: `Unsupported client input ${_exhaustive}` }),
+      );
+    }
+  }
+};
+
 const encodeClientInput = (
   tag: ClientInputTag,
-  _payload?: unknown,
+  payload?: unknown,
 ): Effect.Effect<string, HeadError> =>
-  Effect.try({
-    try: () => {
-      // TODO(protocol-schema): Replace this ad-hoc encoder with request schemas
-      // from `origin/protocol-module`:
-      // - packages/hydra-sdk/src/Protocol/RequestMessage.ts
-      switch (tag) {
-        case "Init":
-        case "Close":
-        case "SafeClose":
-        case "Fanout":
-        case "Abort":
-        case "Contest":
-          return JSON.stringify({ tag });
-        case "NewTx":
-          return JSON.stringify({ tag, transaction: _payload });
-        case "Recover":
-          return JSON.stringify({
-            tag,
-            recoverTxId: (_payload as { recoverTxId?: string })?.recoverTxId,
-          });
-        case "Decommit":
-          return JSON.stringify({ tag, decommitTx: _payload });
-        case "Commit":
-          throw new Error(
-            'Unsupported client input "Commit": must be sent via REST API, not websocket',
-          );
-        default: {
-          const _exhaustive: never = tag;
-          throw new Error(`Unsupported client input ${_exhaustive}`);
-        }
-      }
-    },
-    catch: (cause) =>
-      new HeadError({
-        message: `Failed to encode command ${tag}`,
-        cause,
-      }),
-  });
+  buildRequestMessage(tag, payload).pipe(
+    Effect.map((msg) => JSON.stringify(msg)),
+    Effect.mapError(
+      (cause) =>
+        new HeadError({
+          message: `Failed to encode command ${tag}`,
+          cause,
+        }),
+    ),
+  );
 
 export const makeHeadTransport = (
   config: HeadConfig,
@@ -551,14 +604,6 @@ export const makeHeadTransport = (
       payload?: unknown,
     ): Effect.Effect<void, HeadError> =>
       Effect.gen(function* () {
-        if (tag === "Commit") {
-          return yield* Effect.fail(
-            new HeadError({
-              message: "Commit must use REST API, not websocket transport",
-            }),
-          );
-        }
-
         const encoded = yield* encodeClientInput(tag, payload);
         yield* Queue.offer(outbound, encoded);
       }).pipe(

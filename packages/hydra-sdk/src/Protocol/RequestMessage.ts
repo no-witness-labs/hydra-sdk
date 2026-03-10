@@ -114,7 +114,7 @@ export type SideLoadSnapshotMessage = typeof SideLoadSnapshotMessageSchema.Type;
  * @since 0.2.0
  * @category schemas
  */
-const SafeCloseMessageSchema = Schema.Struct({
+export const SafeCloseMessageSchema = Schema.Struct({
   tag: Schema.Literal("SafeClose"),
 });
 export type SafeCloseMessage = typeof SafeCloseMessageSchema.Type;

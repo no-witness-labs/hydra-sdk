@@ -6,7 +6,7 @@ describe("Head / Recover command", () => {
     const head = await Head.create({ url: "mock://localhost:4001" });
 
     await head.init();
-    await head.commit([]);
+    await head.commit({});
     expect(head.getState()).toBe("Open");
 
     await head.recover("tx-deposit-abc123");
@@ -34,7 +34,7 @@ describe("Head / Decommit command", () => {
     const head = await Head.create({ url: "mock://localhost:4001" });
 
     await head.init();
-    await head.commit([]);
+    await head.commit({});
     expect(head.getState()).toBe("Open");
 
     await head.decommit({
@@ -72,7 +72,7 @@ describe("Head / Contest command", () => {
     const head = await Head.create({ url: "mock://localhost:4001" });
 
     await head.init();
-    await head.commit([]);
+    await head.commit({});
     expect(head.getState()).toBe("Open");
 
     await expect(head.contest()).rejects.toThrow(
@@ -103,7 +103,7 @@ describe("Head / Contest command", () => {
         });
 
         yield* head.effect.init();
-        yield* head.effect.commit([]);
+        yield* head.effect.commit({});
 
         // Mock transport moves past Closed to FanoutPossible automatically.
         // Force FSM to Closed to test the Contest command in isolation.

@@ -9,7 +9,7 @@ describe("Head module", () => {
     await head.init();
     // NOTE(scaffold): Commit is treated as a mock-only operation in this test path.
     // Real Hydra commit integration belongs to REST, not websocket transport.
-    await head.commit([]);
+    await head.commit({});
     await head.close();
     await head.fanout();
 

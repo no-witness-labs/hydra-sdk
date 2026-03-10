@@ -120,7 +120,7 @@ describe("Provider / HydraProvider", () => {
 
     // Move head to Open state: Init → Commit → Open
     await head.init();
-    await head.commit([]);
+    await head.commit({});
 
     const provider = new HydraProvider({
       head,
@@ -188,7 +188,7 @@ describe("Provider / HydraProvider", () => {
 
     // Move head to Open state
     await head.init();
-    await head.commit([]);
+    await head.commit({});
 
     const provider: EvolutionProvider = new HydraProvider({
       head,

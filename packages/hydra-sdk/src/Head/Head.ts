@@ -17,6 +17,8 @@ import {
   Stream,
 } from "effect";
 
+import type { UTxO } from "../Protocol/Types.js";
+import { postCommit } from "../Provider/http.js";
 import { makeHeadFsm, outputTagFromStatus } from "./Head.fsm.js";
 import type { MatchResult } from "./Head.router.js";
 import {
@@ -26,6 +28,10 @@ import {
   matchSuccess,
 } from "./Head.router.js";
 import { isServerOutput, makeHeadTransport } from "./Head.transport.js";
+
+/** Derive an HTTP URL from a WebSocket URL. */
+const wsToHttp = (wsUrl: string): string =>
+  wsUrl.replace(/^ws(s?):\/\//, "http$1://");
 
 /**
  * All possible lifecycle states of a Hydra Head.
@@ -53,6 +59,12 @@ export type HeadStatus =
 export interface HeadConfig {
   /** WebSocket URL of the hydra-node API (e.g. `"ws://localhost:9944"`). */
   readonly url: string;
+  /**
+   * HTTP URL of the hydra-node REST API (e.g. `"http://localhost:9944"`).
+   * If omitted, derived automatically from `url` by replacing `ws(s)://`
+   * with `http(s)://`.
+   */
+  readonly httpUrl?: string;
   /**
    * When `true`, the hydra-node will replay all past server outputs upon the
    * initial WebSocket connection so the client can reconstruct current state.
@@ -85,10 +97,27 @@ export interface HeadConfig {
  * @category Models
  */
 export interface InitParams {
-  // TODO(protocol-schema): Hydra websocket Init currently has no payload.
-  // Keep this reserved field scaffold-only until protocol schema integration.
   /** Optional contestation period in seconds; if provided, overrides the default configured in hydra-node. */
   readonly contestationPeriod?: number;
+}
+
+/**
+ * Request body for the Hydra Head REST `/commit` endpoint.
+ *
+ * Pass an empty object `{}` for an empty commit, or provide a blueprint
+ * transaction together with the UTxO set to commit into the head.
+ *
+ * @category Models
+ */
+export interface CommitRequest {
+  /** Blueprint transaction that references the UTxOs to commit. */
+  readonly blueprintTx?: {
+    readonly type: string;
+    readonly description: string;
+    readonly cborHex: string;
+  };
+  /** UTxO map (keyed by `"txHash#index"`) to commit into the head. */
+  readonly utxo?: UTxO;
 }
 
 /**
@@ -104,18 +133,16 @@ export interface ServerOutput {
 }
 
 /**
- * Discriminated union of all WebSocket command tags a client can send to
- * hydra-node.
+ * Discriminated union of all command tags a client can send to hydra-node.
+ * Most are WebSocket commands; `Commit` is routed through the REST API.
  *
  * @category Models
  */
 export type ClientInputTag =
   | "Init"
-  // TODO(protocol-schema): Commit is REST-based in Hydra; retained here as scaffold API surface.
   | "Commit"
   | "NewTx"
   | "Close"
-  // TODO(protocol-schema): SafeClose is scaffold-only and not part of Hydra websocket commands.
   | "SafeClose"
   | "Fanout"
   | "Abort"
@@ -130,10 +157,7 @@ export type ClientInputTag =
  */
 export interface ClientMessage {
   /** Discriminating tag that identifies which command failed. */
-  readonly tag:
-    | "CommandFailed"
-    | "RejectedInputBecauseUnsynced"
-    | "PostTxOnChainFailed";
+  readonly tag: "CommandFailed" | "PostTxOnChainFailed";
   /** Optional tag of the client command that triggered this failure, if applicable. */
   readonly clientInputTag?: ClientInputTag;
   /** Optional human-readable explanation of why the command failed. */
@@ -308,17 +332,15 @@ export interface HydraHead {
   init(params?: InitParams): Promise<void>;
 
   /**
-   * Sends the `Commit` command to hydra-node to commit UTxOs into the head.
+   * Commits UTxOs into the Hydra Head via the REST `/commit` endpoint.
    *
-   * Resolves once `HeadIsOpen` is received, indicating all participants have
-   * committed and the head is ready for off-chain transactions.
+   * POSTs the commit body (blueprint transaction + UTxO map) to the
+   * hydra-node HTTP API. The returned draft transaction must be signed
+   * and submitted to L1 by the caller. Resolves once `HeadIsOpen` is
+   * received over WebSocket, indicating all participants have committed.
    *
-   * > **Note:** Commit is REST-driven in the Hydra protocol. This WebSocket
-   * > scaffold signature is temporary and will be replaced when protocol-schema
-   * > integration lands.
-   *
-   * @param utxos - UTxO set to commit; type will be narrowed to the protocol
-   *   Transaction type in a future release.
+   * @param body - Commit request body containing `blueprintTx` and `utxo`,
+   *   or an empty object `{}` for an empty commit.
    *
    * @example Promise API
    * ```ts
@@ -326,8 +348,8 @@ export interface HydraHead {
    *
    * const head = await Head.create({ url: "ws://localhost:9944" });
    * await head.init();
-   * await head.commit({ txHash: "abc...", txIx: 0 });
-   * console.log(head.getState()); // "Open"
+   * const draftTx = await head.commit({ blueprintTx: { ... }, utxo: { ... } });
+   * // sign and submit draftTx to L1
    * ```
    *
    * @example Effect API
@@ -338,13 +360,11 @@ export interface HydraHead {
    * const program = Effect.gen(function* () {
    *   const head = yield* Head.effect.create({ url: "ws://localhost:9944" });
    *   yield* head.effect.init();
-   *   yield* head.effect.commit({ txHash: "abc...", txIx: 0 });
+   *   const draftTx = yield* head.effect.commit({ blueprintTx: { ... }, utxo: { ... } });
    * });
    * ```
    */
-  // TODO(protocol-schema): replace unknown with protocol Transaction type.
-  // Commit is REST-driven in Hydra and this scaffold signature is temporary.
-  commit(utxos: unknown): Promise<void>;
+  commit(body: CommitRequest): Promise<unknown>;
 
   /**
    * Sends the `Close` command to request closing the Hydra Head on-chain.
@@ -621,9 +641,7 @@ export interface HydraHead {
    */
   readonly effect: {
     init(params?: InitParams): Effect.Effect<void, HeadError>;
-    // TODO(protocol-schema): replace unknown with protocol Transaction type.
-    // Commit is REST-driven in Hydra and this scaffold signature is temporary.
-    commit(utxos: unknown): Effect.Effect<void, HeadError>;
+    commit(body: CommitRequest): Effect.Effect<unknown, HeadError>;
     close(): Effect.Effect<void, HeadError>;
     safeClose(): Effect.Effect<void, HeadError>;
     fanout(): Effect.Effect<void, HeadError>;
@@ -730,6 +748,9 @@ const createEffect = (
     const router = yield* makeCommandRouter(transport);
     const fsm = yield* makeHeadFsm();
 
+    // Resolve HTTP URL for REST-based operations (e.g. commit)
+    const httpUrl = config.httpUrl ?? wsToHttp(config.url);
+
     // -----------------------------------------------------------------------
     // Managed state via Ref – safe for concurrent reads/writes
     // fsm.status is the single source of truth for HeadStatus
@@ -821,26 +842,77 @@ const createEffect = (
     // -----------------------------------------------------------------------
 
     const initEffect = (params?: InitParams): Effect.Effect<void, HeadError> =>
-      execute(
-        "Init",
-        params,
-        (event) => matchServerTag(event, "HeadIsInitializing", "Init"),
-        30_000,
-      ).pipe(
-        Effect.tap(() =>
-          // TODO(protocol-schema): extract headId from HeadIsInitializing payload.
-          Ref.set(headIdRef, "dummy-head-id"),
-        ),
-      );
+      Effect.gen(function* () {
+        yield* assertNotDisposed;
+        yield* fsm.assertCommandAllowed("Init");
 
-    const commitEffect = (utxos: unknown): Effect.Effect<void, HeadError> =>
-      // TODO(protocol-schema): Commit should be routed through REST integration.
-      execute(
-        "Commit",
-        utxos,
-        (event) => matchServerTag(event, "HeadIsOpen", "Commit"),
-        30_000,
-      );
+        const event = yield* router.sendAndAwait(
+          transport.send("Init", params),
+          (event) => {
+            if (
+              event._tag === "ServerOutput" &&
+              event.output.tag === "HeadIsInitializing"
+            ) {
+              return matchSuccess(event.output);
+            }
+            return isCommandFailure(event, "Init");
+          },
+          30_000,
+        );
+
+        // Extract headId from the HeadIsInitializing payload
+        const payload = event.payload as { headId?: string } | undefined;
+        yield* Ref.set(headIdRef, payload?.headId ?? null);
+      });
+
+    const isMock = config.url.startsWith("mock://");
+
+    const commitEffect = (
+      body: CommitRequest,
+    ): Effect.Effect<unknown, HeadError> =>
+      Effect.gen(function* () {
+        yield* assertNotDisposed;
+        yield* fsm.assertCommandAllowed("Commit");
+
+        if (isMock) {
+          // In mock mode, subscribe first then simulate the REST commit
+          // by publishing HeadIsOpen directly.
+          yield* router.sendAndAwait(
+            transport.events.publish({
+              _tag: "ServerOutput",
+              output: { tag: "HeadIsOpen", payload: body },
+            }),
+            (event) => matchServerTag(event, "HeadIsOpen", "Commit"),
+            30_000,
+          );
+          return undefined;
+        }
+
+        // Use sendAndAwait to subscribe *before* POSTing, preventing the
+        // race where a fast HeadIsOpen arrives before the listener is ready.
+        let draftTx: unknown;
+        yield* router.sendAndAwait(
+          postCommit(httpUrl, body).pipe(
+            Effect.tap((result) =>
+              Effect.sync(() => {
+                draftTx = result;
+              }),
+            ),
+            Effect.mapError(
+              (err) =>
+                new HeadError({
+                  message: `Commit REST request failed: ${err.message}`,
+                  cause: err.cause,
+                }),
+            ),
+            Effect.asVoid,
+          ),
+          (event) => matchServerTag(event, "HeadIsOpen", "Commit"),
+          30_000,
+        );
+
+        return draftTx;
+      });
 
     const closeEffect = (): Effect.Effect<void, HeadError> =>
       execute(
@@ -1171,7 +1243,7 @@ const createEffect = (
       getState: () => Effect.runSync(Ref.get(fsm.status)),
 
       init: (params?: InitParams) => runEffect(effectApi.init(params)),
-      commit: (utxos: unknown) => runEffect(effectApi.commit(utxos)),
+      commit: (body: CommitRequest) => runEffect(effectApi.commit(body)),
       close: () => runEffect(effectApi.close()),
       safeClose: () => runEffect(effectApi.safeClose()),
       fanout: () => runEffect(effectApi.fanout()),
