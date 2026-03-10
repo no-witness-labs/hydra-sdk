@@ -1,5 +1,11 @@
 # @no-witness-labs/hydra-sdk-cli
 
+## 0.0.4
+
+### Patch Changes
+
+- 8496951: publish hydra sdk cli
+
 ## 0.0.3
 
 ### Patch Changes
