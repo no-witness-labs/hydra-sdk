@@ -19,21 +19,8 @@ const FAST_SHELLEY_GENESIS = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function commitEmpty(cluster: Cluster.Cluster): Promise<void> {
-  const response = await fetch(`${cluster.hydraHttpUrl}/commit`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({}),
-  });
-  if (!response.ok) {
-    throw new Error(
-      `Commit draft failed: ${response.status} ${await response.text()}`,
-    );
-  }
-  const draftTx = await response.text();
-
-  await writeFile(join(cluster.tempDir!, "commit-draft.json"), draftTx);
-
+/** Sign and submit a draft commit transaction on L1. */
+async function signAndSubmitCommit(cluster: Cluster.Cluster): Promise<void> {
   await Container.exec(cluster.cardanoNode!, [
     "sh",
     "-c",
@@ -51,6 +38,219 @@ async function commitEmpty(cluster: Cluster.Cluster): Promise<void> {
       " --socket-path /opt/cardano/ipc/node.socket" +
       ` --testnet-magic ${cluster.config.cardanoNode.networkMagic}`,
   ]);
+}
+
+/** Draft an empty commit, sign, and submit to L1. */
+async function commitEmpty(cluster: Cluster.Cluster): Promise<void> {
+  const response = await fetch(`${cluster.hydraHttpUrl}/commit`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  if (!response.ok) {
+    throw new Error(
+      `Commit draft failed: ${response.status} ${await response.text()}`,
+    );
+  }
+  await writeFile(
+    join(cluster.tempDir!, "commit-draft.json"),
+    await response.text(),
+  );
+  await signAndSubmitCommit(cluster);
+}
+
+/**
+ * Commit funded UTxOs into the head.
+ *
+ * 1. Derive payment address
+ * 2. Split genesis UTxO: 10 ADA for commit, rest stays as L1 fuel
+ * 3. Build blueprint tx for the 10 ADA UTxO
+ * 4. POST /commit with blueprint + UTxO
+ * 5. Sign and submit the draft commit tx
+ */
+async function commitFunds(cluster: Cluster.Cluster): Promise<void> {
+  const magic = cluster.config.cardanoNode.networkMagic;
+  const exec = (cmd: string) =>
+    Container.exec(cluster.cardanoNode!, ["sh", "-c", cmd]);
+
+  // 1. Get payment address
+  const addr = (
+    await exec(
+      "cardano-cli conway address build" +
+        " --payment-verification-key-file /opt/cardano/config/payment.vkey" +
+        ` --testnet-magic ${magic}`,
+    )
+  ).trim();
+
+  // 2. Query current UTxOs
+  await exec(
+    "cardano-cli conway query utxo" +
+      ` --address ${addr}` +
+      " --socket-path /opt/cardano/ipc/node.socket" +
+      ` --testnet-magic ${magic}` +
+      " --out-file /tmp/utxos.json",
+  );
+  const utxoJson = JSON.parse(
+    await Container.exec(cluster.cardanoNode!, ["cat", "/tmp/utxos.json"]),
+  );
+
+  const firstRef = Object.keys(utxoJson)[0];
+  if (!firstRef) throw new Error("No UTxOs found for payment address");
+
+  // 3. Split: send 10 ADA to self (for commit), change stays as fuel
+  const commitLovelace = 10_000_000;
+  await exec(
+    "cardano-cli conway transaction build" +
+      ` --socket-path /opt/cardano/ipc/node.socket` +
+      ` --testnet-magic ${magic}` +
+      ` --tx-in ${firstRef}` +
+      ` --tx-out ${addr}+${commitLovelace}` +
+      ` --change-address ${addr}` +
+      " --out-file /tmp/split.json",
+  );
+  await exec(
+    "cardano-cli conway transaction sign" +
+      " --tx-file /tmp/split.json" +
+      " --signing-key-file /opt/cardano/config/payment.skey" +
+      " --out-file /tmp/split-signed.json",
+  );
+  await exec(
+    "cardano-cli conway transaction submit" +
+      " --tx-file /tmp/split-signed.json" +
+      " --socket-path /opt/cardano/ipc/node.socket" +
+      ` --testnet-magic ${magic}`,
+  );
+
+  // Wait for split tx to confirm
+  await new Promise((r) => setTimeout(r, 3_000));
+
+  // 4. Re-query UTxOs, find the 10 ADA output
+  await exec(
+    "cardano-cli conway query utxo" +
+      ` --address ${addr}` +
+      " --socket-path /opt/cardano/ipc/node.socket" +
+      ` --testnet-magic ${magic}` +
+      " --out-file /tmp/utxos2.json",
+  );
+  const utxoJson2 = JSON.parse(
+    await Container.exec(cluster.cardanoNode!, ["cat", "/tmp/utxos2.json"]),
+  );
+
+  // Pick the smallest UTxO (the 10 ADA one) to commit
+  const sorted = Object.entries(utxoJson2).sort(
+    (a, b) =>
+      (a[1] as { value: { lovelace: number } }).value.lovelace -
+      (b[1] as { value: { lovelace: number } }).value.lovelace,
+  );
+  const [commitRef, commitUtxoData] = sorted[0];
+  const commitAddr = (commitUtxoData as { address: string }).address;
+  const commitVal = (commitUtxoData as { value: { lovelace: number } }).value
+    .lovelace;
+
+  // 5. Build blueprint tx for the commit UTxO (fee=0, all value to same addr)
+  const [cHash, cIx] = commitRef.split("#");
+  await exec(
+    "cardano-cli conway transaction build-raw" +
+      ` --tx-in ${cHash}#${cIx}` +
+      ` --tx-out ${commitAddr}+${commitVal}` +
+      " --fee 0" +
+      " --out-file /tmp/blueprint.json",
+  );
+  const blueprintEnvelope = JSON.parse(
+    await Container.exec(cluster.cardanoNode!, ["cat", "/tmp/blueprint.json"]),
+  );
+
+  // 6. POST /commit with blueprint + UTxO
+  const response = await fetch(`${cluster.hydraHttpUrl}/commit`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      blueprintTx: blueprintEnvelope,
+      utxo: { [commitRef]: { address: commitAddr, value: { lovelace: commitVal } } },
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(
+      `Commit draft failed: ${response.status} ${await response.text()}`,
+    );
+  }
+  await writeFile(
+    join(cluster.tempDir!, "commit-draft.json"),
+    await response.text(),
+  );
+
+  // 7. Sign and submit the draft
+  await signAndSubmitCommit(cluster);
+}
+
+/**
+ * Build and sign a simple L2 transaction inside the open head.
+ *
+ * Queries /snapshot/utxo, picks the first UTxO, and builds a tx
+ * that sends the full value back to the same address (fee=0 in head).
+ * Returns the signed tx envelope and its txId.
+ */
+async function buildL2Tx(
+  cluster: Cluster.Cluster,
+): Promise<{ type: string; description: string; cborHex: string; txId: string }> {
+  // 1. Query head UTxOs
+  const utxoResponse = await fetch(`${cluster.hydraHttpUrl}/snapshot/utxo`);
+  const headUtxo = await utxoResponse.json();
+  const utxoRef = Object.keys(headUtxo)[0];
+  if (!utxoRef) throw new Error("No UTxOs in head");
+  const [txHash, txIx] = utxoRef.split("#");
+  const addr: string = headUtxo[utxoRef].address;
+  const lovelace: number = headUtxo[utxoRef].value.lovelace;
+
+  // 2. Build raw tx (fees are 0 inside Hydra head)
+  await Container.exec(cluster.cardanoNode!, [
+    "sh",
+    "-c",
+    "cardano-cli conway transaction build-raw" +
+      ` --tx-in ${txHash}#${txIx}` +
+      ` --tx-out ${addr}+${lovelace}` +
+      " --fee 0" +
+      " --out-file /tmp/l2-tx.json",
+  ]);
+
+  // 3. Sign with payment key (skey is on the read-only config mount)
+  await Container.exec(cluster.cardanoNode!, [
+    "sh",
+    "-c",
+    "cardano-cli conway transaction sign" +
+      " --tx-file /tmp/l2-tx.json" +
+      " --signing-key-file /opt/cardano/config/payment.skey" +
+      " --out-file /tmp/l2-tx-signed.json",
+  ]);
+
+  // 4. Read signed tx envelope
+  const txEnvelopeRaw = await Container.exec(cluster.cardanoNode!, [
+    "cat",
+    "/tmp/l2-tx-signed.json",
+  ]);
+  const txEnvelope = JSON.parse(txEnvelopeRaw);
+
+  // 5. Get txId (cardano-cli may return plain hex or JSON {"txhash": "..."})
+  const txIdRaw = (
+    await Container.exec(cluster.cardanoNode!, [
+      "sh",
+      "-c",
+      "cardano-cli conway transaction txid --tx-file /tmp/l2-tx-signed.json",
+    ])
+  ).trim();
+  let txId: string;
+  try {
+    txId = (JSON.parse(txIdRaw) as { txhash: string }).txhash;
+  } catch {
+    txId = txIdRaw;
+  }
+
+  return {
+    type: txEnvelope.type,
+    description: txEnvelope.description,
+    cborHex: txEnvelope.cborHex,
+    txId,
+  };
 }
 
 function makeCluster(
@@ -131,12 +331,12 @@ describe("Hydra SDK — Head Lifecycle Integration", () => {
   );
 
   // -------------------------------------------------------------------------
-  // 2. NewTx: open head → submit invalid tx → verify rejection
+  // 2. NewTx: commit funds → open → submit valid L2 tx → TxValid
   // -------------------------------------------------------------------------
   it(
-    "newTx rejects invalid transaction in Open head",
+    "newTx succeeds with a valid L2 transaction",
     async () => {
-      // Fresh cluster for this test since the previous one finalized
+      // Fresh cluster since the previous test finalized
       await cluster.remove();
       cluster = makeCluster("hydra-sdk-newtx", {
         node: 9006,
@@ -152,24 +352,19 @@ describe("Hydra SDK — Head Lifecycle Integration", () => {
       try {
         await head.init();
 
+        // Commit real UTxOs so the head has funds to transact
         const events = head.subscribeEvents();
-        await commitEmpty(cluster);
+        await commitFunds(cluster);
         for await (const event of events) {
           if (event.tag === "HeadIsOpen") break;
         }
         expect(head.getState()).toBe("Open");
 
-        // Submit an invalid transaction — empty head has no UTxOs to spend
-        await expect(
-          head.newTx({
-            type: "Tx ConwayEra",
-            description: "Ledger Cddl Format",
-            cborHex: "84a400d9010280018002000300a0f5f6",
-            txId: "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
-          }),
-        ).rejects.toThrow();
+        // Build and submit a valid L2 transaction
+        const tx = await buildL2Tx(cluster);
+        await head.newTx(tx);
 
-        // Head should remain Open after a rejected transaction
+        // Head stays Open after a successful transaction
         expect(head.getState()).toBe("Open");
       } finally {
         await head.dispose();
@@ -257,14 +452,14 @@ describe("Hydra SDK — Event Subscription", () => {
       const collectedTags: Array<string> = [];
 
       try {
+        // Subscribe synchronously before any command — guarantees no events missed
         const unsub = head.subscribe((event) => {
           collectedTags.push(event.tag);
         });
 
+        // init() only resolves after HeadIsInitializing is received and dispatched,
+        // so by this point the callback has already been invoked
         await head.init();
-
-        // Allow events to propagate
-        await new Promise((r) => setTimeout(r, 2_000));
         unsub();
 
         expect(collectedTags).toContain("HeadIsInitializing");
@@ -319,15 +514,18 @@ describe("Hydra SDK — Reconnection", () => {
         await head.init();
         expect(head.getState()).toBe("Initializing");
 
-        // Restart hydra-node to force disconnect
+        // Restart hydra-node to force disconnect + reconnect
         await Container.stop(cluster.hydraNode!);
         await Container.start(cluster.hydraNode!);
 
         // Wait for reconnection + Greetings with restored state
         await new Promise((r) => setTimeout(r, 15_000));
-
-        // After reconnect, hydra-node sends Greetings with persisted state
         expect(head.getState()).toBe("Initializing");
+
+        // Prove the connection is live by executing a command that requires
+        // a working WebSocket — abort() sends Abort and awaits HeadIsAborted
+        await head.abort();
+        expect(head.getState()).toBe("Aborted");
       } finally {
         await head.dispose();
       }
