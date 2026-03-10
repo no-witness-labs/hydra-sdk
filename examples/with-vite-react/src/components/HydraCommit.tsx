@@ -96,6 +96,7 @@ export default function HydraCommit({ walletApi }: Props) {
   const [sendAddr, setSendAddr] = useState("");
   const [sendAda, setSendAda] = useState("");
   const [decommitAda, setDecommitAda] = useState("");
+  const [recoverTxId, setRecoverTxId] = useState("");
 
   const headRef = useRef<Head.HydraHead | null>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
@@ -215,9 +216,42 @@ export default function HydraCommit({ walletApi }: Props) {
     [head, fireAction],
   );
 
+  const handleSafeClose = useCallback(
+    () => fireAction(() => head!.safeClose()),
+    [head, fireAction],
+  );
+
   const handleAbort = useCallback(
     () => fireAction(() => head!.abort()),
     [head, fireAction],
+  );
+
+  const handleContest = useCallback(
+    () =>
+      fireAction(async () => {
+        try {
+          await head!.contest();
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (msg.includes("CommandFailed")) {
+            throw new Error(
+              "Contest failed — no newer snapshot available to contest with. " +
+                "Contest is only useful when the head was closed with an outdated snapshot.",
+            );
+          }
+          throw err;
+        }
+      }),
+    [head, fireAction],
+  );
+
+  const handleRecover = useCallback(
+    (recoverTxId: string) =>
+      fireAction(async () => {
+        await head!.recover(recoverTxId);
+        appendLog("RecoverSubmitted", { recoverTxId });
+      }),
+    [head, fireAction, appendLog],
   );
 
   // -- L2 Send ----------------------------------------------------------------
@@ -490,6 +524,7 @@ export default function HydraCommit({ walletApi }: Props) {
   const canFanout = !submitting && head && status === "FanoutPossible";
   const canAbort =
     !submitting && head && (status === "Idle" || status === "Initializing");
+  const canContest = !submitting && head && status === "Closed";
   const isOpen = status === "Open";
 
   return (
@@ -597,6 +632,20 @@ export default function HydraCommit({ walletApi }: Props) {
             className="rounded bg-amber-600 px-3 py-1.5 text-sm font-medium hover:bg-amber-700 disabled:opacity-30"
           >
             Close
+          </button>
+          <button
+            onClick={handleSafeClose}
+            disabled={!canClose}
+            className="rounded bg-amber-700 px-3 py-1.5 text-sm font-medium hover:bg-amber-800 disabled:opacity-30"
+          >
+            SafeClose
+          </button>
+          <button
+            onClick={handleContest}
+            disabled={!canContest}
+            className="rounded bg-rose-600 px-3 py-1.5 text-sm font-medium hover:bg-rose-700 disabled:opacity-30"
+          >
+            Contest
           </button>
           <button
             onClick={handleFanout}
@@ -753,6 +802,32 @@ export default function HydraCommit({ walletApi }: Props) {
                     className="rounded bg-amber-600 px-4 py-1.5 text-sm font-medium hover:bg-amber-700 disabled:opacity-30"
                   >
                     Decommit
+                  </button>
+                </div>
+              </div>
+
+              {/* Recover failed deposit */}
+              <div className="space-y-2">
+                <span className="block text-xs text-gray-500">
+                  Recover (reclaim a failed incremental commit deposit)
+                </span>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={recoverTxId}
+                    onChange={(e) => setRecoverTxId(e.target.value)}
+                    placeholder="Deposit tx ID"
+                    className="flex-1 rounded border border-rose-900/40 bg-gray-950 px-3 py-1.5 text-sm font-mono focus:border-rose-500 focus:outline-none"
+                  />
+                  <button
+                    onClick={() => {
+                      handleRecover(recoverTxId);
+                      setRecoverTxId("");
+                    }}
+                    disabled={submitting || !recoverTxId}
+                    className="rounded bg-rose-600 px-4 py-1.5 text-sm font-medium hover:bg-rose-700 disabled:opacity-30"
+                  >
+                    Recover
                   </button>
                 </div>
               </div>
