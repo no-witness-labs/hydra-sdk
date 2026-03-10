@@ -1,6 +1,6 @@
 {
   "name": "@no-witness-labs/hydra-sdk-cli",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "",
   "main": "./dist/cli.js",
   "types": "./dist/cli.d.ts",
