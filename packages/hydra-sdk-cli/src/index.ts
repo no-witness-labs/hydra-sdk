@@ -1,93 +1,127 @@
 #!/usr/bin/env node
 
-import type { CliApp } from "@effect/cli/CliApp";
 import * as Command from "@effect/cli/Command";
-import type { ValidationError } from "@effect/cli/ValidationError";
 import * as NodeContext from "@effect/platform-node/NodeContext";
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
-import { Config, Head, Protocol, Socket } from "@no-witness-labs/hydra-sdk";
+import { Head, Protocol } from "@no-witness-labs/hydra-sdk";
+import { Schedule } from "effect";
 import * as Effect from "effect/Effect";
+
+const URL = "ws://172.16.238.30:4001";
+
+const withHead = (
+  fn: (head: Head.HydraHead) => Effect.Effect<void>,
+): Effect.Effect<void> =>
+  Head.effect
+    .create({ url: URL })
+    .pipe(
+      Effect.flatMap((head) =>
+        fn(head).pipe(
+          Effect.ensuring(head.effect.dispose().pipe(Effect.orDie)),
+        ),
+      ),
+      Effect.catchAll((e) => Effect.logError(`Connection failed: ${e}`)),
+    );
 
 export const statusCommand = Command.make("status", {}).pipe(
   Command.withHandler(() =>
-    Effect.gen(function* () {
-      const HydraHeadController = yield* Head.HydraHeadController;
-      yield* HydraHeadController.logStatusHeadForewer;
-    }),
+    withHead((head) =>
+      Effect.gen(function* () {
+        yield* Effect.logInfo(`The status is: [${head.getState()}]`);
+      }).pipe(Effect.repeat(Schedule.spaced("1 second"))),
+    ),
   ),
 );
 
 export const initializeCommand = Command.make("initialize", {}).pipe(
   Command.withHandler(() =>
-    Effect.gen(function* () {
-      const HydraHeadController = yield* Head.HydraHeadController;
-      yield* HydraHeadController.initialize.pipe(
+    withHead((head) =>
+      Effect.gen(function* () {
+        yield* Effect.logInfo("Sending Init command");
+        yield* head.effect.init();
+        yield* Effect.logInfo(`Init complete, status is now [${head.getState()}]`);
+      }).pipe(
         Effect.catchAll((e) =>
           Effect.logInfo(`Failed initialize with error: ${e}`),
         ),
-      );
-    }),
+      ),
+    ),
   ),
 );
 
 export const abortCommand = Command.make("abort", {}).pipe(
   Command.withHandler(() =>
-    Effect.gen(function* () {
-      const HydraHeadController = yield* Head.HydraHeadController;
-      yield* HydraHeadController.abort.pipe(
+    withHead((head) =>
+      Effect.gen(function* () {
+        yield* Effect.logInfo("Sending Abort command");
+        yield* head.effect.abort();
+        yield* Effect.logInfo(`Abort complete, status is now [${head.getState()}]`);
+      }).pipe(
         Effect.catchAll((e) => Effect.logInfo(`Failed abort with error: ${e}`)),
-      );
-    }),
+      ),
+    ),
   ),
 );
 
 export const closeCommand = Command.make("close", {}).pipe(
   Command.withHandler(() =>
-    Effect.gen(function* () {
-      const HydraHeadController = yield* Head.HydraHeadController;
-      yield* HydraHeadController.close.pipe(
+    withHead((head) =>
+      Effect.gen(function* () {
+        yield* Effect.logInfo("Sending Close command");
+        yield* head.effect.close();
+        yield* Effect.logInfo(`Close complete, status is now [${head.getState()}]`);
+      }).pipe(
         Effect.catchAll((e) => Effect.logInfo(`Failed close with error: ${e}`)),
-      );
-    }),
+      ),
+    ),
   ),
 );
 
 export const commitCommand = Command.make("commit", {}).pipe(
   Command.withHandler(() =>
-    Effect.gen(function* () {
-      const HydraHeadController = yield* Head.HydraHeadController;
-      yield* HydraHeadController.commit.pipe(
+    withHead((head) =>
+      Effect.gen(function* () {
+        yield* Effect.logInfo("Sending empty Commit (REST)");
+        yield* head.effect.commit({});
+        yield* Effect.logInfo(`Commit complete, status is now [${head.getState()}]`);
+      }).pipe(
         Effect.catchAll((e) =>
           Effect.logInfo(`Failed commit with error: ${e}`),
         ),
-      );
-    }),
+      ),
+    ),
   ),
 );
 
 export const contestCommand = Command.make("contest", {}).pipe(
   Command.withHandler(() =>
-    Effect.gen(function* () {
-      const HydraHeadController = yield* Head.HydraHeadController;
-      yield* HydraHeadController.contest.pipe(
+    withHead((head) =>
+      Effect.gen(function* () {
+        yield* Effect.logInfo("Sending Contest command");
+        yield* head.effect.contest();
+        yield* Effect.logInfo(`Contest complete, status is now [${head.getState()}]`);
+      }).pipe(
         Effect.catchAll((e) =>
           Effect.logInfo(`Failed contest with error: ${e}`),
         ),
-      );
-    }),
+      ),
+    ),
   ),
 );
 
 export const fanoutCommand = Command.make("fanout", {}).pipe(
   Command.withHandler(() =>
-    Effect.gen(function* () {
-      const HydraHeadController = yield* Head.HydraHeadController;
-      yield* HydraHeadController.fanout.pipe(
+    withHead((head) =>
+      Effect.gen(function* () {
+        yield* Effect.logInfo("Sending Fanout command");
+        yield* head.effect.fanout();
+        yield* Effect.logInfo(`Fanout complete, status is now [${head.getState()}]`);
+      }).pipe(
         Effect.catchAll((e) =>
           Effect.logInfo(`Failed fanout with error: ${e}`),
         ),
-      );
-    }),
+      ),
+    ),
   ),
 );
 
@@ -103,28 +137,15 @@ const command = Command.make("hydra-manager").pipe(
   ]),
 );
 
-export const runCommands: (
-  args: ReadonlyArray<string>,
-) => Effect.Effect<
-  void,
-  ValidationError,
-  CliApp.Environment | Head.HydraStateMachine | Head.HydraHeadController
-> = Command.run(command, {
+export const runCommands = Command.run(command, {
   name: "Hydra Manager",
   version: "0.1.0",
 });
 
-const urlNoAppends = "172.16.238.30:4001";
-
 runCommands(process.argv).pipe(
-  Effect.provide(Head.HydraHeadController.Default),
-  Effect.provide(Head.HydraStateMachine.Default),
-  Effect.provide(Socket.SocketController.Default),
-  Effect.provide(Config.Config.Default(urlNoAppends)),
   Effect.provide(NodeContext.layer),
-  Effect.scoped,
   NodeRuntime.runMain(),
 );
 
-// Export and reimport since the lsp doesn't like to import @no-witness-labs/hydra-sdk-cli in tests
-export { Config, Head, Protocol, Socket };
+// Re-export for tests
+export { Head, Protocol };
