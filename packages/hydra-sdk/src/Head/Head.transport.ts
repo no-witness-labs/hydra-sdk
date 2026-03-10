@@ -2,6 +2,22 @@ import { Socket } from "@effect/platform";
 import { Effect, Fiber, Layer, Queue, Ref, Schedule, Schema } from "effect";
 
 import {
+  AbortMessageSchema,
+  CloseMessageSchema,
+  ContestMessageSchema,
+  DecommitMessageSchema,
+  FanoutMessageSchema,
+  InitMessageSchema,
+  NewTxMessageSchema,
+  RecoverMessageSchema,
+  SafeCloseMessageSchema,
+} from "../Protocol/RequestMessage.js";
+import {
+  CommandFailedMessageSchema,
+  GreetingsMessageSchema,
+  PostTxOnChainFailedMessageSchema,
+} from "../Protocol/ResponseMessage.js";
+import {
   type ApiEvent,
   type ClientInputTag,
   type HeadConfig,
@@ -9,22 +25,6 @@ import {
   type HeadStatus,
   type ServerOutput,
 } from "./Head.js";
-import {
-  InitMessageSchema,
-  AbortMessageSchema,
-  NewTxMessageSchema,
-  RecoverMessageSchema,
-  DecommitMessageSchema,
-  CloseMessageSchema,
-  ContestMessageSchema,
-  FanoutMessageSchema,
-  SafeCloseMessageSchema,
-} from "../Protocol/RequestMessage.js";
-import {
-  GreetingsMessageSchema,
-  CommandFailedMessageSchema,
-  PostTxOnChainFailedMessageSchema,
-} from "../Protocol/ResponseMessage.js";
 
 export interface HeadTransport {
   readonly events: {

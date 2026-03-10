@@ -17,6 +17,8 @@ import {
   Stream,
 } from "effect";
 
+import type { UTxO } from "../Protocol/Types.js";
+import { postCommit } from "../Provider/http.js";
 import { makeHeadFsm, outputTagFromStatus } from "./Head.fsm.js";
 import type { MatchResult } from "./Head.router.js";
 import {
@@ -26,8 +28,6 @@ import {
   matchSuccess,
 } from "./Head.router.js";
 import { isServerOutput, makeHeadTransport } from "./Head.transport.js";
-import { postCommit } from "../Provider/http.js";
-import type { UTxO } from "../Protocol/Types.js";
 
 /** Derive an HTTP URL from a WebSocket URL. */
 const wsToHttp = (wsUrl: string): string =>
