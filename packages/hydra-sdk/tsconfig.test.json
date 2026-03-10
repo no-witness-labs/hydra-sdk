@@ -8,7 +8,8 @@
     "noEmit": true,
     "paths": {
       "@no-witness-labs/hydra-sdk": ["./src/index.ts"],
-      "@no-witness-labs/hydra-sdk/*": ["./src/*"]
+      "@no-witness-labs/hydra-sdk/*": ["./src/*"],
+      "@no-witness-labs/hydra-devnet": ["../hydra-devnet/src/index.ts"]
     }
   },
   "references": [{ "path": "tsconfig.src.json" }]

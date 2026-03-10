@@ -11,6 +11,10 @@ export default defineConfig({
         "./src/index.ts",
         import.meta.url,
       ).pathname,
+      "@no-witness-labs/hydra-sdk": new URL(
+        "../hydra-sdk/src/index.ts",
+        import.meta.url,
+      ).pathname,
     },
   },
 });

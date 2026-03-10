@@ -1,6 +1,6 @@
-"use client"
-import { create } from "@orama/orama"
-import { useDocsSearch } from "fumadocs-core/search/client"
+"use client";
+import { create } from "@orama/orama";
+import { useDocsSearch } from "fumadocs-core/search/client";
 import {
   SearchDialog,
   SearchDialogClose,
@@ -10,32 +10,40 @@ import {
   SearchDialogInput,
   SearchDialogList,
   SearchDialogOverlay,
-  type SharedProps
-} from "fumadocs-ui/components/dialog/search"
-import { useI18n } from "fumadocs-ui/contexts/i18n"
+  type SharedProps,
+} from "fumadocs-ui/components/dialog/search";
+import { useI18n } from "fumadocs-ui/contexts/i18n";
 
 async function initOrama() {
   return await create({
     schema: { _: "string" },
-    language: "english"
-  })
+    language: "english",
+  });
 }
 
 export default function DefaultSearchDialog(props: SharedProps) {
-  const { locale } = useI18n()
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? ""
-  const normalizedBase = basePath.endsWith("/") && basePath.length > 1 ? basePath.slice(0, -1) : basePath
-  const apiFrom = `${normalizedBase}/api/search`
+  const { locale } = useI18n();
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+  const normalizedBase =
+    basePath.endsWith("/") && basePath.length > 1
+      ? basePath.slice(0, -1)
+      : basePath;
+  const apiFrom = `${normalizedBase}/api/search`;
 
   const { query, search, setSearch } = useDocsSearch({
     type: "static",
     initOrama,
     locale,
-    from: apiFrom
-  })
+    from: apiFrom,
+  });
 
   return (
-    <SearchDialog search={search} onSearchChange={setSearch} isLoading={query.isLoading} {...props}>
+    <SearchDialog
+      search={search}
+      onSearchChange={setSearch}
+      isLoading={query.isLoading}
+      {...props}
+    >
       <SearchDialogOverlay />
       <SearchDialogContent>
         <SearchDialogHeader>
@@ -46,5 +54,5 @@ export default function DefaultSearchDialog(props: SharedProps) {
         <SearchDialogList items={query.data !== "empty" ? query.data : null} />
       </SearchDialogContent>
     </SearchDialog>
-  )
+  );
 }

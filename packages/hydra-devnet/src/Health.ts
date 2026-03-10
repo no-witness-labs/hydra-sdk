@@ -28,8 +28,8 @@
  * @module
  */
 
-import Docker from 'dockerode';
-import { Context, Data, Effect, Layer } from 'effect';
+import Docker from "dockerode";
+import { Context, Data, Effect, Layer } from "effect";
 
 // =============================================================================
 // Errors
@@ -41,7 +41,7 @@ import { Context, Data, Effect, Layer } from 'effect';
  * @since 0.1.0
  * @category errors
  */
-export class HealthCheckError extends Data.TaggedError('HealthCheckError')<{
+export class HealthCheckError extends Data.TaggedError("HealthCheckError")<{
   readonly service: string;
   readonly cause: unknown;
 }> {}
@@ -96,7 +96,7 @@ export interface HealthServiceImpl {
  * @since 0.1.0
  * @category service
  */
-export class HealthService extends Context.Tag('HealthService')<
+export class HealthService extends Context.Tag("HealthService")<
   HealthService,
   HealthServiceImpl
 >() {}
@@ -115,7 +115,7 @@ function sleep(ms: number): Promise<void> {
  */
 async function checkWebSocketConnection(url: string): Promise<boolean> {
   return new Promise((resolve) => {
-    import('ws')
+    import("ws")
       .then(({ default: WebSocket }) => {
         const ws = new WebSocket(url);
         const timeout = setTimeout(() => {
@@ -123,13 +123,13 @@ async function checkWebSocketConnection(url: string): Promise<boolean> {
           resolve(false);
         }, 5000);
 
-        ws.on('open', () => {
+        ws.on("open", () => {
           clearTimeout(timeout);
           ws.close();
           resolve(true);
         });
 
-        ws.on('error', () => {
+        ws.on("error", () => {
           clearTimeout(timeout);
           resolve(false);
         });
@@ -166,7 +166,7 @@ function waitForHttpEffect(
         while (Date.now() - startTime < timeout) {
           try {
             const response = await fetch(url, {
-              method: 'GET',
+              method: "GET",
               signal: AbortSignal.timeout(5000),
             });
 
@@ -185,12 +185,9 @@ function waitForHttpEffect(
           await sleep(interval);
         }
 
-        throw new Error(
-          `Health check timed out after ${timeout}ms for ${url}`,
-        );
+        throw new Error(`Health check timed out after ${timeout}ms for ${url}`);
       },
-      catch: (cause: unknown) =>
-        new HealthCheckError({ service: url, cause }),
+      catch: (cause: unknown) => new HealthCheckError({ service: url, cause }),
     });
   });
 }
@@ -236,8 +233,7 @@ function waitForWebSocketEffect(
           `WebSocket check timed out after ${timeout}ms for ${url}`,
         );
       },
-      catch: (cause: unknown) =>
-        new HealthCheckError({ service: url, cause }),
+      catch: (cause: unknown) => new HealthCheckError({ service: url, cause }),
     });
   });
 }
@@ -255,19 +251,16 @@ function waitForPortEffect(
       try: async () => {
         const { interval = 1000, timeout = 60000 } = options;
         const startTime = Date.now();
-        const { createConnection } = await import('net');
+        const { createConnection } = await import("net");
 
         while (Date.now() - startTime < timeout) {
           const connected = await new Promise<boolean>((resolve) => {
-            const socket = createConnection(
-              { port, host: 'localhost' },
-              () => {
-                socket.destroy();
-                resolve(true);
-              },
-            );
+            const socket = createConnection({ port, host: "localhost" }, () => {
+              socket.destroy();
+              resolve(true);
+            });
 
-            socket.on('error', () => {
+            socket.on("error", () => {
               socket.destroy();
               resolve(false);
             });
@@ -316,7 +309,7 @@ function waitForContainerHealthyEffect(
             const info = await container.inspect();
             const health = info.State.Health;
 
-            if (health?.Status === 'healthy') {
+            if (health?.Status === "healthy") {
               return;
             }
 

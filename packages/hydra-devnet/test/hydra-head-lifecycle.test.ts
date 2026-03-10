@@ -1,9 +1,9 @@
-import { writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { writeFile } from "node:fs/promises";
+import { join } from "node:path";
 
-import { Cluster, Container } from '@no-witness-labs/hydra-devnet';
-import { Head } from '@no-witness-labs/hydra-sdk';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { Cluster, Container } from "@no-witness-labs/hydra-devnet";
+import { Head } from "@no-witness-labs/hydra-sdk";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 /**
  * Fast Shelley genesis config for testing.
@@ -33,8 +33,8 @@ const FAST_SHELLEY_GENESIS = {
  */
 async function commitEmpty(cluster: Cluster.Cluster): Promise<void> {
   const response = await fetch(`${cluster.hydraHttpUrl}/commit`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({}),
   });
   if (!response.ok) {
@@ -44,23 +44,23 @@ async function commitEmpty(cluster: Cluster.Cluster): Promise<void> {
   }
   const draftTx = await response.text();
 
-  await writeFile(join(cluster.tempDir!, 'commit-draft.json'), draftTx);
+  await writeFile(join(cluster.tempDir!, "commit-draft.json"), draftTx);
 
   await Container.exec(cluster.cardanoNode!, [
-    'sh',
-    '-c',
-    'cardano-cli conway transaction sign' +
-      ' --tx-file /opt/cardano/config/commit-draft.json' +
-      ' --signing-key-file /opt/cardano/config/payment.skey' +
-      ' --out-file /tmp/commit-signed.json',
+    "sh",
+    "-c",
+    "cardano-cli conway transaction sign" +
+      " --tx-file /opt/cardano/config/commit-draft.json" +
+      " --signing-key-file /opt/cardano/config/payment.skey" +
+      " --out-file /tmp/commit-signed.json",
   ]);
 
   await Container.exec(cluster.cardanoNode!, [
-    'sh',
-    '-c',
-    'cardano-cli conway transaction submit' +
-      ' --tx-file /tmp/commit-signed.json' +
-      ' --socket-path /opt/cardano/ipc/node.socket' +
+    "sh",
+    "-c",
+    "cardano-cli conway transaction submit" +
+      " --tx-file /tmp/commit-signed.json" +
+      " --socket-path /opt/cardano/ipc/node.socket" +
       ` --testnet-magic ${cluster.config.cardanoNode.networkMagic}`,
   ]);
 }
@@ -81,12 +81,12 @@ async function commitEmpty(cluster: Cluster.Cluster): Promise<void> {
  * - `head.close()` resolves when HeadIsClosed is received
  * - `head.fanout()` awaits ReadyToFanout then resolves on HeadIsFinalized
  */
-describe('Hydra Head Lifecycle — DevNet Integration', () => {
+describe("Hydra Head Lifecycle — DevNet Integration", () => {
   let cluster: Cluster.Cluster;
 
   beforeAll(async () => {
     cluster = Cluster.make({
-      clusterName: 'hydra-lifecycle-test',
+      clusterName: "hydra-lifecycle-test",
       cardanoNode: { port: 9001, submitPort: 9090 },
       hydraNode: {
         apiPort: 9401,
@@ -108,41 +108,37 @@ describe('Hydra Head Lifecycle — DevNet Integration', () => {
     }
   }, 120_000);
 
-  it(
-    'full lifecycle: init → commit → open → close → fanout',
-    async () => {
-      const head = await Head.create({ url: cluster.hydraApiUrl });
+  it("full lifecycle: init → commit → open → close → fanout", async () => {
+    const head = await Head.create({ url: cluster.hydraApiUrl });
 
-      try {
-        // 1. SDK connects and receives Greetings → state is Idle
-        expect(head.getState()).toBe('Idle');
+    try {
+      // 1. SDK connects and receives Greetings → state is Idle
+      expect(head.getState()).toBe("Idle");
 
-        // 2. init() sends Init and awaits HeadIsInitializing
-        await head.init();
-        expect(head.getState()).toBe('Initializing');
+      // 2. init() sends Init and awaits HeadIsInitializing
+      await head.init();
+      expect(head.getState()).toBe("Initializing");
 
-        // 3. Commit empty UTxO set to L1 (external REST + cardano-cli flow)
-        //    Then use SDK event stream to await HeadIsOpen from the hydra-node.
-        const events = head.subscribeEvents();
-        await commitEmpty(cluster);
+      // 3. Commit empty UTxO set to L1 (external REST + cardano-cli flow)
+      //    Then use SDK event stream to await HeadIsOpen from the hydra-node.
+      const events = head.subscribeEvents();
+      await commitEmpty(cluster);
 
-        // SDK's event stream delivers HeadIsOpen once L1 confirms the commit
-        for await (const event of events) {
-          if (event.tag === 'HeadIsOpen') break;
-        }
-        expect(head.getState()).toBe('Open');
-
-        // 4. close() sends Close and awaits HeadIsClosed
-        await head.close();
-        expect(head.getState()).toBe('Closed');
-
-        // 5. fanout() awaits ReadyToFanout then sends Fanout and awaits HeadIsFinalized
-        await head.fanout();
-        expect(head.getState()).toBe('Final');
-      } finally {
-        await head.dispose();
+      // SDK's event stream delivers HeadIsOpen once L1 confirms the commit
+      for await (const event of events) {
+        if (event.tag === "HeadIsOpen") break;
       }
-    },
-    600_000,
-  );
+      expect(head.getState()).toBe("Open");
+
+      // 4. close() sends Close and awaits HeadIsClosed
+      await head.close();
+      expect(head.getState()).toBe("Closed");
+
+      // 5. fanout() awaits ReadyToFanout then sends Fanout and awaits HeadIsFinalized
+      await head.fanout();
+      expect(head.getState()).toBe("Final");
+    } finally {
+      await head.dispose();
+    }
+  }, 600_000);
 });

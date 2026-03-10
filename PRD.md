@@ -9,11 +9,11 @@
 
 ## Document History
 
-| Version | Date              | Author             | Summary                                                                                                     |
-| ------- | ----------------- | ------------------ | ----------------------------------------------------------------------------------------------------------- |
-| 1.0     | February 16, 2026 | No Witness Labs    | Initial draft                                                                                               |
-| 1.1     | February 26, 2026 | No Witness Labs    | Sync with GitHub issues: milestone status, CLI package rename, #9 superseded, #30 and #39 added to roadmap |
-| 1.2     | February 26, 2026 | No Witness Labs    | PRD upgrade to skill schema: 4-section structure, removed implementation code samples, condensed Executive Summary, Testing Approach table, Appendix replaced with reference |
+| Version | Date              | Author          | Summary                                                                                                                                                                      |
+| ------- | ----------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.0     | February 16, 2026 | No Witness Labs | Initial draft                                                                                                                                                                |
+| 1.1     | February 26, 2026 | No Witness Labs | Sync with GitHub issues: milestone status, CLI package rename, #9 superseded, #30 and #39 added to roadmap                                                                   |
+| 1.2     | February 26, 2026 | No Witness Labs | PRD upgrade to skill schema: 4-section structure, removed implementation code samples, condensed Executive Summary, Testing Approach table, Appendix replaced with reference |
 
 ---
 
@@ -29,13 +29,13 @@ Developers building on Cardano's Hydra Layer 2 must interact directly with a low
 
 ### Success Criteria
 
-| KPI | Target |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| Protocol completeness | 100% of `ClientInput` (10 commands) + `ServerOutput` (32 events) typed and validated by Effect Schema |
-| End-to-end lifecycle | Full lifecycle (Connect → Init → Commit → Open → NewTx → Close → Fanout) verified by integration tests against `@no-witness-labs/hydra-devnet` |
-| Production resilience | `hydra-node` drop/restart triggers automatic SDK reconnection; head state consistent within 30 seconds |
-| Cross-platform reach | Test suite passes on Chromium, Firefox, WebKit × Linux, macOS, Windows |
-| Release readiness | npm package published with provenance attestation; Getting Started guide enables first working L2 transaction in < 30 minutes |
+| KPI                   | Target                                                                                                                                         |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Protocol completeness | 100% of `ClientInput` (10 commands) + `ServerOutput` (32 events) typed and validated by Effect Schema                                          |
+| End-to-end lifecycle  | Full lifecycle (Connect → Init → Commit → Open → NewTx → Close → Fanout) verified by integration tests against `@no-witness-labs/hydra-devnet` |
+| Production resilience | `hydra-node` drop/restart triggers automatic SDK reconnection; head state consistent within 30 seconds                                         |
+| Cross-platform reach  | Test suite passes on Chromium, Firefox, WebKit × Linux, macOS, Windows                                                                         |
+| Release readiness     | npm package published with provenance attestation; Getting Started guide enables first working L2 transaction in < 30 minutes                  |
 
 ---
 
@@ -395,10 +395,10 @@ evolution-sdk is declared as an **optional peer dependency**. The core SDK modul
 
 hydra-sdk maintains **two separate type universes** connected by schema transforms:
 
-| Universe | Owner | Purpose | Examples |
-|---|---|---|---|
-| **Wire types** | hydra-sdk (`Protocol/Types.ts`) | Model hydra-node JSON wire format, validated by Effect Schema | `HydraUTxOSchema`, `HydraValueSchema`, `HydraTxOutSchema` |
-| **Domain types** | evolution-sdk | Model Cardano data at a higher level, used by tx builders & wallets | `UTxO`, `Value`, `Assets`, `ProtocolParameters` |
+| Universe         | Owner                           | Purpose                                                             | Examples                                                  |
+| ---------------- | ------------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------- |
+| **Wire types**   | hydra-sdk (`Protocol/Types.ts`) | Model hydra-node JSON wire format, validated by Effect Schema       | `HydraUTxOSchema`, `HydraValueSchema`, `HydraTxOutSchema` |
+| **Domain types** | evolution-sdk                   | Model Cardano data at a higher level, used by tx builders & wallets | `UTxO`, `Value`, `Assets`, `ProtocolParameters`           |
 
 hydra-sdk **never re-exports** evolution-sdk types from its public namespace. evolution-sdk types only appear at the `Provider` boundary.
 
@@ -457,16 +457,16 @@ All errors extend `Data.TaggedError` from Effect (`HeadError`, `ProtocolError`).
 
 **Goal:** Core infrastructure, protocol types, WebSocket layer, head state machine, devnet testing infrastructure.
 
-| Deliverable                                               | Issue |
-| --------------------------------------------------------- | ----- |
-| Package structure & build config                          | #2    |
-| Protocol module — message types & schemas (initial)       | #3    |
-| Transport layer — WebSocket communication                 | #4    |
-| Head state machine (internal)                             | #5    |
-| `Head.create()` factory function                          | #6    |
-| All Head commands (lifecycle + tx operations)             | #6    |
+| Deliverable                                                                                        | Issue |
+| -------------------------------------------------------------------------------------------------- | ----- |
+| Package structure & build config                                                                   | #2    |
+| Protocol module — message types & schemas (initial)                                                | #3    |
+| Transport layer — WebSocket communication                                                          | #4    |
+| Head state machine (internal)                                                                      | #5    |
+| `Head.create()` factory function                                                                   | #6    |
+| All Head commands (lifecycle + tx operations)                                                      | #6    |
 | Protocol module — schema refinements (optional fields, UTxO types, typed failures, negative tests) | #30   |
-| Documentation site setup                                  | #7    |
+| Documentation site setup                                                                           | #7    |
 
 > **hydra-devnet:** Integration tests run against `@no-witness-labs/hydra-devnet`, which provides a Docker-based Cardano + Hydra L2 devnet. The devnet module handles key generation, genesis configuration, script publishing, and full cluster orchestration.
 
@@ -537,12 +537,12 @@ Multi-head orchestration across multiple `hydra-node` instances. Out of scope fo
 
 ### Testing Approach
 
-| Layer         | Tool                         | Scope                                                                         |
-| ------------- | ---------------------------- | ----------------------------------------------------------------------------- |
-| Unit          | Vitest                       | Protocol schema validation, FSM transitions, Transport reconnection           |
-| Integration   | Vitest + hydra-devnet        | Full head lifecycle, multi-party heads, reconnection, L1↔L2 commit/fanout    |
-| Cross-browser | Playwright                   | Chromium, Firefox, WebKit — WebSocket connection, wallet extension interaction |
-| Platform      | CI matrix                    | Linux, macOS, Windows                                                         |
-| Testnet       | Manual + CI                  | Transfer, Mint/Burn, State Update on Cardano `preview`                        |
+| Layer         | Tool                  | Scope                                                                          |
+| ------------- | --------------------- | ------------------------------------------------------------------------------ |
+| Unit          | Vitest                | Protocol schema validation, FSM transitions, Transport reconnection            |
+| Integration   | Vitest + hydra-devnet | Full head lifecycle, multi-party heads, reconnection, L1↔L2 commit/fanout      |
+| Cross-browser | Playwright            | Chromium, Firefox, WebKit — WebSocket connection, wallet extension interaction |
+| Platform      | CI matrix             | Linux, macOS, Windows                                                          |
+| Testnet       | Manual + CI           | Transfer, Mint/Burn, State Update on Cardano `preview`                         |
 
 > **Architectural reference:** All SDK modules follow the Hybrid Effect API pattern (Promise API + Effect API, four surfaces per module). Full implementation rules are defined in [hybrid-effect-api.instructions.md](/.github/instructions/hybrid-effect-api.instructions.md).

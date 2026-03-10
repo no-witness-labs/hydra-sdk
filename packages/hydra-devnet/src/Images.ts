@@ -26,8 +26,8 @@
  * @module
  */
 
-import Docker from 'dockerode';
-import { Data, Effect } from 'effect';
+import Docker from "dockerode";
+import { Data, Effect } from "effect";
 
 // =============================================================================
 // Errors
@@ -39,7 +39,7 @@ import { Data, Effect } from 'effect';
  * @since 0.1.0
  * @category errors
  */
-export class ImageError extends Data.TaggedError('ImageError')<{
+export class ImageError extends Data.TaggedError("ImageError")<{
   readonly reason: string;
   readonly message: string;
   readonly cause?: unknown;
@@ -65,7 +65,7 @@ const isAvailableEffect = (
     },
     catch: (cause) =>
       new ImageError({
-        reason: 'image_inspection_failed',
+        reason: "image_inspection_failed",
         message: `Failed to check if image '${imageName}' is available.`,
         cause,
       }),
@@ -88,7 +88,7 @@ const pullEffect = (imageName: string): Effect.Effect<void, ImageError> =>
       try: () => docker.pull(imageName),
       catch: (cause) =>
         new ImageError({
-          reason: 'image_pull_failed',
+          reason: "image_pull_failed",
           message: `Failed to pull image '${imageName}'. Check internet connection and image name.`,
           cause,
         }),
@@ -106,12 +106,12 @@ const pullEffect = (imageName: string): Effect.Effect<void, ImageError> =>
             (event: { status?: string; id?: string }) => {
               if (
                 event.status &&
-                event.status !== 'Downloading' &&
-                event.status !== 'Extracting'
+                event.status !== "Downloading" &&
+                event.status !== "Extracting"
               ) {
                 // eslint-disable-next-line no-console
                 console.log(
-                  `[HydraDevNet] ${event.status}${event.id ? ` ${event.id}` : ''}`,
+                  `[HydraDevNet] ${event.status}${event.id ? ` ${event.id}` : ""}`,
                 );
               }
             },
@@ -119,7 +119,7 @@ const pullEffect = (imageName: string): Effect.Effect<void, ImageError> =>
         }),
       catch: (cause) =>
         new ImageError({
-          reason: 'image_pull_failed',
+          reason: "image_pull_failed",
           message: `Failed to complete image pull for '${imageName}'.`,
           cause,
         }),

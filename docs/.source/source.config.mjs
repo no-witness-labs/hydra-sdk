@@ -1,6 +1,11 @@
 // source.config.ts
 import { rehypeCodeDefaultOptions } from "fumadocs-core/mdx-plugins";
-import { defineConfig, defineDocs, frontmatterSchema, metaSchema } from "fumadocs-mdx/config";
+import {
+  defineConfig,
+  defineDocs,
+  frontmatterSchema,
+  metaSchema
+} from "fumadocs-mdx/config";
 import { transformerTwoslash } from "fumadocs-twoslash";
 import { createFileSystemTypesCache } from "fumadocs-twoslash/cache-fs";
 var isDev = process.env.NODE_ENV === "development";

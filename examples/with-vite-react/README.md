@@ -46,45 +46,24 @@ The signing step uses raw CBOR manipulation (not Schema round-trip) to preserve 
 
 Once all participants commit, the head transitions to `Open`.
 
-### 5. L2 Operations (while head is Open)
+### 5. Close
 
-#### Send on L2
+Click **Close** (available when state is `Open`). Posts a `Close` command to the hydra-node, which submits an L1 close transaction. The state transitions to `Closed` and a contestation countdown timer appears.
 
-Enter a recipient address and ADA amount, then click **Send**. This builds a transaction using L2 UTxOs, signs it with the wallet, and submits it to the Hydra head via `NewTx`. L2 transactions are instant and fee-free.
-
-#### Decommit
-
-Enter an ADA amount and click **Decommit** to withdraw funds from L2 back to L1. The SDK sends a `Decommit` command with the signed transaction to the Hydra node.
-
-#### Recover
-
-If an incremental commit deposit fails or expires, enter the deposit transaction ID and click **Recover** to reclaim the deposited UTxOs on L1.
-
-### 6. Close / SafeClose
-
-- **Close** (available when state is `Open`) — posts a `Close` command to the hydra-node, which submits an L1 close transaction. The state transitions to `Closed` and the contestation period begins.
-- **SafeClose** (available when state is `Open`) — same as Close but verifies the confirmed snapshot does not contain non-ADA assets before closing, preventing potential asset lockup.
-
-### 7. Contest
-
-Click **Contest** (available when state is `Closed`). Challenges the closed snapshot with a more recent one during the contestation period. Use this if you observe a closure with an outdated snapshot.
-
-### 8. Fanout
+### 6. Fanout
 
 Click **Fanout** (available when state is `FanoutPossible`, after the contestation period expires). This submits an L1 fanout transaction that distributes the final UTxO set back to L1.
 
-### 9. Abort
+### 7. Abort
 
 Click **Abort** (available when state is `Idle` or `Initializing`). Aborts the head initialization and refunds any committed UTxOs.
 
 ## State Machine
 
 ```
-Idle → Init → Initializing → Commit → Open → Close → Closed → Contest → Closed
-                    ↓                    ↓                         ↓
-                  Abort            SafeClose                 ReadyToFanout
-                                                                  ↓
-                                                          FanoutPossible → Fanout → Final
+Idle → Init → Initializing → Commit → Open → Close → Closed → FanoutPossible → Fanout → Final
+                    ↓
+                  Abort
 ```
 
 ## Development
