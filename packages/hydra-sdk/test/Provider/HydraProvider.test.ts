@@ -78,9 +78,7 @@ describe("Provider / HydraProvider", () => {
       httpUrl: "http://localhost:4001",
     });
 
-    const delegation = await provider.getDelegation(
-      testRewardAddress
-    );
+    const delegation = await provider.getDelegation(testRewardAddress);
 
     expect(delegation.poolId).toBeNull();
     expect(delegation.rewards).toBe(0n);
@@ -154,10 +152,7 @@ describe("Provider / HydraProvider", () => {
     });
 
     // Pass HydraProvider into a generic function that accepts Provider
-    const delegation = await queryDelegation(
-      hydraProvider,
-      testRewardAddress,
-    );
+    const delegation = await queryDelegation(hydraProvider, testRewardAddress);
 
     expect(delegation.poolId).toBeNull();
     expect(delegation.rewards).toBe(0n);
@@ -173,9 +168,7 @@ describe("Provider / HydraProvider", () => {
 
     // Use Effect API through the Provider interface
     const result = await Effect.runPromise(
-      provider.Effect.getDelegation(
-        testRewardAddress,
-      ),
+      provider.Effect.getDelegation(testRewardAddress),
     );
 
     expect(result.poolId).toBeNull();

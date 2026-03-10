@@ -30,12 +30,12 @@
  * @module
  */
 
-import Docker from 'dockerode';
-import { Context, Data, Effect, Layer } from 'effect';
-import { PassThrough } from 'stream';
+import Docker from "dockerode";
+import { Context, Data, Effect, Layer } from "effect";
+import { PassThrough } from "stream";
 
-import type { ResolvedDevNetConfig } from './Config.js';
-import * as Images from './Images.js';
+import type { ResolvedDevNetConfig } from "./Config.js";
+import * as Images from "./Images.js";
 
 // =============================================================================
 // Errors
@@ -47,7 +47,7 @@ import * as Images from './Images.js';
  * @since 0.1.0
  * @category errors
  */
-export class ContainerError extends Data.TaggedError('ContainerError')<{
+export class ContainerError extends Data.TaggedError("ContainerError")<{
   readonly operation: string;
   readonly container: string;
   readonly cause: unknown;
@@ -59,7 +59,7 @@ export class ContainerError extends Data.TaggedError('ContainerError')<{
     } else if (this.cause) {
       parts.push(String(this.cause));
     }
-    return parts.join(' ');
+    return parts.join(" ");
   }
 }
 
@@ -70,7 +70,7 @@ export class ContainerError extends Data.TaggedError('ContainerError')<{
  * @category errors
  */
 export class DockerNotRunningError extends Data.TaggedError(
-  'DockerNotRunningError',
+  "DockerNotRunningError",
 )<{
   readonly cause: unknown;
 }> {}
@@ -97,9 +97,7 @@ export interface Container {
  * @category service
  */
 export interface ContainerServiceImpl {
-  readonly start: (
-    container: Container,
-  ) => Effect.Effect<void, ContainerError>;
+  readonly start: (container: Container) => Effect.Effect<void, ContainerError>;
   readonly stop: (container: Container) => Effect.Effect<void, ContainerError>;
   readonly remove: (
     container: Container,
@@ -107,9 +105,7 @@ export interface ContainerServiceImpl {
   readonly getStatus: (
     container: Container,
   ) => Effect.Effect<Docker.ContainerInspectInfo | undefined, ContainerError>;
-  readonly isRunning: (
-    container: Container,
-  ) => Effect.Effect<boolean, never>;
+  readonly isRunning: (container: Container) => Effect.Effect<boolean, never>;
 }
 
 /**
@@ -118,7 +114,7 @@ export interface ContainerServiceImpl {
  * @since 0.1.0
  * @category service
  */
-export class ContainerService extends Context.Tag('ContainerService')<
+export class ContainerService extends Context.Tag("ContainerService")<
   ContainerService,
   ContainerServiceImpl
 >() {}
@@ -141,7 +137,7 @@ function startEffect(
     },
     catch: (cause: unknown) =>
       new ContainerError({
-        operation: 'start',
+        operation: "start",
         container: container.name,
         cause,
       }),
@@ -152,9 +148,7 @@ function startEffect(
  * Stop a container if running.
  * @internal
  */
-function stopEffect(
-  container: Container,
-): Effect.Effect<void, ContainerError> {
+function stopEffect(container: Container): Effect.Effect<void, ContainerError> {
   return Effect.gen(function* () {
     yield* Effect.tryPromise({
       try: async () => {
@@ -167,7 +161,7 @@ function stopEffect(
       },
       catch: (cause: unknown) =>
         new ContainerError({
-          operation: 'stop',
+          operation: "stop",
           container: container.name,
           cause,
         }),
@@ -191,7 +185,7 @@ function removeEffect(
       },
       catch: (cause: unknown) =>
         new ContainerError({
-          operation: 'remove',
+          operation: "remove",
           container: container.name,
           cause,
         }),
@@ -213,7 +207,7 @@ function getStatusEffect(
     },
     catch: (cause: unknown) =>
       new ContainerError({
-        operation: 'inspect',
+        operation: "inspect",
         container: container.name,
         cause,
       }),
@@ -242,7 +236,7 @@ function execEffect(
         }),
       catch: (cause: unknown) =>
         new ContainerError({
-          operation: 'exec',
+          operation: "exec",
           container: container.name,
           cause,
         }),
@@ -252,7 +246,7 @@ function execEffect(
       try: () => exec.start({ Detach: false }),
       catch: (cause: unknown) =>
         new ContainerError({
-          operation: 'exec',
+          operation: "exec",
           container: container.name,
           cause,
         }),
@@ -263,20 +257,20 @@ function execEffect(
     const stderr = new PassThrough();
     docker.modem.demuxStream(stream, stdout, stderr);
 
-    let output = '';
+    let output = "";
 
-    stdout.on('data', (chunk: Buffer) => {
+    stdout.on("data", (chunk: Buffer) => {
       output += chunk.toString();
     });
 
-    stderr.on('data', (_chunk: Buffer) => {
+    stderr.on("data", (_chunk: Buffer) => {
       // Capture stderr but don't fail — some tools write info to stderr
     });
 
     yield* Effect.promise(
       () =>
         new Promise<void>((resolve) => {
-          stream.on('end', resolve);
+          stream.on("end", resolve);
         }),
     );
 
@@ -315,7 +309,7 @@ function runOnceEffect(
       try: () => docker.createContainer(createOptions),
       catch: (cause: unknown) =>
         new ContainerError({
-          operation: 'run-once-create',
+          operation: "run-once-create",
           container: image,
           cause,
         }),
@@ -325,7 +319,7 @@ function runOnceEffect(
       try: () => container.start(),
       catch: (cause: unknown) =>
         new ContainerError({
-          operation: 'run-once-start',
+          operation: "run-once-start",
           container: image,
           cause,
         }),
@@ -336,7 +330,7 @@ function runOnceEffect(
       try: () => container.wait() as Promise<{ StatusCode: number }>,
       catch: (cause: unknown) =>
         new ContainerError({
-          operation: 'run-once-wait',
+          operation: "run-once-wait",
           container: image,
           cause,
         }),
@@ -356,13 +350,13 @@ function runOnceEffect(
           follow: false,
         });
         return [
-          typeof out === 'string' ? out : (out as Buffer).toString('utf-8'),
-          typeof err === 'string' ? err : (err as Buffer).toString('utf-8'),
+          typeof out === "string" ? out : (out as Buffer).toString("utf-8"),
+          typeof err === "string" ? err : (err as Buffer).toString("utf-8"),
         ] as const;
       },
       catch: (cause: unknown) =>
         new ContainerError({
-          operation: 'run-once-logs',
+          operation: "run-once-logs",
           container: image,
           cause,
         }),
@@ -373,19 +367,19 @@ function runOnceEffect(
       try: () => container.remove(),
       catch: () =>
         new ContainerError({
-          operation: 'run-once-cleanup',
+          operation: "run-once-cleanup",
           container: image,
-          cause: 'Failed to remove one-off container',
+          cause: "Failed to remove one-off container",
         }),
     }).pipe(Effect.either); // Don't fail on cleanup errors
 
     if (waitResult.StatusCode !== 0) {
       const combined = [stdout.trim(), stderr.trim()]
         .filter(Boolean)
-        .join('\n');
+        .join("\n");
       return yield* Effect.fail(
         new ContainerError({
-          operation: 'run-once',
+          operation: "run-once",
           container: image,
           cause: `Container exited with code ${waitResult.StatusCode}: ${combined}`,
         }),
@@ -414,7 +408,7 @@ function findByNameEffect(
     },
     catch: (cause: unknown) =>
       new ContainerError({
-        operation: 'lookup',
+        operation: "lookup",
         container: containerName,
         cause,
       }),
@@ -441,7 +435,7 @@ function removeByNameEffect(
         },
         catch: (cause: unknown) =>
           new ContainerError({
-            operation: 'remove',
+            operation: "remove",
             container: containerName,
             cause,
           }),
@@ -467,7 +461,7 @@ async function ensureNetwork(networkName: string): Promise<Docker.Network> {
   if (existing) {
     return docker.getNetwork(existing.Id!);
   }
-  return docker.createNetwork({ Name: networkName, Driver: 'bridge' });
+  return docker.createNetwork({ Name: networkName, Driver: "bridge" });
 }
 
 /**
@@ -492,9 +486,7 @@ async function removeNetwork(networkName: string): Promise<void> {
  * @category utilities
  * @internal
  */
-export async function removeClusterNetwork(
-  clusterName: string,
-): Promise<void> {
+export async function removeClusterNetwork(clusterName: string): Promise<void> {
   try {
     await removeNetwork(`${clusterName}-network`);
   } catch {
@@ -554,31 +546,31 @@ function createCardanoNodeEffect(
             `CARDANO_NETWORK_MAGIC=${config.cardanoNode.networkMagic}`,
           ],
           Cmd: [
-            'run',
-            '--topology',
-            '/opt/cardano/config/topology.json',
-            '--database-path',
-            '/opt/cardano/data',
-            '--socket-path',
-            '/opt/cardano/ipc/node.socket',
-            '--host-addr',
-            '0.0.0.0',
-            '--port',
+            "run",
+            "--topology",
+            "/opt/cardano/config/topology.json",
+            "--database-path",
+            "/opt/cardano/data",
+            "--socket-path",
+            "/opt/cardano/ipc/node.socket",
+            "--host-addr",
+            "0.0.0.0",
+            "--port",
             String(config.cardanoNode.port),
-            '--config',
-            '/opt/cardano/config/config.json',
-            '--shelley-kes-key',
-            '/opt/cardano/config/kes.skey',
-            '--shelley-vrf-key',
-            '/opt/cardano/config/vrf.skey',
-            '--shelley-operational-certificate',
-            '/opt/cardano/config/pool.cert',
+            "--config",
+            "/opt/cardano/config/config.json",
+            "--shelley-kes-key",
+            "/opt/cardano/config/kes.skey",
+            "--shelley-vrf-key",
+            "/opt/cardano/config/vrf.skey",
+            "--shelley-operational-certificate",
+            "/opt/cardano/config/pool.cert",
           ],
         });
       },
       catch: (cause: unknown) =>
         new ContainerError({
-          operation: 'create',
+          operation: "create",
           container: `${config.clusterName}-cardano-node`,
           cause,
         }),
@@ -626,45 +618,42 @@ function createHydraNodeEffect(
                 { HostPort: String(config.hydraNode.monitoringPort) },
               ],
             },
-            Binds: [
-              `${tempDir}:/config:ro`,
-              `${volumeName}:/ipc`,
-            ],
+            Binds: [`${tempDir}:/config:ro`, `${volumeName}:/ipc`],
             NetworkMode: networkName,
           },
           Cmd: [
-            '--node-id',
+            "--node-id",
             config.hydraNode.nodeId,
-            '--api-host',
-            '0.0.0.0',
-            '--api-port',
+            "--api-host",
+            "0.0.0.0",
+            "--api-port",
             String(config.hydraNode.apiPort),
-            '--listen',
+            "--listen",
             `0.0.0.0:${config.hydraNode.peerPort}`,
-            '--monitoring-port',
+            "--monitoring-port",
             String(config.hydraNode.monitoringPort),
-            '--persistence-dir',
-            '/data',
-            '--hydra-signing-key',
-            '/config/hydra.sk',
-            '--cardano-signing-key',
-            '/config/payment.skey',
-            '--ledger-protocol-parameters',
-            '/config/protocol-parameters.json',
-            '--testnet-magic',
+            "--persistence-dir",
+            "/data",
+            "--hydra-signing-key",
+            "/config/hydra.sk",
+            "--cardano-signing-key",
+            "/config/payment.skey",
+            "--ledger-protocol-parameters",
+            "/config/protocol-parameters.json",
+            "--testnet-magic",
             String(config.cardanoNode.networkMagic),
-            '--node-socket',
-            '/ipc/node.socket',
-            '--hydra-scripts-tx-id',
+            "--node-socket",
+            "/ipc/node.socket",
+            "--hydra-scripts-tx-id",
             scriptsTxId,
-            '--contestation-period',
+            "--contestation-period",
             `${config.hydraNode.contestationPeriod}s`,
           ],
         });
       },
       catch: (cause: unknown) =>
         new ContainerError({
-          operation: 'create',
+          operation: "create",
           container: `${config.clusterName}-hydra-node`,
           cause,
         }),

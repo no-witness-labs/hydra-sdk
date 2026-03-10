@@ -4,11 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 
 /** Decode lovelace from a CIP-30 getBalance() CBOR hex string. */
 function decodeCborCoin(hex: string): bigint {
-  const bytes = new Uint8Array(
-    hex.match(/.{2}/g)!.map((b) => parseInt(b, 16)),
-  );
+  const bytes = new Uint8Array(hex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
   // Major type 4 (array) means multi-asset Value — first element is lovelace
-  const offset = (bytes[0]! >> 5) === 4 ? 1 : 0;
+  const offset = bytes[0]! >> 5 === 4 ? 1 : 0;
   return readCborUint(bytes, offset);
 }
 
@@ -70,10 +68,8 @@ export default function WalletConnect({ onApiReady }: Props) {
 
   const handleConnect = useCallback(
     (name: string) => {
-      connect(
-        name,
-        undefined,
-        (err) => console.error("Wallet connect error:", err),
+      connect(name, undefined, (err) =>
+        console.error("Wallet connect error:", err),
       );
     },
     [connect],

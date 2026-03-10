@@ -20,16 +20,12 @@ const getUrl = (): string => {
 const withHead = (
   fn: (head: Head.HydraHead) => Effect.Effect<void>,
 ): Effect.Effect<void> =>
-  Head.effect
-    .create({ url: getUrl() })
-    .pipe(
-      Effect.flatMap((head) =>
-        fn(head).pipe(
-          Effect.ensuring(head.effect.dispose().pipe(Effect.orDie)),
-        ),
-      ),
-      Effect.orDie,
-    );
+  Head.effect.create({ url: getUrl() }).pipe(
+    Effect.flatMap((head) =>
+      fn(head).pipe(Effect.ensuring(head.effect.dispose().pipe(Effect.orDie))),
+    ),
+    Effect.orDie,
+  );
 
 export const statusCommand = Command.make("status", {}).pipe(
   Command.withHandler(() =>
@@ -47,7 +43,9 @@ export const initializeCommand = Command.make("initialize", {}).pipe(
       Effect.gen(function* () {
         yield* Effect.logInfo("Sending Init command");
         yield* head.effect.init();
-        yield* Effect.logInfo(`Init complete, status is now [${head.getState()}]`);
+        yield* Effect.logInfo(
+          `Init complete, status is now [${head.getState()}]`,
+        );
       }).pipe(
         Effect.catchAll((e) =>
           Effect.logInfo(`Failed initialize with error: ${e}`),
@@ -63,7 +61,9 @@ export const abortCommand = Command.make("abort", {}).pipe(
       Effect.gen(function* () {
         yield* Effect.logInfo("Sending Abort command");
         yield* head.effect.abort();
-        yield* Effect.logInfo(`Abort complete, status is now [${head.getState()}]`);
+        yield* Effect.logInfo(
+          `Abort complete, status is now [${head.getState()}]`,
+        );
       }).pipe(
         Effect.catchAll((e) => Effect.logInfo(`Failed abort with error: ${e}`)),
       ),
@@ -77,7 +77,9 @@ export const closeCommand = Command.make("close", {}).pipe(
       Effect.gen(function* () {
         yield* Effect.logInfo("Sending Close command");
         yield* head.effect.close();
-        yield* Effect.logInfo(`Close complete, status is now [${head.getState()}]`);
+        yield* Effect.logInfo(
+          `Close complete, status is now [${head.getState()}]`,
+        );
       }).pipe(
         Effect.catchAll((e) => Effect.logInfo(`Failed close with error: ${e}`)),
       ),
@@ -91,7 +93,9 @@ export const commitCommand = Command.make("commit", {}).pipe(
       Effect.gen(function* () {
         yield* Effect.logInfo("Sending empty Commit (REST)");
         yield* head.effect.commit({});
-        yield* Effect.logInfo(`Commit complete, status is now [${head.getState()}]`);
+        yield* Effect.logInfo(
+          `Commit complete, status is now [${head.getState()}]`,
+        );
       }).pipe(
         Effect.catchAll((e) =>
           Effect.logInfo(`Failed commit with error: ${e}`),
@@ -107,7 +111,9 @@ export const contestCommand = Command.make("contest", {}).pipe(
       Effect.gen(function* () {
         yield* Effect.logInfo("Sending Contest command");
         yield* head.effect.contest();
-        yield* Effect.logInfo(`Contest complete, status is now [${head.getState()}]`);
+        yield* Effect.logInfo(
+          `Contest complete, status is now [${head.getState()}]`,
+        );
       }).pipe(
         Effect.catchAll((e) =>
           Effect.logInfo(`Failed contest with error: ${e}`),
@@ -123,7 +129,9 @@ export const fanoutCommand = Command.make("fanout", {}).pipe(
       Effect.gen(function* () {
         yield* Effect.logInfo("Sending Fanout command");
         yield* head.effect.fanout();
-        yield* Effect.logInfo(`Fanout complete, status is now [${head.getState()}]`);
+        yield* Effect.logInfo(
+          `Fanout complete, status is now [${head.getState()}]`,
+        );
       }).pipe(
         Effect.catchAll((e) =>
           Effect.logInfo(`Failed fanout with error: ${e}`),

@@ -1,12 +1,12 @@
-import "@/app/global.css"
+import "@/app/global.css";
 
-import { Inter } from "next/font/google"
+import { Inter } from "next/font/google";
 
-import { Provider } from "./provider"
+import { Provider } from "./provider";
 
 const inter = Inter({
-  subsets: ["latin"]
-})
+  subsets: ["latin"],
+});
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -15,5 +15,5 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <Provider>{children}</Provider>
       </body>
     </html>
-  )
+  );
 }

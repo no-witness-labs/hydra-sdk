@@ -6,9 +6,11 @@
  * evolution-sdk transaction-building API against a Hydra Head.
  */
 import type {
-  Address,  InlineDatum,
+  Address,
+  InlineDatum,
   TransactionInput,
-  UTxO} from "@evolution-sdk/evolution";
+  UTxO,
+} from "@evolution-sdk/evolution";
 import {
   Assets,
   Credential,
@@ -46,9 +48,7 @@ const wrapError = <A>(
   message: string,
 ): Effect.Effect<A, ProviderError> =>
   effect.pipe(
-    Effect.mapError(
-      (cause) => new ProviderError({ cause, message }),
-    ),
+    Effect.mapError((cause) => new ProviderError({ cause, message })),
   );
 
 const getAllUtxos = (
@@ -140,20 +140,16 @@ export class HydraProvider implements Provider {
     addressOrCredential: Parameters<Provider["getUtxosWithUnit"]>[0],
     unit: Parameters<Provider["getUtxosWithUnit"]>[1],
   ) =>
-    Effect.runPromise(
-      this.Effect.getUtxosWithUnit(addressOrCredential, unit),
-    );
+    Effect.runPromise(this.Effect.getUtxosWithUnit(addressOrCredential, unit));
 
   getUtxoByUnit = (unit: Parameters<Provider["getUtxoByUnit"]>[0]) =>
     Effect.runPromise(this.Effect.getUtxoByUnit(unit));
 
-  getUtxosByOutRef = (
-    outRefs: Parameters<Provider["getUtxosByOutRef"]>[0],
-  ) => Effect.runPromise(this.Effect.getUtxosByOutRef(outRefs));
+  getUtxosByOutRef = (outRefs: Parameters<Provider["getUtxosByOutRef"]>[0]) =>
+    Effect.runPromise(this.Effect.getUtxosByOutRef(outRefs));
 
-  getDelegation = (
-    rewardAddress: Parameters<Provider["getDelegation"]>[0],
-  ) => Effect.runPromise(this.Effect.getDelegation(rewardAddress));
+  getDelegation = (rewardAddress: Parameters<Provider["getDelegation"]>[0]) =>
+    Effect.runPromise(this.Effect.getDelegation(rewardAddress));
 
   getDatum = (datumHash: Parameters<Provider["getDatum"]>[0]) =>
     Effect.runPromise(this.Effect.getDatum(datumHash));
@@ -209,9 +205,7 @@ const getProtocolParametersEffect = (
           priceMem: extractPriceMem(pp.executionUnitPrices),
           priceStep: extractPriceStep(pp.executionUnitPrices),
           maxTxExMem: BigInt(execUnits.memory as number),
-          maxTxExSteps: BigInt(
-            (execUnits.steps ?? execUnits.cpu) as number,
-          ),
+          maxTxExSteps: BigInt((execUnits.steps ?? execUnits.cpu) as number),
           coinsPerUtxoByte: lovelaceOf(
             raw.utxoCostPerByte ?? raw.utxoConstPerByte,
           ),
@@ -333,10 +327,12 @@ const awaitTxEffect = (
         }
       }
       if (event.tag === "TxInvalid") {
-        const payload = event.payload as {
-          transaction?: { txId?: string };
-          validationError?: { reason?: string };
-        } | undefined;
+        const payload = event.payload as
+          | {
+              transaction?: { txId?: string };
+              validationError?: { reason?: string };
+            }
+          | undefined;
         if (payload?.transaction?.txId === targetTxId) {
           unsubscribe();
           resume(
@@ -403,7 +399,9 @@ const extractPriceMem = (executionUnitPrices: unknown): number => {
     executionUnitPrices !== null &&
     "priceMemory" in executionUnitPrices
   ) {
-    return Number((executionUnitPrices as { priceMemory: unknown }).priceMemory);
+    return Number(
+      (executionUnitPrices as { priceMemory: unknown }).priceMemory,
+    );
   }
   return 0;
 };
@@ -419,5 +417,7 @@ const extractPriceStep = (executionUnitPrices: unknown): number => {
   return 0;
 };
 
-const arrayToIndexedRecord = (arr: ReadonlyArray<number>): Record<string, number> =>
+const arrayToIndexedRecord = (
+  arr: ReadonlyArray<number>,
+): Record<string, number> =>
   Object.fromEntries(arr.map((v, i) => [String(i), v]));

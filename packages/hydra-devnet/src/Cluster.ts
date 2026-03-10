@@ -55,20 +55,20 @@
  * @module
  */
 
-import { NodeStream } from '@effect/platform-node';
-import Docker from 'dockerode';
-import { Context, Data, Effect, Layer, Stream } from 'effect';
-import { mkdtemp, rm, writeFile } from 'fs/promises';
-import { tmpdir } from 'os';
-import { join } from 'path';
+import { NodeStream } from "@effect/platform-node";
+import Docker from "dockerode";
+import { Context, Data, Effect, Layer, Stream } from "effect";
+import { mkdtemp, rm, writeFile } from "fs/promises";
+import { tmpdir } from "os";
+import { join } from "path";
 
-import type { DevNetConfig, ResolvedDevNetConfig } from './Config.js';
-import { DEFAULT_DEVNET_CONFIG } from './Config.js';
-import * as Container from './Container.js';
-import type { GeneratedKeys } from './Genesis.js';
-import * as Genesis from './Genesis.js';
-import * as Health from './Health.js';
-import * as Images from './Images.js';
+import type { DevNetConfig, ResolvedDevNetConfig } from "./Config.js";
+import { DEFAULT_DEVNET_CONFIG } from "./Config.js";
+import * as Container from "./Container.js";
+import type { GeneratedKeys } from "./Genesis.js";
+import * as Genesis from "./Genesis.js";
+import * as Health from "./Health.js";
+import * as Images from "./Images.js";
 
 // =============================================================================
 // Errors
@@ -80,7 +80,7 @@ import * as Images from './Images.js';
  * @since 0.1.0
  * @category errors
  */
-export class ClusterError extends Data.TaggedError('ClusterError')<{
+export class ClusterError extends Data.TaggedError("ClusterError")<{
   readonly operation: string;
   readonly cluster?: string;
   readonly cause: unknown;
@@ -90,12 +90,16 @@ export class ClusterError extends Data.TaggedError('ClusterError')<{
     if (this.cluster) parts.push(`cluster=${this.cluster}`);
     if (this.cause instanceof Error) {
       parts.push(this.cause.message);
-    } else if (this.cause && typeof this.cause === 'object' && 'message' in this.cause) {
+    } else if (
+      this.cause &&
+      typeof this.cause === "object" &&
+      "message" in this.cause
+    ) {
       parts.push(String((this.cause as { message: unknown }).message));
     } else if (this.cause) {
       parts.push(String(this.cause));
     }
-    return parts.join(' ');
+    return parts.join(" ");
   }
 }
 
@@ -210,7 +214,7 @@ export interface ClusterServiceImpl {
  * @since 0.1.0
  * @category service
  */
-export class ClusterService extends Context.Tag('ClusterService')<
+export class ClusterService extends Context.Tag("ClusterService")<
   ClusterService,
   ClusterServiceImpl
 >() {}
@@ -229,8 +233,7 @@ function resolveConfig(config: DevNetConfig = {}): ResolvedDevNetConfig {
     cardanoNode: {
       image:
         config.cardanoNode?.image ?? DEFAULT_DEVNET_CONFIG.cardanoNode.image,
-      port:
-        config.cardanoNode?.port ?? DEFAULT_DEVNET_CONFIG.cardanoNode.port,
+      port: config.cardanoNode?.port ?? DEFAULT_DEVNET_CONFIG.cardanoNode.port,
       submitPort:
         config.cardanoNode?.submitPort ??
         DEFAULT_DEVNET_CONFIG.cardanoNode.submitPort,
@@ -239,8 +242,7 @@ function resolveConfig(config: DevNetConfig = {}): ResolvedDevNetConfig {
         DEFAULT_DEVNET_CONFIG.cardanoNode.networkMagic,
     },
     hydraNode: {
-      image:
-        config.hydraNode?.image ?? DEFAULT_DEVNET_CONFIG.hydraNode.image,
+      image: config.hydraNode?.image ?? DEFAULT_DEVNET_CONFIG.hydraNode.image,
       apiPort:
         config.hydraNode?.apiPort ?? DEFAULT_DEVNET_CONFIG.hydraNode.apiPort,
       peerPort:
@@ -289,15 +291,15 @@ function waitForBlockProductionEffect(
         () => stream,
         (error) =>
           new ClusterError({
-            operation: 'log-stream',
+            operation: "log-stream",
             cause: error,
           }),
       ),
     ),
     Stream.takeUntil(
       (line) =>
-        line.toString().includes('Forge.Loop.AdoptedBlock') ||
-        line.toString().includes('Forge.Loop.NodeIsLeader'),
+        line.toString().includes("Forge.Loop.AdoptedBlock") ||
+        line.toString().includes("Forge.Loop.NodeIsLeader"),
     ),
     Stream.runDrain,
   );
@@ -321,7 +323,7 @@ function cleanupExistingEffect(
       Container.effect.removeByName(`${config.clusterName}-hydra-node`),
       (cause) =>
         new ClusterError({
-          operation: 'cleanup',
+          operation: "cleanup",
           cluster: config.clusterName,
           cause,
         }),
@@ -330,7 +332,7 @@ function cleanupExistingEffect(
       Container.effect.removeByName(`${config.clusterName}-cardano-node`),
       (cause) =>
         new ClusterError({
-          operation: 'cleanup',
+          operation: "cleanup",
           cluster: config.clusterName,
           cause,
         }),
@@ -375,7 +377,7 @@ function startClusterEffect(
       }),
       (cause) =>
         new ClusterError({
-          operation: 'pull-images',
+          operation: "pull-images",
           cluster: config.clusterName,
           cause,
         }),
@@ -383,11 +385,10 @@ function startClusterEffect(
 
     // Step 3: Create temp directory for config files
     const tempDir = yield* Effect.tryPromise({
-      try: () =>
-        mkdtemp(join(tmpdir(), `${config.clusterName}-`)),
+      try: () => mkdtemp(join(tmpdir(), `${config.clusterName}-`)),
       catch: (cause: unknown) =>
         new ClusterError({
-          operation: 'create-temp-dir',
+          operation: "create-temp-dir",
           cluster: config.clusterName,
           cause,
         }),
@@ -399,7 +400,7 @@ function startClusterEffect(
       Genesis.effect.generateKeys(tempDir, config),
       (cause) =>
         new ClusterError({
-          operation: 'generate-keys',
+          operation: "generate-keys",
           cluster: config.clusterName,
           cause,
         }),
@@ -416,7 +417,7 @@ function startClusterEffect(
       ),
       (cause) =>
         new ClusterError({
-          operation: 'write-config',
+          operation: "write-config",
           cluster: config.clusterName,
           cause,
         }),
@@ -434,13 +435,13 @@ function startClusterEffect(
         if (!existing) {
           await docker.createNetwork({
             Name: networkName,
-            Driver: 'bridge',
+            Driver: "bridge",
           });
         }
       },
       catch: (cause: unknown) =>
         new ClusterError({
-          operation: 'create-network',
+          operation: "create-network",
           cluster: config.clusterName,
           cause,
         }),
@@ -451,7 +452,7 @@ function startClusterEffect(
       Container.effect.createCardanoNode(config, networkName, tempDir),
       (cause) =>
         new ClusterError({
-          operation: 'create-cardano-node',
+          operation: "create-cardano-node",
           cluster: config.clusterName,
           cause,
         }),
@@ -465,7 +466,7 @@ function startClusterEffect(
       Container.effect.start(state.cardanoNode),
       (cause) =>
         new ClusterError({
-          operation: 'start-cardano-node',
+          operation: "start-cardano-node",
           cluster: config.clusterName,
           cause,
         }),
@@ -478,7 +479,7 @@ function startClusterEffect(
       Effect.mapError(
         (cause) =>
           new ClusterError({
-            operation: 'wait-cardano-node',
+            operation: "wait-cardano-node",
             cluster: config.clusterName,
             cause,
           }),
@@ -500,9 +501,9 @@ function startClusterEffect(
             tail: 50,
           });
           const logText =
-            typeof logs === 'string'
+            typeof logs === "string"
               ? logs
-              : (logs as Buffer).toString('utf-8');
+              : (logs as Buffer).toString("utf-8");
           throw new Error(
             `Cardano node exited: status=${info.State.Status} exit=${info.State.ExitCode}\nLast logs:\n${logText}`,
           );
@@ -510,7 +511,7 @@ function startClusterEffect(
       },
       catch: (cause: unknown) =>
         new ClusterError({
-          operation: 'verify-cardano-socket',
+          operation: "verify-cardano-socket",
           cluster: config.clusterName,
           cause,
         }),
@@ -521,7 +522,7 @@ function startClusterEffect(
       Genesis.effect.publishHydraScripts(tempDir, config),
       (cause) =>
         new ClusterError({
-          operation: 'publish-hydra-scripts',
+          operation: "publish-hydra-scripts",
           cluster: config.clusterName,
           cause,
         }),
@@ -531,21 +532,18 @@ function startClusterEffect(
     // Step 9b: Query protocol parameters from running cardano-node and write to tempDir
     yield* Effect.mapError(
       Effect.gen(function* () {
-        const ppOutput = yield* Container.effect.exec(
-          state.cardanoNode!,
-          [
-            'cardano-cli',
-            'conway',
-            'query',
-            'protocol-parameters',
-            '--testnet-magic',
-            String(config.cardanoNode.networkMagic),
-            '--socket-path',
-            '/opt/cardano/ipc/node.socket',
-            '--out-file',
-            '/dev/stdout',
-          ],
-        );
+        const ppOutput = yield* Container.effect.exec(state.cardanoNode!, [
+          "cardano-cli",
+          "conway",
+          "query",
+          "protocol-parameters",
+          "--testnet-magic",
+          String(config.cardanoNode.networkMagic),
+          "--socket-path",
+          "/opt/cardano/ipc/node.socket",
+          "--out-file",
+          "/dev/stdout",
+        ]);
         const pp = JSON.parse(ppOutput);
         // Zero out fees for the Hydra L2 ledger (same as hydra demo)
         pp.txFeeFixed = 0;
@@ -560,12 +558,12 @@ function startClusterEffect(
         yield* Effect.tryPromise({
           try: () =>
             writeFile(
-              join(tempDir, 'protocol-parameters.json'),
+              join(tempDir, "protocol-parameters.json"),
               JSON.stringify(pp, null, 2),
             ),
           catch: (cause: unknown) =>
             new ClusterError({
-              operation: 'write-protocol-params',
+              operation: "write-protocol-params",
               cluster: config.clusterName,
               cause,
             }),
@@ -573,7 +571,7 @@ function startClusterEffect(
       }),
       (cause) =>
         new ClusterError({
-          operation: 'query-protocol-params',
+          operation: "query-protocol-params",
           cluster: config.clusterName,
           cause,
         }),
@@ -589,7 +587,7 @@ function startClusterEffect(
       ),
       (cause) =>
         new ClusterError({
-          operation: 'create-hydra-node',
+          operation: "create-hydra-node",
           cluster: config.clusterName,
           cause,
         }),
@@ -603,7 +601,7 @@ function startClusterEffect(
       Container.effect.start(state.hydraNode),
       (cause) =>
         new ClusterError({
-          operation: 'start-hydra-node',
+          operation: "start-hydra-node",
           cluster: config.clusterName,
           cause,
         }),
@@ -617,7 +615,7 @@ function startClusterEffect(
       }),
       (cause) =>
         new ClusterError({
-          operation: 'wait-hydra-api',
+          operation: "wait-hydra-api",
           cluster: config.clusterName,
           cause,
         }),
@@ -639,7 +637,7 @@ function stopClusterEffect(
         Container.effect.stop(state.hydraNode),
         (cause) =>
           new ClusterError({
-            operation: 'stop-hydra-node',
+            operation: "stop-hydra-node",
             cluster: state.config.clusterName,
             cause,
           }),
@@ -651,7 +649,7 @@ function stopClusterEffect(
         Container.effect.stop(state.cardanoNode),
         (cause) =>
           new ClusterError({
-            operation: 'stop-cardano-node',
+            operation: "stop-cardano-node",
             cluster: state.config.clusterName,
             cause,
           }),
@@ -674,7 +672,7 @@ function removeClusterEffect(
         Container.effect.remove(state.hydraNode),
         (cause) =>
           new ClusterError({
-            operation: 'remove-hydra-node',
+            operation: "remove-hydra-node",
             cluster: state.config.clusterName,
             cause,
           }),
@@ -687,7 +685,7 @@ function removeClusterEffect(
         Container.effect.remove(state.cardanoNode),
         (cause) =>
           new ClusterError({
-            operation: 'remove-cardano-node',
+            operation: "remove-cardano-node",
             cluster: state.config.clusterName,
             cause,
           }),
@@ -699,7 +697,7 @@ function removeClusterEffect(
       try: () => Container.removeClusterNetwork(state.config.clusterName),
       catch: (cause: unknown) =>
         new ClusterError({
-          operation: 'remove-network',
+          operation: "remove-network",
           cluster: state.config.clusterName,
           cause,
         }),
@@ -718,7 +716,7 @@ function removeClusterEffect(
       },
       catch: (cause: unknown) =>
         new ClusterError({
-          operation: 'remove-volume',
+          operation: "remove-volume",
           cluster: state.config.clusterName,
           cause,
         }),
@@ -730,7 +728,7 @@ function removeClusterEffect(
         try: () => rm(state.tempDir!, { recursive: true, force: true }),
         catch: (cause: unknown) =>
           new ClusterError({
-            operation: 'remove-temp',
+            operation: "remove-temp",
             cluster: state.config.clusterName,
             cause,
           }),

@@ -53,22 +53,22 @@ prefer `withHead`.
 **Signature**
 
 ```ts
-export declare const create: (config: HeadConfig) => Promise<HydraHead>
+export declare const create: (config: HeadConfig) => Promise<HydraHead>;
 ```
 
 **Example**
 
 ```ts
-import { Head } from "@no-witness-labs/hydra-sdk"
+import { Head } from "@no-witness-labs/hydra-sdk";
 
 async function example() {
-  const head = await Head.create({ url: "ws://localhost:9944" })
-  console.log(head.getState()) // "Idle"
+  const head = await Head.create({ url: "ws://localhost:9944" });
+  console.log(head.getState()); // "Idle"
 
-  await head.init()
-  console.log(head.getState()) // "Initializing"
+  await head.init();
+  console.log(head.getState()); // "Initializing"
 
-  await head.dispose()
+  await head.dispose();
 }
 ```
 
@@ -84,39 +84,43 @@ resource management, and typed error channel.
 
 ```ts
 export declare const effect: {
-  create: (config: HeadConfig) => Effect.Effect<HydraHead, HeadError>
-  createScoped: (config: HeadConfig) => Effect.Effect<HydraHead, HeadError, Scope.Scope>
-}
+  create: (config: HeadConfig) => Effect.Effect<HydraHead, HeadError>;
+  createScoped: (
+    config: HeadConfig,
+  ) => Effect.Effect<HydraHead, HeadError, Scope.Scope>;
+};
 ```
 
 **Example**
 
 ```ts
 // effect.create — manual lifecycle
-import { Effect } from "effect"
-import { Head } from "@no-witness-labs/hydra-sdk"
+import { Effect } from "effect";
+import { Head } from "@no-witness-labs/hydra-sdk";
 
 const program = Effect.gen(function* () {
-  const head = yield* Head.effect.create({ url: "ws://localhost:9944" })
-  yield* head.effect.init()
+  const head = yield* Head.effect.create({ url: "ws://localhost:9944" });
+  yield* head.effect.init();
   // ... do work ...
-  yield* head.effect.dispose()
-})
+  yield* head.effect.dispose();
+});
 ```
 
 **Example**
 
 ```ts
 // effect.createScoped — automatic disposal
-import { Effect } from "effect"
-import { Head } from "@no-witness-labs/hydra-sdk"
+import { Effect } from "effect";
+import { Head } from "@no-witness-labs/hydra-sdk";
 
 const program = Effect.scoped(
   Effect.gen(function* () {
-    const head = yield* Head.effect.createScoped({ url: "ws://localhost:9944" })
-    yield* head.effect.init()
-  })
-)
+    const head = yield* Head.effect.createScoped({
+      url: "ws://localhost:9944",
+    });
+    yield* head.effect.init();
+  }),
+);
 ```
 
 ## withHead
@@ -130,24 +134,30 @@ Creates a `HydraHead`, runs `body` with it, then unconditionally calls
 **Signature**
 
 ```ts
-export declare const withHead: <A>(config: HeadConfig, body: (head: HydraHead) => Promise<A>) => Promise<A>
+export declare const withHead: <A>(
+  config: HeadConfig,
+  body: (head: HydraHead) => Promise<A>,
+) => Promise<A>;
 ```
 
 **Example**
 
 ```ts
-import { Head } from "@no-witness-labs/hydra-sdk"
+import { Head } from "@no-witness-labs/hydra-sdk";
 
 async function example() {
-  const result = await Head.withHead({ url: "ws://localhost:9944" }, async (head) => {
-    await head.init()
-    // ... do work ...
-    await head.close()
-    await head.fanout()
-    return head.getState() // "Final"
-  })
+  const result = await Head.withHead(
+    { url: "ws://localhost:9944" },
+    async (head) => {
+      await head.init();
+      // ... do work ...
+      await head.close();
+      await head.fanout();
+      return head.getState(); // "Final"
+    },
+  );
 
-  console.log(result) // "Final"
+  console.log(result); // "Final"
   // head.dispose() was called automatically
 }
 ```
@@ -179,7 +189,7 @@ export type ApiEvent =
   | { readonly _tag: "ServerOutput"; readonly output: ServerOutput }
   | { readonly _tag: "ClientMessage"; readonly message: ClientMessage }
   | { readonly _tag: "Greetings"; readonly greetings: Greetings }
-  | { readonly _tag: "InvalidInput"; readonly invalidInput: InvalidInput }
+  | { readonly _tag: "InvalidInput"; readonly invalidInput: InvalidInput };
 ```
 
 ## ClientInputTag (type alias)
@@ -198,7 +208,7 @@ export type ClientInputTag =
   // TODO(protocol-schema): SafeClose is scaffold-only and not part of Hydra websocket commands.
   | "SafeClose"
   | "Fanout"
-  | "Abort"
+  | "Abort";
 ```
 
 ## ClientMessage (interface)
@@ -210,11 +220,14 @@ Failure envelope returned by hydra-node when a client command is rejected.
 ```ts
 export interface ClientMessage {
   /** Discriminating tag that identifies which command failed. */
-  readonly tag: "CommandFailed" | "RejectedInputBecauseUnsynced" | "PostTxOnChainFailed"
+  readonly tag:
+    | "CommandFailed"
+    | "RejectedInputBecauseUnsynced"
+    | "PostTxOnChainFailed";
   /** Optional tag of the client command that triggered this failure, if applicable. */
-  readonly clientInputTag?: ClientInputTag
+  readonly clientInputTag?: ClientInputTag;
   /** Optional human-readable explanation of why the command failed. */
-  readonly reason?: string
+  readonly reason?: string;
 }
 ```
 
@@ -229,7 +242,7 @@ history.
 ```ts
 export interface Greetings {
   /** The head state as known by hydra-node at the time of the greeting. */
-  readonly headStatus: HeadStatus
+  readonly headStatus: HeadStatus;
 }
 ```
 
@@ -242,30 +255,30 @@ Connection and reconnection configuration for a Hydra Head.
 ```ts
 export interface HeadConfig {
   /** WebSocket URL of the hydra-node API (e.g. `"ws://localhost:9944"`). */
-  readonly url: string
+  readonly url: string;
   /**
    * When `true`, the hydra-node will replay all past server outputs upon the
    * initial WebSocket connection so the client can reconstruct current state.
    */
-  readonly historyOnConnect?: boolean
+  readonly historyOnConnect?: boolean;
   /**
    * When `true`, the hydra-node replays past server outputs after each
    * automatic reconnection attempt.
    */
-  readonly historyOnReconnect?: boolean
+  readonly historyOnReconnect?: boolean;
   /** Optional exponential back-off parameters for automatic reconnection. */
   readonly reconnect?: {
     /** Optional maximum number of reconnection attempts before giving up. */
-    readonly maxRetries?: number
+    readonly maxRetries?: number;
     /** Optional delay in milliseconds before the first reconnection attempt. */
-    readonly initialDelayMs?: number
+    readonly initialDelayMs?: number;
     /** Optional upper bound in milliseconds for the back-off delay. */
-    readonly maxDelayMs?: number
+    readonly maxDelayMs?: number;
     /** Optional multiplier applied to the delay after each failed attempt. */
-    readonly factor?: number
+    readonly factor?: number;
     /** Optional random jitter factor in the range `[0, 1]` (inclusive) added to each delay to avoid thundering herd. The SDK does not perform runtime validation of this range and forwards the value to the underlying reconnection implementation; callers are responsible for only providing values within the documented range. */
-    readonly jitter?: number
-  }
+    readonly jitter?: number;
+  };
 }
 ```
 
@@ -280,7 +293,14 @@ hydra-node over the WebSocket connection. The normal happy-path is:
 **Signature**
 
 ```ts
-export type HeadStatus = "Idle" | "Initializing" | "Open" | "Closed" | "FanoutPossible" | "Final" | "Aborted"
+export type HeadStatus =
+  | "Idle"
+  | "Initializing"
+  | "Open"
+  | "Closed"
+  | "FanoutPossible"
+  | "Final"
+  | "Aborted";
 ```
 
 ## HydraHead (interface)
@@ -296,7 +316,7 @@ export interface HydraHead {
    * Current `HeadStatus` of this head, read synchronously from the
    * in-memory FSM state.
    */
-  readonly state: HeadStatus
+  readonly state: HeadStatus;
 
   /**
    * Unique identifier for the Hydra Head.
@@ -305,7 +325,7 @@ export interface HydraHead {
    * `null` after `dispose()`. Full extraction from the `HeadIsInitializing`
    * payload is pending protocol-schema integration.
    */
-  readonly headId: string | null
+  readonly headId: string | null;
 
   /**
    * Returns the current `HeadStatus` synchronously.
@@ -333,7 +353,7 @@ export interface HydraHead {
    * });
    * ```
    */
-  getState(): HeadStatus
+  getState(): HeadStatus;
 
   /**
    * Initialize a new Hydra Head on the L1 chain.
@@ -356,7 +376,7 @@ export interface HydraHead {
    * });
    * ```
    */
-  init(params?: InitParams): Promise<void>
+  init(params?: InitParams): Promise<void>;
 
   /**
    * Sends the `Commit` command to hydra-node to commit UTxOs into the head.
@@ -395,7 +415,7 @@ export interface HydraHead {
    */
   // TODO(protocol-schema): replace unknown with protocol Transaction type.
   // Commit is REST-driven in Hydra and this scaffold signature is temporary.
-  commit(utxos: unknown): Promise<void>
+  commit(utxos: unknown): Promise<void>;
 
   /**
    * Sends the `Close` command to request closing the Hydra Head on-chain.
@@ -425,7 +445,7 @@ export interface HydraHead {
    * });
    * ```
    */
-  close(): Promise<void>
+  close(): Promise<void>;
 
   /**
    * Sends the `SafeClose` command to request closing the Hydra Head on-chain.
@@ -458,7 +478,7 @@ export interface HydraHead {
    * });
    * ```
    */
-  safeClose(): Promise<void>
+  safeClose(): Promise<void>;
 
   /**
    * Fans out the final UTxO set to the L1 chain after the contestation period
@@ -490,7 +510,7 @@ export interface HydraHead {
    * });
    * ```
    */
-  fanout(): Promise<void>
+  fanout(): Promise<void>;
 
   /**
    * Aborts the head initialization before it is finalized on-chain. Sends the
@@ -519,7 +539,7 @@ export interface HydraHead {
    * });
    * ```
    */
-  abort(): Promise<void>
+  abort(): Promise<void>;
 
   /**
    * Registers a callback that is invoked for every `ServerOutput` event
@@ -549,7 +569,7 @@ export interface HydraHead {
    * await head.dispose();
    * ```
    */
-  subscribe(callback: (event: ServerOutput) => void): Unsubscribe
+  subscribe(callback: (event: ServerOutput) => void): Unsubscribe;
 
   /**
    * Returns an async iterator that yields each `ServerOutput` event in
@@ -574,7 +594,7 @@ export interface HydraHead {
    * await head.dispose();
    * ```
    */
-  subscribeEvents(): AsyncIterableIterator<ServerOutput>
+  subscribeEvents(): AsyncIterableIterator<ServerOutput>;
 
   /**
    * Tears down the head instance: interrupts the projector fiber, shuts down
@@ -605,7 +625,7 @@ export interface HydraHead {
    * });
    * ```
    */
-  dispose(): Promise<void>
+  dispose(): Promise<void>;
 
   /**
    * Effect-native counterparts of every Promise API method, plus additional
@@ -615,13 +635,13 @@ export interface HydraHead {
    * otherwise, making them composable with the full Effect ecosystem.
    */
   readonly effect: {
-    init(params?: InitParams): Effect.Effect<void, HeadError>
+    init(params?: InitParams): Effect.Effect<void, HeadError>;
     // TODO(protocol-schema): replace unknown with protocol Transaction type.
     // Commit is REST-driven in Hydra and this scaffold signature is temporary.
-    commit(utxos: unknown): Effect.Effect<void, HeadError>
-    close(): Effect.Effect<void, HeadError>
-    safeClose(): Effect.Effect<void, HeadError>
-    fanout(): Effect.Effect<void, HeadError>
+    commit(utxos: unknown): Effect.Effect<void, HeadError>;
+    close(): Effect.Effect<void, HeadError>;
+    safeClose(): Effect.Effect<void, HeadError>;
+    fanout(): Effect.Effect<void, HeadError>;
     /**
      * Waits for the head to reach the `FanoutPossible` state:
      * - Returns immediately if the head is already in `FanoutPossible`.
@@ -644,11 +664,11 @@ export interface HydraHead {
      * });
      * ```
      */
-    awaitReadyToFanout(): Effect.Effect<void, HeadError>
-    abort(): Effect.Effect<void, HeadError>
-    events(): Stream.Stream<ServerOutput>
-    dispose(): Effect.Effect<void, HeadError>
-  }
+    awaitReadyToFanout(): Effect.Effect<void, HeadError>;
+    abort(): Effect.Effect<void, HeadError>;
+    events(): Stream.Stream<ServerOutput>;
+    dispose(): Effect.Effect<void, HeadError>;
+  };
 }
 ````
 
@@ -656,18 +676,18 @@ export interface HydraHead {
 
 ```ts
 // Promise API — full lifecycle
-import { Head } from "@no-witness-labs/hydra-sdk"
+import { Head } from "@no-witness-labs/hydra-sdk";
 
 async function example() {
-  const head = await Head.create({ url: "ws://localhost:4001" })
+  const head = await Head.create({ url: "ws://localhost:4001" });
 
-  await head.init()
-  await head.commit({ txHash: "abc...", txIx: 0 })
-  await head.close()
-  await head.fanout()
-  console.log(head.getState()) // "Final"
+  await head.init();
+  await head.commit({ txHash: "abc...", txIx: 0 });
+  await head.close();
+  await head.fanout();
+  console.log(head.getState()); // "Final"
 
-  await head.dispose()
+  await head.dispose();
 }
 ```
 
@@ -675,20 +695,20 @@ async function example() {
 
 ```ts
 // Effect API — full lifecycle
-import { Effect } from "effect"
-import { Head } from "@no-witness-labs/hydra-sdk"
+import { Effect } from "effect";
+import { Head } from "@no-witness-labs/hydra-sdk";
 
 const program = Effect.gen(function* () {
-  const head = yield* Head.effect.create({ url: "ws://localhost:4001" })
+  const head = yield* Head.effect.create({ url: "ws://localhost:4001" });
 
-  yield* head.effect.init()
-  yield* head.effect.commit({ txHash: "abc...", txIx: 0 })
-  yield* head.effect.close()
-  yield* head.effect.fanout()
-  console.log(head.getState()) // "Final"
+  yield* head.effect.init();
+  yield* head.effect.commit({ txHash: "abc...", txIx: 0 });
+  yield* head.effect.close();
+  yield* head.effect.fanout();
+  console.log(head.getState()); // "Final"
 
-  yield* head.effect.dispose()
-})
+  yield* head.effect.dispose();
+});
 ```
 
 ## InitParams (interface)
@@ -703,7 +723,7 @@ export interface InitParams {
   // TODO(protocol-schema): Hydra websocket Init currently has no payload.
   // Keep this reserved field scaffold-only until protocol schema integration.
   /** Optional contestation period in seconds; if provided, overrides the default configured in hydra-node. */
-  readonly contestationPeriod?: number
+  readonly contestationPeriod?: number;
 }
 ```
 
@@ -717,9 +737,9 @@ message.
 ```ts
 export interface InvalidInput {
   /** Human-readable explanation of why the input was rejected. */
-  readonly reason: string
+  readonly reason: string;
   /** The raw input string that was rejected, if available. */
-  readonly input?: string
+  readonly input?: string;
 }
 ```
 
@@ -732,9 +752,9 @@ A raw event envelope emitted by hydra-node over the WebSocket connection.
 ```ts
 export interface ServerOutput {
   /** Discriminating tag that identifies the hydra-node event type. */
-  readonly tag: string
+  readonly tag: string;
   /** Optional event-specific payload; shape varies by `tag`. */
-  readonly payload?: unknown
+  readonly payload?: unknown;
 }
 ```
 
@@ -745,7 +765,7 @@ Function type returned by `HydraHead.subscribe` to cancel the subscription.
 **Signature**
 
 ```ts
-export type Unsubscribe = () => void
+export type Unsubscribe = () => void;
 ```
 
 # Tags
@@ -767,16 +787,18 @@ export declare class HydraHeadService
 **Example**
 
 ```ts
-import { Effect } from "effect"
-import { Head } from "@no-witness-labs/hydra-sdk"
+import { Effect } from "effect";
+import { Head } from "@no-witness-labs/hydra-sdk";
 
 const program = Effect.gen(function* () {
-  const head = yield* Head.HydraHeadService
-  yield* head.effect.init()
-  console.log(head.getState()) // "Initializing"
-})
+  const head = yield* Head.HydraHeadService;
+  yield* head.effect.init();
+  console.log(head.getState()); // "Initializing"
+});
 
-const runnable = program.pipe(Effect.provide(Head.layer({ url: "ws://localhost:9944" })))
+const runnable = program.pipe(
+  Effect.provide(Head.layer({ url: "ws://localhost:9944" })),
+);
 ```
 
 # layers
@@ -793,41 +815,43 @@ the layer's scope is released, making it safe for use with
 **Signature**
 
 ```ts
-export declare const layer: (config: HeadConfig) => Layer.Layer<HydraHeadService, HeadError>
+export declare const layer: (
+  config: HeadConfig,
+) => Layer.Layer<HydraHeadService, HeadError>;
 ```
 
 **Example**
 
 ```ts
-import { Effect, Layer } from "effect"
-import { Head } from "@no-witness-labs/hydra-sdk"
+import { Effect, Layer } from "effect";
+import { Head } from "@no-witness-labs/hydra-sdk";
 
-const HeadLayer = Head.layer({ url: "ws://localhost:9944" })
+const HeadLayer = Head.layer({ url: "ws://localhost:9944" });
 
 const program = Effect.gen(function* () {
-  const head = yield* Head.HydraHeadService
-  yield* head.effect.init()
-})
+  const head = yield* Head.HydraHeadService;
+  yield* head.effect.init();
+});
 
-const runnable = program.pipe(Effect.provide(HeadLayer))
+const runnable = program.pipe(Effect.provide(HeadLayer));
 ```
 
 **Example**
 
 ```ts
 // Composing with other layers
-import { Effect, Layer } from "effect"
-import { Head } from "@no-witness-labs/hydra-sdk"
+import { Effect, Layer } from "effect";
+import { Head } from "@no-witness-labs/hydra-sdk";
 
 const AppLayer = Layer.mergeAll(
-  Head.layer({ url: "ws://localhost:9944" })
+  Head.layer({ url: "ws://localhost:9944" }),
   // ... other service layers ...
-)
+);
 
 const program = Effect.gen(function* () {
-  const head = yield* Head.HydraHeadService
-  yield* head.effect.init()
-})
+  const head = yield* Head.HydraHeadService;
+  yield* head.effect.init();
+});
 
-const runnable = program.pipe(Effect.provide(AppLayer))
+const runnable = program.pipe(Effect.provide(AppLayer));
 ```

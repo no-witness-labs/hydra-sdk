@@ -1,19 +1,24 @@
-import { rehypeCodeDefaultOptions } from "fumadocs-core/mdx-plugins"
-import { defineConfig, defineDocs, frontmatterSchema, metaSchema } from "fumadocs-mdx/config"
-import { transformerTwoslash } from "fumadocs-twoslash"
-import { createFileSystemTypesCache } from "fumadocs-twoslash/cache-fs"
+import { rehypeCodeDefaultOptions } from "fumadocs-core/mdx-plugins";
+import {
+  defineConfig,
+  defineDocs,
+  frontmatterSchema,
+  metaSchema,
+} from "fumadocs-mdx/config";
+import { transformerTwoslash } from "fumadocs-twoslash";
+import { createFileSystemTypesCache } from "fumadocs-twoslash/cache-fs";
 
 // Only enable twoslash cache in production to avoid stale types during development
-const isDev = process.env.NODE_ENV === "development"
+const isDev = process.env.NODE_ENV === "development";
 
 export const docs = defineDocs({
   docs: {
-    schema: frontmatterSchema
+    schema: frontmatterSchema,
   },
   meta: {
-    schema: metaSchema
-  }
-})
+    schema: metaSchema,
+  },
+});
 
 export default defineConfig({
   mdxOptions: {
@@ -21,16 +26,16 @@ export default defineConfig({
       lazy: true,
       themes: {
         light: "github-light",
-        dark: "github-dark"
+        dark: "github-dark",
       },
       langs: ["ts", "tsx", "js", "jsx", "bash", "sh", "json"],
       transformers: [
         ...(rehypeCodeDefaultOptions.transformers ?? []),
         transformerTwoslash({
           // Disable cache in dev to always get fresh types from packages
-          typesCache: isDev ? undefined : createFileSystemTypesCache()
-        })
-      ]
-    }
-  }
-})
+          typesCache: isDev ? undefined : createFileSystemTypesCache(),
+        }),
+      ],
+    },
+  },
+});

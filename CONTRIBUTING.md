@@ -143,13 +143,13 @@ Integration tests are **excluded** from the default `pnpm test` run. They use a 
 
 ### What the Tests Cover
 
-| Test | Flow |
-|------|------|
-| Full lifecycle | Init → Commit → Open → Close → Fanout |
-| NewTx rejection | Open → NewTx (invalid) → stays Open |
-| Abort path | Init → Abort → Aborted |
-| Event subscription | `subscribe()` delivers lifecycle events |
-| Reconnection | Hydra-node restart → SDK reconnects with state preserved |
+| Test               | Flow                                                     |
+| ------------------ | -------------------------------------------------------- |
+| Full lifecycle     | Init → Commit → Open → Close → Fanout                    |
+| NewTx rejection    | Open → NewTx (invalid) → stays Open                      |
+| Abort path         | Init → Abort → Aborted                                   |
+| Event subscription | `subscribe()` delivers lifecycle events                  |
+| Reconnection       | Hydra-node restart → SDK reconnects with state preserved |
 
 ### How It Works
 

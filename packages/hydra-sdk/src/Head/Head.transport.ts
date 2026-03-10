@@ -371,7 +371,15 @@ const buildRequestMessage = (
     case "NewTx":
       return Schema.encode(NewTxMessageSchema)({
         tag: "NewTx",
-        transaction: payload as { type: "Tx ConwayEra" | "Unwitnessed Tx ConwayEra" | "Witnessed Tx ConwayEra"; description: string; cborHex: string; txId: string },
+        transaction: payload as {
+          type:
+            | "Tx ConwayEra"
+            | "Unwitnessed Tx ConwayEra"
+            | "Witnessed Tx ConwayEra";
+          description: string;
+          cborHex: string;
+          txId: string;
+        },
       });
     case "Recover":
       return Schema.encode(RecoverMessageSchema)({
@@ -381,7 +389,15 @@ const buildRequestMessage = (
     case "Decommit":
       return Schema.encode(DecommitMessageSchema)({
         tag: "Decommit",
-        decommitTx: payload as { type: "Tx ConwayEra" | "Unwitnessed Tx ConwayEra" | "Witnessed Tx ConwayEra"; description: string; cborHex: string; txId: string },
+        decommitTx: payload as {
+          type:
+            | "Tx ConwayEra"
+            | "Unwitnessed Tx ConwayEra"
+            | "Witnessed Tx ConwayEra";
+          description: string;
+          cborHex: string;
+          txId: string;
+        },
       });
     case "Commit":
       return Effect.fail(

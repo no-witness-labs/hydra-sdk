@@ -105,9 +105,9 @@ export type NodeConfig = {
   readonly ApplicationName: string;
   readonly ApplicationVersion: number;
   readonly MaxKnownMajorProtocolVersion: number;
-  readonly 'LastKnownBlockVersion-Alt': number;
-  readonly 'LastKnownBlockVersion-Major': number;
-  readonly 'LastKnownBlockVersion-Minor': number;
+  readonly "LastKnownBlockVersion-Alt": number;
+  readonly "LastKnownBlockVersion-Major": number;
+  readonly "LastKnownBlockVersion-Minor": number;
   readonly TestShelleyHardForkAtEpoch: number;
   readonly TestAllegraHardForkAtEpoch: number;
   readonly TestMaryHardForkAtEpoch: number;
@@ -256,7 +256,7 @@ export type ShelleyGenesis = {
         readonly publicKey: string;
         readonly relays: ReadonlyArray<unknown>;
         readonly rewardAccount: {
-          readonly credential: { readonly 'key hash': string };
+          readonly credential: { readonly "key hash": string };
           readonly network: string;
         };
         readonly vrf: string;
@@ -276,8 +276,14 @@ export type ShelleyGenesis = {
 export type AlonzoGenesis = {
   readonly lovelacePerUTxOWord: number;
   readonly executionPrices: {
-    readonly prSteps: { readonly numerator: number; readonly denominator: number };
-    readonly prMem: { readonly numerator: number; readonly denominator: number };
+    readonly prSteps: {
+      readonly numerator: number;
+      readonly denominator: number;
+    };
+    readonly prMem: {
+      readonly numerator: number;
+      readonly denominator: number;
+    };
   };
   readonly maxTxExUnits: {
     readonly exUnitsMem: number;
@@ -359,7 +365,7 @@ export type CardanoKey = {
  * @category constants
  */
 export const DEFAULT_CARDANO_NODE_IMAGE =
-  'ghcr.io/intersectmbo/cardano-node:10.5.3' as const;
+  "ghcr.io/intersectmbo/cardano-node:10.5.3" as const;
 
 /**
  * Default Hydra node Docker image.
@@ -367,7 +373,7 @@ export const DEFAULT_CARDANO_NODE_IMAGE =
  * @category constants
  */
 export const DEFAULT_HYDRA_NODE_IMAGE =
-  'ghcr.io/cardano-scaling/hydra-node:1.2.0' as const;
+  "ghcr.io/cardano-scaling/hydra-node:1.2.0" as const;
 
 // ---------------------------------------------------------------------------
 // Default Container Configuration
@@ -396,7 +402,7 @@ export const DEFAULT_HYDRA_NODE_CONFIG: Required<HydraNodeConfig> = {
   peerPort: 5001,
   monitoringPort: 6001,
   contestationPeriod: 60,
-  nodeId: 'devnet-1',
+  nodeId: "devnet-1",
 } as const;
 
 /**
@@ -405,7 +411,7 @@ export const DEFAULT_HYDRA_NODE_CONFIG: Required<HydraNodeConfig> = {
  * @category constants
  */
 export const DEFAULT_DEVNET_CONFIG: ResolvedDevNetConfig = {
-  clusterName: 'hydra-devnet',
+  clusterName: "hydra-devnet",
   cardanoNode: DEFAULT_CARDANO_NODE_CONFIG,
   hydraNode: DEFAULT_HYDRA_NODE_CONFIG,
 } as const;
@@ -422,39 +428,39 @@ export const DEFAULT_DEVNET_CONFIG: ResolvedDevNetConfig = {
  * @category constants
  */
 export const DEFAULT_NODE_JSON_CONFIG: NodeConfig = {
-  Protocol: 'Cardano',
-  ByronGenesisFile: 'genesis-byron.json',
-  ShelleyGenesisFile: 'genesis-shelley.json',
-  AlonzoGenesisFile: 'genesis-alonzo.json',
-  ConwayGenesisFile: 'genesis-conway.json',
-  ApplicationName: 'cardano-sl',
+  Protocol: "Cardano",
+  ByronGenesisFile: "genesis-byron.json",
+  ShelleyGenesisFile: "genesis-shelley.json",
+  AlonzoGenesisFile: "genesis-alonzo.json",
+  ConwayGenesisFile: "genesis-conway.json",
+  ApplicationName: "cardano-sl",
   ApplicationVersion: 1,
   MaxKnownMajorProtocolVersion: 2,
-  'LastKnownBlockVersion-Alt': 0,
-  'LastKnownBlockVersion-Major': 6,
-  'LastKnownBlockVersion-Minor': 0,
+  "LastKnownBlockVersion-Alt": 0,
+  "LastKnownBlockVersion-Major": 6,
+  "LastKnownBlockVersion-Minor": 0,
   TestShelleyHardForkAtEpoch: 0,
   TestAllegraHardForkAtEpoch: 0,
   TestMaryHardForkAtEpoch: 0,
   TestAlonzoHardForkAtEpoch: 0,
   TestBabbageHardForkAtEpoch: 0,
   TestConwayHardForkAtEpoch: 0,
-  RequiresNetworkMagic: 'RequiresNoMagic',
-  minSeverity: 'Info',
-  defaultBackends: ['KatipBK'],
-  defaultScribes: [['StdoutSK', 'stdout']],
-  setupBackends: ['KatipBK'],
+  RequiresNetworkMagic: "RequiresNoMagic",
+  minSeverity: "Info",
+  defaultBackends: ["KatipBK"],
+  defaultScribes: [["StdoutSK", "stdout"]],
+  setupBackends: ["KatipBK"],
   setupScribes: [
     {
-      scFormat: 'ScJson',
-      scKind: 'StdoutSK',
-      scName: 'stdout',
+      scFormat: "ScJson",
+      scKind: "StdoutSK",
+      scName: "stdout",
       scRotation: null,
     },
   ],
   TurnOnLogMetrics: true,
   TurnOnLogging: true,
-  TracingVerbosity: 'NormalVerbosity',
+  TracingVerbosity: "NormalVerbosity",
   TraceBlockFetchClient: false,
   TraceBlockFetchDecisions: false,
   TraceBlockFetchProtocol: false,
@@ -483,14 +489,14 @@ export const DEFAULT_NODE_JSON_CONFIG: NodeConfig = {
   TraceTxOutbound: false,
   TraceTxSubmissionProtocol: false,
   hasEKG: 12788,
-  hasPrometheus: ['0.0.0.0', 12798],
+  hasPrometheus: ["0.0.0.0", 12798],
   options: {
     mapBackends: {
-      'cardano.node.metrics': ['EKGViewBK'],
-      'cardano.node.resources': ['EKGViewBK'],
+      "cardano.node.metrics": ["EKGViewBK"],
+      "cardano.node.resources": ["EKGViewBK"],
     },
     mapSubtrace: {
-      'cardano.node.metrics': { subtrace: 'Neutral' },
+      "cardano.node.metrics": { subtrace: "Neutral" },
     },
   },
   ExperimentalHardForksEnabled: true,
@@ -515,29 +521,29 @@ export const DEFAULT_BYRON_GENESIS: ByronGenesis = {
   startTime: Math.floor(Date.now() / 1000),
   blockVersionData: {
     scriptVersion: 0,
-    slotDuration: '250',
-    maxBlockSize: '2000000',
-    maxHeaderSize: '2000000',
-    maxTxSize: '4096',
-    maxProposalSize: '700',
-    mpcThd: '20000000000000',
-    heavyDelThd: '300000000000',
-    updateVoteThd: '1000000000000',
-    updateProposalThd: '100000000000000',
-    updateImplicit: '10000',
+    slotDuration: "250",
+    maxBlockSize: "2000000",
+    maxHeaderSize: "2000000",
+    maxTxSize: "4096",
+    maxProposalSize: "700",
+    mpcThd: "20000000000000",
+    heavyDelThd: "300000000000",
+    updateVoteThd: "1000000000000",
+    updateProposalThd: "100000000000000",
+    updateImplicit: "10000",
     softforkRule: {
-      initThd: '900000000000000',
-      minThd: '600000000000000',
-      thdDecrement: '50000000000000',
+      initThd: "900000000000000",
+      minThd: "600000000000000",
+      thdDecrement: "50000000000000",
     },
     txFeePolicy: {
-      summand: '155381000000000',
-      multiplier: '43000000000',
+      summand: "155381000000000",
+      multiplier: "43000000000",
     },
-    unlockStakeEpoch: '18446744073709551615',
+    unlockStakeEpoch: "18446744073709551615",
   },
   bootStakeholders: {
-    '7a4519c93d7be4577dd85bd524c644e6b809e44eae0457b43128c1c7': 1,
+    "7a4519c93d7be4577dd85bd524c644e6b809e44eae0457b43128c1c7": 1,
   },
   heavyDelegation: {},
   nonAvvmBalances: {},
@@ -560,13 +566,13 @@ export const DEFAULT_SHELLEY_GENESIS: ShelleyGenesis = {
   initialFunds: {},
   maxKESEvolutions: 60,
   maxLovelaceSupply: 2000000000000,
-  networkId: 'Testnet',
+  networkId: "Testnet",
   networkMagic: 42,
   protocolParams: {
     a0: 0.0,
     decentralisationParam: 0,
     eMax: 18,
-    extraEntropy: { tag: 'NeutralNonce' },
+    extraEntropy: { tag: "NeutralNonce" },
     keyDeposit: 0,
     maxBlockBodySize: 65536,
     maxBlockHeaderSize: 1100,
@@ -584,28 +590,27 @@ export const DEFAULT_SHELLEY_GENESIS: ShelleyGenesis = {
   slotsPerKESPeriod: 129600,
   staking: {
     pools: {
-      '8a219b698d3b6e034391ae84cee62f1d76b6fbc45ddfe4e31e0d4b60': {
+      "8a219b698d3b6e034391ae84cee62f1d76b6fbc45ddfe4e31e0d4b60": {
         cost: 0,
         margin: 0.0,
         metadata: null,
         owners: [],
         pledge: 0,
-        publicKey:
-          '8a219b698d3b6e034391ae84cee62f1d76b6fbc45ddfe4e31e0d4b60',
+        publicKey: "8a219b698d3b6e034391ae84cee62f1d76b6fbc45ddfe4e31e0d4b60",
         relays: [],
         rewardAccount: {
           credential: {
-            'key hash':
-              'b6ffb20cf821f9286802235841d4348a2c2bafd4f73092b7de6655ea',
+            "key hash":
+              "b6ffb20cf821f9286802235841d4348a2c2bafd4f73092b7de6655ea",
           },
-          network: 'Testnet',
+          network: "Testnet",
         },
-        vrf: 'fec17ed60cbf2ec5be3f061fb4de0b6ef1f20947cfbfce5fb2783d12f3f69ff5',
+        vrf: "fec17ed60cbf2ec5be3f061fb4de0b6ef1f20947cfbfce5fb2783d12f3f69ff5",
       },
     },
     stake: {
-      '074a515f7f32bf31a4f41c7417a8136e8152bfb42f06d71b389a6896':
-        '8a219b698d3b6e034391ae84cee62f1d76b6fbc45ddfe4e31e0d4b60',
+      "074a515f7f32bf31a4f41c7417a8136e8152bfb42f06d71b389a6896":
+        "8a219b698d3b6e034391ae84cee62f1d76b6fbc45ddfe4e31e0d4b60",
     },
   },
   systemStart: new Date().toISOString(),
@@ -632,34 +637,34 @@ export const DEFAULT_ALONZO_GENESIS: AlonzoGenesis = {
   maxCollateralInputs: 3,
   costModels: {
     PlutusV1: [
-      100788, 420, 1, 1, 1000, 173, 0, 1, 1000, 59957, 4, 1, 11183, 32,
-      201305, 8356, 4, 16000, 100, 16000, 100, 16000, 100, 16000, 100, 16000,
-      100, 16000, 100, 100, 100, 16000, 100, 94375, 32, 132994, 32, 61462, 4,
-      72010, 178, 0, 1, 22151, 32, 91189, 769, 4, 2, 85848, 228465, 122, 0, 1,
-      1, 1000, 42921, 4, 2, 24548, 29498, 38, 1, 898148, 27279, 1, 51775, 558,
-      1, 39184, 1000, 60594, 1, 141895, 32, 83150, 32, 15299, 32, 76049, 1,
-      13169, 4, 22100, 10, 28999, 74, 1, 28999, 74, 1, 43285, 552, 1, 44749,
-      541, 1, 33852, 32, 68246, 32, 72362, 32, 7243, 32, 7391, 32, 11546, 32,
-      85848, 228465, 122, 0, 1, 1, 90434, 519, 0, 1, 74433, 32, 85848, 228465,
-      122, 0, 1, 1, 85848, 228465, 122, 0, 1, 1, 270652, 22588, 4, 1457325,
-      64566, 4, 20467, 1, 4, 0, 141992, 32, 100788, 420, 1, 1, 81663, 32,
-      59498, 32, 20142, 32, 24588, 32, 20744, 32, 25933, 32, 24623, 32,
-      53384111, 14333, 10,
+      100788, 420, 1, 1, 1000, 173, 0, 1, 1000, 59957, 4, 1, 11183, 32, 201305,
+      8356, 4, 16000, 100, 16000, 100, 16000, 100, 16000, 100, 16000, 100,
+      16000, 100, 100, 100, 16000, 100, 94375, 32, 132994, 32, 61462, 4, 72010,
+      178, 0, 1, 22151, 32, 91189, 769, 4, 2, 85848, 228465, 122, 0, 1, 1, 1000,
+      42921, 4, 2, 24548, 29498, 38, 1, 898148, 27279, 1, 51775, 558, 1, 39184,
+      1000, 60594, 1, 141895, 32, 83150, 32, 15299, 32, 76049, 1, 13169, 4,
+      22100, 10, 28999, 74, 1, 28999, 74, 1, 43285, 552, 1, 44749, 541, 1,
+      33852, 32, 68246, 32, 72362, 32, 7243, 32, 7391, 32, 11546, 32, 85848,
+      228465, 122, 0, 1, 1, 90434, 519, 0, 1, 74433, 32, 85848, 228465, 122, 0,
+      1, 1, 85848, 228465, 122, 0, 1, 1, 270652, 22588, 4, 1457325, 64566, 4,
+      20467, 1, 4, 0, 141992, 32, 100788, 420, 1, 1, 81663, 32, 59498, 32,
+      20142, 32, 24588, 32, 20744, 32, 25933, 32, 24623, 32, 53384111, 14333,
+      10,
     ],
     PlutusV2: [
-      100788, 420, 1, 1, 1000, 173, 0, 1, 1000, 59957, 4, 1, 11183, 32,
-      201305, 8356, 4, 16000, 100, 16000, 100, 16000, 100, 16000, 100, 16000,
-      100, 16000, 100, 100, 100, 16000, 100, 94375, 32, 132994, 32, 61462, 4,
-      72010, 178, 0, 1, 22151, 32, 91189, 769, 4, 2, 85848, 228465, 122, 0, 1,
-      1, 1000, 42921, 4, 2, 24548, 29498, 38, 1, 898148, 27279, 1, 51775, 558,
-      1, 39184, 1000, 60594, 1, 141895, 32, 83150, 32, 15299, 32, 76049, 1,
-      13169, 4, 22100, 10, 28999, 74, 1, 28999, 74, 1, 43285, 552, 1, 44749,
-      541, 1, 33852, 32, 68246, 32, 72362, 32, 7243, 32, 7391, 32, 11546, 32,
-      85848, 228465, 122, 0, 1, 1, 90434, 519, 0, 1, 74433, 32, 85848, 228465,
-      122, 0, 1, 1, 85848, 228465, 122, 0, 1, 1, 955506, 213312, 0, 2, 270652,
-      22588, 4, 1457325, 64566, 4, 20467, 1, 4, 0, 141992, 32, 100788, 420, 1,
-      1, 81663, 32, 59498, 32, 20142, 32, 24588, 32, 20744, 32, 25933, 32,
-      24623, 32, 43053543, 10, 53384111, 14333, 10, 43574283, 26308, 10,
+      100788, 420, 1, 1, 1000, 173, 0, 1, 1000, 59957, 4, 1, 11183, 32, 201305,
+      8356, 4, 16000, 100, 16000, 100, 16000, 100, 16000, 100, 16000, 100,
+      16000, 100, 100, 100, 16000, 100, 94375, 32, 132994, 32, 61462, 4, 72010,
+      178, 0, 1, 22151, 32, 91189, 769, 4, 2, 85848, 228465, 122, 0, 1, 1, 1000,
+      42921, 4, 2, 24548, 29498, 38, 1, 898148, 27279, 1, 51775, 558, 1, 39184,
+      1000, 60594, 1, 141895, 32, 83150, 32, 15299, 32, 76049, 1, 13169, 4,
+      22100, 10, 28999, 74, 1, 28999, 74, 1, 43285, 552, 1, 44749, 541, 1,
+      33852, 32, 68246, 32, 72362, 32, 7243, 32, 7391, 32, 11546, 32, 85848,
+      228465, 122, 0, 1, 1, 90434, 519, 0, 1, 74433, 32, 85848, 228465, 122, 0,
+      1, 1, 85848, 228465, 122, 0, 1, 1, 955506, 213312, 0, 2, 270652, 22588, 4,
+      1457325, 64566, 4, 20467, 1, 4, 0, 141992, 32, 100788, 420, 1, 1, 81663,
+      32, 59498, 32, 20142, 32, 24588, 32, 20744, 32, 25933, 32, 24623, 32,
+      43053543, 10, 53384111, 14333, 10, 43574283, 26308, 10,
     ],
   },
 };
@@ -707,23 +712,23 @@ export const DEFAULT_CONWAY_GENESIS: ConwayGenesis = {
     51775, 558, 1, 39184, 1000, 60594, 1, 141895, 32, 83150, 32, 15299, 32,
     76049, 1, 13169, 4, 22100, 10, 28999, 74, 1, 28999, 74, 1, 43285, 552, 1,
     44749, 541, 1, 33852, 32, 68246, 32, 72362, 32, 7243, 32, 7391, 32, 11546,
-    32, 85848, 123203, 7305, -900, 1716, 549, 57, 85848, 0, 1, 90434, 519, 0,
-    1, 74433, 32, 85848, 123203, 7305, -900, 1716, 549, 57, 85848, 0, 1, 1,
-    85848, 123203, 7305, -900, 1716, 549, 57, 85848, 0, 1, 955506, 213312, 0,
-    2, 270652, 22588, 4, 1457325, 64566, 4, 20467, 1, 4, 0, 141992, 32, 100788,
-    420, 1, 1, 81663, 32, 59498, 32, 20142, 32, 24588, 32, 20744, 32, 25933,
-    32, 24623, 32, 43053543, 10, 53384111, 14333, 10, 43574283, 26308, 10,
-    16000, 100, 16000, 100, 962335, 18, 2780678, 6, 442008, 1, 52538055, 3756,
-    18, 267929, 18, 76433006, 8868, 18, 52948122, 18, 1995836, 36, 3227919, 12,
+    32, 85848, 123203, 7305, -900, 1716, 549, 57, 85848, 0, 1, 90434, 519, 0, 1,
+    74433, 32, 85848, 123203, 7305, -900, 1716, 549, 57, 85848, 0, 1, 1, 85848,
+    123203, 7305, -900, 1716, 549, 57, 85848, 0, 1, 955506, 213312, 0, 2,
+    270652, 22588, 4, 1457325, 64566, 4, 20467, 1, 4, 0, 141992, 32, 100788,
+    420, 1, 1, 81663, 32, 59498, 32, 20142, 32, 24588, 32, 20744, 32, 25933, 32,
+    24623, 32, 43053543, 10, 53384111, 14333, 10, 43574283, 26308, 10, 16000,
+    100, 16000, 100, 962335, 18, 2780678, 6, 442008, 1, 52538055, 3756, 18,
+    267929, 18, 76433006, 8868, 18, 52948122, 18, 1995836, 36, 3227919, 12,
     901022, 1, 166917843, 4307, 36, 284546, 36, 158221314, 26549, 36, 74698472,
     36, 333849714, 1, 254006273, 72, 2174038, 72, 2261318, 64571, 4, 207616,
     8310, 4, 1293828, 28716, 63, 0, 1, 1006041, 43623, 251, 0, 1,
   ],
   constitution: {
     anchor: {
-      url: '',
+      url: "",
       dataHash:
-        '0000000000000000000000000000000000000000000000000000000000000000',
+        "0000000000000000000000000000000000000000000000000000000000000000",
     },
   },
   committee: {
@@ -744,10 +749,10 @@ export const DEFAULT_CONWAY_GENESIS: ConwayGenesis = {
  * @category constants
  */
 export const DEFAULT_KES_KEY: CardanoKey = {
-  type: 'KesSigningKey_ed25519_kes_2^6',
-  description: 'KES Signing Key',
+  type: "KesSigningKey_ed25519_kes_2^6",
+  description: "KES Signing Key",
   cborHex:
-    '590260a199f16b11da6c7f5c1e0f1eb0b9bbe278d3d8f35bfd50d0951c2ff94d0344cd57df5f64c9bac1dd60b4482f9c636168f40737d526625a2ec82f22ec0c72de0013f86ef743a7bba0286db6ddf3d85bf8e49ddbf14d9d3b7ee22f4857c77b740948f84f2e72f6bcf91f405e34ea50a2c53fa4876b43cfce2bcfe87c06a903de8bb33d968ca7930b67d0c23f5cb2d74e422d773ba80e388de384691000d6ba8a9b4dc7d3187f76048fbef9a52b72d80d835bb76eced7c0e0cdc5b58869b73c095dffa01db4ff51765afcead565395a5ed1cf74e5f2134d61076fece21aacd080bbbfaab94125401d7bbc74eafc7e7e3a2235f59dc03d6e332e53d558493a1e22213b92c77b1328ff1b83855da704fc366bf4415490602481d1939136eeaf252c65184912a779d9d94a90e32b72c1877ef60b6d79e707ce5a762acb4bed46436efe4fe62aae50b39068cc508a09427c92791cbcbea44318529cc68d297ca24e1b73b2394c385ec63fcd85ed56eec3de48860a1ec950aad4f91cbf741dbd7bf1d3c278875bd20e31ff5372339f6aa5280ad9b8bf3514889ac44600fe57ca0b535d6dc6b0b981e079595aad186ee0be9b07e837391ab165e4ca406601c876a86e246a3f53311e21199cccc0b080f28d18f4dc6987731e10e4ade00df7c6921c5ef3022b6f49a29ba307a2c8f4bd2ba42fcfa0aad68a2f0ad31fff69a99d3471f9036d3f5817a3edfeff7fc3c14e1151d767aaa043481cfd1a6ee55e8e5d7853ecdaf9da2bb36c716beae8d706bc648a790d4697e1d044a11a49f305ab8bc64a094bd81bda7395fe6f77dd5557c39919dd9bb9cf22a87fe47408ae3ec2247007d015a5',
+    "590260a199f16b11da6c7f5c1e0f1eb0b9bbe278d3d8f35bfd50d0951c2ff94d0344cd57df5f64c9bac1dd60b4482f9c636168f40737d526625a2ec82f22ec0c72de0013f86ef743a7bba0286db6ddf3d85bf8e49ddbf14d9d3b7ee22f4857c77b740948f84f2e72f6bcf91f405e34ea50a2c53fa4876b43cfce2bcfe87c06a903de8bb33d968ca7930b67d0c23f5cb2d74e422d773ba80e388de384691000d6ba8a9b4dc7d3187f76048fbef9a52b72d80d835bb76eced7c0e0cdc5b58869b73c095dffa01db4ff51765afcead565395a5ed1cf74e5f2134d61076fece21aacd080bbbfaab94125401d7bbc74eafc7e7e3a2235f59dc03d6e332e53d558493a1e22213b92c77b1328ff1b83855da704fc366bf4415490602481d1939136eeaf252c65184912a779d9d94a90e32b72c1877ef60b6d79e707ce5a762acb4bed46436efe4fe62aae50b39068cc508a09427c92791cbcbea44318529cc68d297ca24e1b73b2394c385ec63fcd85ed56eec3de48860a1ec950aad4f91cbf741dbd7bf1d3c278875bd20e31ff5372339f6aa5280ad9b8bf3514889ac44600fe57ca0b535d6dc6b0b981e079595aad186ee0be9b07e837391ab165e4ca406601c876a86e246a3f53311e21199cccc0b080f28d18f4dc6987731e10e4ade00df7c6921c5ef3022b6f49a29ba307a2c8f4bd2ba42fcfa0aad68a2f0ad31fff69a99d3471f9036d3f5817a3edfeff7fc3c14e1151d767aaa043481cfd1a6ee55e8e5d7853ecdaf9da2bb36c716beae8d706bc648a790d4697e1d044a11a49f305ab8bc64a094bd81bda7395fe6f77dd5557c39919dd9bb9cf22a87fe47408ae3ec2247007d015a5",
 };
 
 /**
@@ -758,10 +763,10 @@ export const DEFAULT_KES_KEY: CardanoKey = {
  * @category constants
  */
 export const DEFAULT_OPCERT: CardanoKey = {
-  type: 'NodeOperationalCertificate',
-  description: '',
+  type: "NodeOperationalCertificate",
+  description: "",
   cborHex:
-    '828458204cd49bb05e9885142fe7af1481107995298771fd1a24e72b506a4d600ee2b3120000584089fc9e9f551b2ea873bf31643659d049152d5c8e8de86be4056370bccc5fa62dd12e3f152f1664e614763e46eaa7a17ed366b5cef19958773d1ab96941442e0b58205a3d778e76741a009e29d23093cfe046131808d34d7c864967b515e98dfc3583',
+    "828458204cd49bb05e9885142fe7af1481107995298771fd1a24e72b506a4d600ee2b3120000584089fc9e9f551b2ea873bf31643659d049152d5c8e8de86be4056370bccc5fa62dd12e3f152f1664e614763e46eaa7a17ed366b5cef19958773d1ab96941442e0b58205a3d778e76741a009e29d23093cfe046131808d34d7c864967b515e98dfc3583",
 };
 
 /**
@@ -772,10 +777,10 @@ export const DEFAULT_OPCERT: CardanoKey = {
  * @category constants
  */
 export const DEFAULT_VRF_SKEY: CardanoKey = {
-  type: 'VrfSigningKey_PraosVRF',
-  description: 'VRF Signing Key',
+  type: "VrfSigningKey_PraosVRF",
+  description: "VRF Signing Key",
   cborHex:
-    '5840899795b70e9f34b737159fe21a6170568d6031e187f0cc84555c712b7c29b45cb882007593ef70f86e5c0948561a3b8e8851529a4f98975f2b24e768dda38ce2',
+    "5840899795b70e9f34b737159fe21a6170568d6031e187f0cc84555c712b7c29b45cb882007593ef70f86e5c0948561a3b8e8851529a4f98975f2b24e768dda38ce2",
 };
 
 // ---------------------------------------------------------------------------
@@ -791,10 +796,10 @@ export const DEFAULT_VRF_SKEY: CardanoKey = {
  * @category constants
  */
 export const DEFAULT_PAYMENT_SKEY: CardanoKey = {
-  type: 'PaymentSigningKeyShelley_ed25519',
-  description: 'Payment Signing Key',
+  type: "PaymentSigningKeyShelley_ed25519",
+  description: "Payment Signing Key",
   cborHex:
-    '5820357afa630999fddc45c61b39de6cfb6477874f398d43427e8fda8ce29aef3f01',
+    "5820357afa630999fddc45c61b39de6cfb6477874f398d43427e8fda8ce29aef3f01",
 };
 
 /**
@@ -806,10 +811,10 @@ export const DEFAULT_PAYMENT_SKEY: CardanoKey = {
  * @category constants
  */
 export const DEFAULT_PAYMENT_VKEY: CardanoKey = {
-  type: 'PaymentVerificationKeyShelley_ed25519',
-  description: 'Payment Verification Key',
+  type: "PaymentVerificationKeyShelley_ed25519",
+  description: "Payment Verification Key",
   cborHex:
-    '582015477d62d55fd21e4fbae9aaa1bace69075c2dec346ef62ca9b717a46fad46fa',
+    "582015477d62d55fd21e4fbae9aaa1bace69075c2dec346ef62ca9b717a46fad46fa",
 };
 
 /**
@@ -819,7 +824,7 @@ export const DEFAULT_PAYMENT_VKEY: CardanoKey = {
  * @category constants
  */
 export const DEFAULT_PAYMENT_KEY_HASH =
-  '616e6a8e36fb2cc4560a11ccd9bd3e70d20db58fc8d22d2560574087' as const;
+  "616e6a8e36fb2cc4560a11ccd9bd3e70d20db58fc8d22d2560574087" as const;
 
 /**
  * Enterprise testnet address derived from the default payment key.
@@ -829,7 +834,7 @@ export const DEFAULT_PAYMENT_KEY_HASH =
  * @category constants
  */
 export const DEFAULT_PAYMENT_ADDRESS_HEX =
-  '60616e6a8e36fb2cc4560a11ccd9bd3e70d20db58fc8d22d2560574087' as const;
+  "60616e6a8e36fb2cc4560a11ccd9bd3e70d20db58fc8d22d2560574087" as const;
 
 // ---------------------------------------------------------------------------
 // Default Hydra Keys (pre-generated, test-only)
@@ -855,10 +860,10 @@ export type HydraKey = {
  * @category constants
  */
 export const DEFAULT_HYDRA_SK: HydraKey = {
-  type: 'HydraSigningKey_ed25519',
-  description: '',
+  type: "HydraSigningKey_ed25519",
+  description: "",
   cborHex:
-    '5820956aa2b35a8a83a4aae551d8b8ec03dc0f049313ad3e78c414563b330e0e4295',
+    "5820956aa2b35a8a83a4aae551d8b8ec03dc0f049313ad3e78c414563b330e0e4295",
 };
 
 /**
@@ -870,10 +875,10 @@ export const DEFAULT_HYDRA_SK: HydraKey = {
  * @category constants
  */
 export const DEFAULT_HYDRA_VK: HydraKey = {
-  type: 'HydraVerificationKey_ed25519',
-  description: '',
+  type: "HydraVerificationKey_ed25519",
+  description: "",
   cborHex:
-    '58209314edba432861d5fa4204b3800cc4b8603f6b3f258c9fce8482b72e91889ee2',
+    "58209314edba432861d5fa4204b3800cc4b8603f6b3f258c9fce8482b72e91889ee2",
 };
 
 // ---------------------------------------------------------------------------
@@ -920,7 +925,7 @@ export function buildShelleyGenesis(
     },
     systemStart: new Date(epochSec * 1000)
       .toISOString()
-      .replace(/\.\d{3}Z$/, 'Z'),
+      .replace(/\.\d{3}Z$/, "Z"),
   };
 }
 

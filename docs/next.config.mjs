@@ -1,8 +1,8 @@
-import { createMDX } from "fumadocs-mdx/next"
+import { createMDX } from "fumadocs-mdx/next";
 
-const withMDX = createMDX()
+const withMDX = createMDX();
 
-const isCI = !!process.env.GITHUB_ACTIONS
+const isCI = !!process.env.GITHUB_ACTIONS;
 /** @type {import('next').NextConfig} */
 const config = {
   reactStrictMode: true,
@@ -12,9 +12,9 @@ const config = {
   assetPrefix: isCI ? "/hydra-sdk" : "",
   trailingSlash: true,
   images: {
-    unoptimized: true
+    unoptimized: true,
   },
-  serverExternalPackages: ["typescript", "twoslash"]
-}
+  serverExternalPackages: ["typescript", "twoslash"],
+};
 
-export default withMDX(config)
+export default withMDX(config);

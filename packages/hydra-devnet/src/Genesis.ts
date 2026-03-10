@@ -38,11 +38,11 @@
  * @module
  */
 
-import { Data, Effect } from 'effect';
-import { chmod, mkdir, writeFile } from 'fs/promises';
-import { join } from 'path';
+import { Data, Effect } from "effect";
+import { chmod, mkdir, writeFile } from "fs/promises";
+import { join } from "path";
 
-import type { ResolvedDevNetConfig, ShelleyGenesis } from './Config.js';
+import type { ResolvedDevNetConfig, ShelleyGenesis } from "./Config.js";
 import {
   buildByronGenesis,
   buildShelleyGenesis,
@@ -59,8 +59,8 @@ import {
   DEFAULT_PAYMENT_SKEY,
   DEFAULT_PAYMENT_VKEY,
   DEFAULT_VRF_SKEY,
-} from './Config.js';
-import * as Container from './Container.js';
+} from "./Config.js";
+import * as Container from "./Container.js";
 
 // =============================================================================
 // Errors
@@ -72,7 +72,7 @@ import * as Container from './Container.js';
  * @since 0.1.0
  * @category errors
  */
-export class GenesisError extends Data.TaggedError('GenesisError')<{
+export class GenesisError extends Data.TaggedError("GenesisError")<{
   readonly reason: string;
   readonly message: string;
   readonly cause?: unknown;
@@ -132,7 +132,7 @@ const DEFAULT_TOPOLOGY = {
 function stripDockerFraming(raw: string): string {
   // Remove all non-printable characters except newlines/tabs
   // eslint-disable-next-line no-control-regex
-  const cleaned = raw.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '');
+  const cleaned = raw.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, "");
   return cleaned.trim();
 }
 
@@ -155,38 +155,38 @@ function generateKeysEffect(
         await mkdir(tempDir, { recursive: true });
         await Promise.all([
           writeFile(
-            join(tempDir, 'payment.skey'),
+            join(tempDir, "payment.skey"),
             JSON.stringify(DEFAULT_PAYMENT_SKEY, null, 2),
           ),
           writeFile(
-            join(tempDir, 'payment.vkey'),
+            join(tempDir, "payment.vkey"),
             JSON.stringify(DEFAULT_PAYMENT_VKEY, null, 2),
           ),
           writeFile(
-            join(tempDir, 'hydra.sk'),
+            join(tempDir, "hydra.sk"),
             JSON.stringify(DEFAULT_HYDRA_SK, null, 2),
           ),
           writeFile(
-            join(tempDir, 'hydra.vk'),
+            join(tempDir, "hydra.vk"),
             JSON.stringify(DEFAULT_HYDRA_VK, null, 2),
           ),
         ]);
       },
       catch: (cause) =>
         new GenesisError({
-          reason: 'key-write',
-          message: 'Failed to write pre-generated key files to temp directory',
+          reason: "key-write",
+          message: "Failed to write pre-generated key files to temp directory",
           cause,
         }),
     });
 
     return {
-      paymentSkeyPath: join(tempDir, 'payment.skey'),
-      paymentVkeyPath: join(tempDir, 'payment.vkey'),
+      paymentSkeyPath: join(tempDir, "payment.skey"),
+      paymentVkeyPath: join(tempDir, "payment.vkey"),
       paymentKeyHash: DEFAULT_PAYMENT_KEY_HASH,
       paymentAddressHex: DEFAULT_PAYMENT_ADDRESS_HEX,
-      hydraSkPath: join(tempDir, 'hydra.sk'),
-      hydraVkPath: join(tempDir, 'hydra.vk'),
+      hydraSkPath: join(tempDir, "hydra.sk"),
+      hydraVkPath: join(tempDir, "hydra.vk"),
     };
   });
 }
@@ -236,47 +236,47 @@ function writeConfigFilesEffect(
         // Write all config files in parallel
         await Promise.all([
           writeFile(
-            join(tempDir, 'config.json'),
+            join(tempDir, "config.json"),
             JSON.stringify(DEFAULT_NODE_JSON_CONFIG, null, 2),
           ),
           writeFile(
-            join(tempDir, 'topology.json'),
+            join(tempDir, "topology.json"),
             JSON.stringify(DEFAULT_TOPOLOGY, null, 2),
           ),
           writeFile(
-            join(tempDir, 'genesis-byron.json'),
+            join(tempDir, "genesis-byron.json"),
             JSON.stringify(byronGenesis, null, 2),
           ),
           writeFile(
-            join(tempDir, 'genesis-shelley.json'),
+            join(tempDir, "genesis-shelley.json"),
             JSON.stringify(shelleyGenesis, null, 2),
           ),
           writeFile(
-            join(tempDir, 'genesis-alonzo.json'),
+            join(tempDir, "genesis-alonzo.json"),
             JSON.stringify(DEFAULT_ALONZO_GENESIS, null, 2),
           ),
           writeFile(
-            join(tempDir, 'genesis-conway.json'),
+            join(tempDir, "genesis-conway.json"),
             JSON.stringify(DEFAULT_CONWAY_GENESIS, null, 2),
           ),
           writeFile(
-            join(tempDir, 'kes.skey'),
+            join(tempDir, "kes.skey"),
             JSON.stringify(DEFAULT_KES_KEY, null, 2),
-          ).then(() => chmod(join(tempDir, 'kes.skey'), 0o600)),
+          ).then(() => chmod(join(tempDir, "kes.skey"), 0o600)),
           writeFile(
-            join(tempDir, 'vrf.skey'),
+            join(tempDir, "vrf.skey"),
             JSON.stringify(DEFAULT_VRF_SKEY, null, 2),
-          ).then(() => chmod(join(tempDir, 'vrf.skey'), 0o600)),
+          ).then(() => chmod(join(tempDir, "vrf.skey"), 0o600)),
           writeFile(
-            join(tempDir, 'pool.cert'),
+            join(tempDir, "pool.cert"),
             JSON.stringify(DEFAULT_OPCERT, null, 2),
-          ).then(() => chmod(join(tempDir, 'pool.cert'), 0o600)),
+          ).then(() => chmod(join(tempDir, "pool.cert"), 0o600)),
         ]);
       },
       catch: (cause: unknown) =>
         new GenesisError({
-          reason: 'config-write',
-          message: 'Failed to write configuration files',
+          reason: "config-write",
+          message: "Failed to write configuration files",
           cause,
         }),
     });
@@ -313,21 +313,21 @@ function publishHydraScriptsEffect(
       Container.effect.runOnce(
         config.hydraNode.image,
         [
-          'publish-scripts',
-          '--testnet-magic',
+          "publish-scripts",
+          "--testnet-magic",
           String(config.cardanoNode.networkMagic),
-          '--node-socket',
-          '/ipc/node.socket',
-          '--cardano-signing-key',
-          '/config/payment.skey',
+          "--node-socket",
+          "/ipc/node.socket",
+          "--cardano-signing-key",
+          "/config/payment.skey",
         ],
         [`${volumeName}:/ipc`, `${tempDir}:/config:ro`],
         networkName,
       ),
       (cause) =>
         new GenesisError({
-          reason: 'script-publish',
-          message: 'Failed to publish Hydra scripts to L1',
+          reason: "script-publish",
+          message: "Failed to publish Hydra scripts to L1",
           cause,
         }),
     );
@@ -339,13 +339,13 @@ function publishHydraScriptsEffect(
     if (txIds.length === 0) {
       return yield* Effect.fail(
         new GenesisError({
-          reason: 'script-publish',
+          reason: "script-publish",
           message: `Could not extract transaction IDs from output: "${output}"`,
         }),
       );
     }
 
-    return txIds.join(',');
+    return txIds.join(",");
   });
 }
 
