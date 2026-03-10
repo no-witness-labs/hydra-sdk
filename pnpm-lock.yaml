@@ -246,9 +246,6 @@ importers:
       '@babel/cli':
         specifier: ^7.28.0
         version: 7.28.6(@babel/core@7.29.0)
-      '@no-witness-labs/hydra-sdk':
-        specifier: workspace:*
-        version: link:../hydra-sdk
       '@types/dockerode':
         specifier: ^3.3.38
         version: 3.3.47
