@@ -33,23 +33,23 @@ and use the same evolution-sdk transaction-building API against a Hydra Head.
 ## Basic usage
 
 ```ts
-import { Head, Provider } from "@no-witness-labs/hydra-sdk"
+import { Head, Provider } from "@no-witness-labs/hydra-sdk";
 
-const head = await Head.create({ url: "ws://localhost:4001" })
+const head = await Head.create({ url: "ws://localhost:4001" });
 
 const provider = new Provider.HydraProvider({
   head,
   httpUrl: "http://localhost:4001",
-})
+});
 
 // Query UTxOs in the head
-const utxos = await provider.getUtxos(address)
+const utxos = await provider.getUtxos(address);
 
 // Submit a signed transaction
-const txHash = await provider.submitTx(signedTx)
+const txHash = await provider.submitTx(signedTx);
 
 // Wait for confirmation
-const confirmed = await provider.awaitTx(txHash)
+const confirmed = await provider.awaitTx(txHash);
 ```
 
 ## Provider swap pattern
@@ -58,28 +58,28 @@ const confirmed = await provider.awaitTx(txHash)
 providers. Swap providers to switch between L1 and L2:
 
 ```ts
-import * as Hydra from "@no-witness-labs/hydra-sdk"
-import { Blockfrost } from "@evolution-sdk/evolution/sdk/provider/Blockfrost"
+import * as Hydra from "@no-witness-labs/hydra-sdk";
+import { Blockfrost } from "@evolution-sdk/evolution/sdk/provider/Blockfrost";
 
 // L1 provider
-const l1Provider = new Blockfrost("preview", apiKey)
+const l1Provider = new Blockfrost("preview", apiKey);
 
 // L2 provider — same interface
-const head = await Hydra.Head.create({ url: "ws://localhost:4001" })
+const head = await Hydra.Head.create({ url: "ws://localhost:4001" });
 const l2Provider = new Hydra.Provider.HydraProvider({
   head,
   httpUrl: "http://localhost:4001",
-})
+});
 
 // Both work identically
-const l1Utxos = await l1Provider.getUtxos(address)
-const l2Utxos = await l2Provider.getUtxos(address)
+const l1Utxos = await l1Provider.getUtxos(address);
+const l2Utxos = await l2Provider.getUtxos(address);
 ```
 
 The subpath import is also available:
 
 ```ts
-import { HydraProvider } from "@no-witness-labs/hydra-sdk/provider"
+import { HydraProvider } from "@no-witness-labs/hydra-sdk/provider";
 ```
 
 ## Effect API
@@ -87,20 +87,20 @@ import { HydraProvider } from "@no-witness-labs/hydra-sdk/provider"
 Every method is available as an Effect via the `.Effect` sub-namespace:
 
 ```ts
-import { Effect } from "effect"
-import { Head, Provider } from "@no-witness-labs/hydra-sdk"
+import { Effect } from "effect";
+import { Head, Provider } from "@no-witness-labs/hydra-sdk";
 
 const program = Effect.gen(function* () {
-  const head = yield* Head.effect.create({ url: "ws://localhost:4001" })
+  const head = yield* Head.effect.create({ url: "ws://localhost:4001" });
   const provider = new Provider.HydraProvider({
     head,
     httpUrl: "http://localhost:4001",
-  })
+  });
 
-  const utxos = yield* provider.Effect.getUtxos(address)
-  const txHash = yield* provider.Effect.submitTx(signedTx)
-  const confirmed = yield* provider.Effect.awaitTx(txHash)
-})
+  const utxos = yield* provider.Effect.getUtxos(address);
+  const txHash = yield* provider.Effect.submitTx(signedTx);
+  const confirmed = yield* provider.Effect.awaitTx(txHash);
+});
 ```
 
 ## UTxO conversion helpers
@@ -108,15 +108,15 @@ const program = Effect.gen(function* () {
 Bidirectional converters between hydra-node wire format and evolution-sdk UTxOs:
 
 ```ts
-import { Provider } from "@no-witness-labs/hydra-sdk"
+import { Provider } from "@no-witness-labs/hydra-sdk";
 
 // Hydra → evolution-sdk
-const utxo = Provider.fromHydraUtxo("txhash#0", hydraTxOut)
-const utxos = Provider.fromHydraUtxoMap(hydraUtxoMap)
+const utxo = Provider.fromHydraUtxo("txhash#0", hydraTxOut);
+const utxos = Provider.fromHydraUtxoMap(hydraUtxoMap);
 
 // evolution-sdk → Hydra
-const [key, txOut] = Provider.toHydraUtxo(evolutionUtxo)
-const hydraMap = Provider.toHydraUtxoMap(evolutionUtxos)
+const [key, txOut] = Provider.toHydraUtxo(evolutionUtxo);
+const hydraMap = Provider.toHydraUtxoMap(evolutionUtxos);
 ```
 
 ---
@@ -130,12 +130,12 @@ const hydraMap = Provider.toHydraUtxoMap(evolutionUtxos)
 ```ts
 export interface HydraProviderConfig {
   /** A connected HydraHead instance (for submitting transactions via WS). */
-  readonly head: HydraHead
+  readonly head: HydraHead;
   /**
    * HTTP base URL of the hydra-node API (e.g. "http://localhost:4001").
    * Typically the same host/port as the WebSocket URL with http:// instead of ws://.
    */
-  readonly httpUrl: string
+  readonly httpUrl: string;
 }
 ```
 
@@ -147,25 +147,25 @@ Implements `@evolution-sdk/evolution`'s `Provider` interface.
 
 ```ts
 export class HydraProvider implements Provider {
-  readonly Effect: ProviderEffect
-  constructor(config: HydraProviderConfig)
+  readonly Effect: ProviderEffect;
+  constructor(config: HydraProviderConfig);
 }
 ```
 
 **Provider method mapping**
 
-| Method | Implementation |
-|---|---|
-| `getProtocolParameters()` | `GET /protocol-parameters` → transformed to evolution-sdk format |
-| `getUtxos(addr)` | `GET /snapshot/utxo` → filter by address/credential |
-| `getUtxosWithUnit(addr, unit)` | Same as `getUtxos` + filter by unit |
-| `getUtxoByUnit(unit)` | `GET /snapshot/utxo` → find first matching unit |
-| `getUtxosByOutRef(inputs)` | `GET /snapshot/utxo` → filter by tx hash + index |
-| `submitTx(tx)` | Send `NewTx` via WebSocket |
-| `awaitTx(txHash)` | Subscribe to head events, await `TxValid`/`TxInvalid` |
-| `getDelegation()` | Returns `{ poolId: null, rewards: 0n }` (not applicable on L2) |
-| `getDatum(hash)` | Scan snapshot UTxOs for inline datum with matching hash |
-| `evaluateTx()` | Throws `ProviderError` (not supported on Hydra L2) |
+| Method                         | Implementation                                                   |
+| ------------------------------ | ---------------------------------------------------------------- |
+| `getProtocolParameters()`      | `GET /protocol-parameters` → transformed to evolution-sdk format |
+| `getUtxos(addr)`               | `GET /snapshot/utxo` → filter by address/credential              |
+| `getUtxosWithUnit(addr, unit)` | Same as `getUtxos` + filter by unit                              |
+| `getUtxoByUnit(unit)`          | `GET /snapshot/utxo` → find first matching unit                  |
+| `getUtxosByOutRef(inputs)`     | `GET /snapshot/utxo` → filter by tx hash + index                 |
+| `submitTx(tx)`                 | Send `NewTx` via WebSocket                                       |
+| `awaitTx(txHash)`              | Subscribe to head events, await `TxValid`/`TxInvalid`            |
+| `getDelegation()`              | Returns `{ poolId: null, rewards: 0n }` (not applicable on L2)   |
+| `getDatum(hash)`               | Scan snapshot UTxOs for inline datum with matching hash          |
+| `evaluateTx()`                 | Throws `ProviderError` (not supported on Hydra L2)               |
 
 ---
 
