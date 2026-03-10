@@ -363,8 +363,8 @@ export const SnapshotConfirmedMessageSchema = Schema.Struct({
     number: Schema.Int,
     confirmed: Schema.Array(Common.TransactionMessageSchema),
     utxo: UTxOSchema,
-    utxoToCommit: Schema.optional(UTxOSchema),
-    utxoToDecommit: Schema.optional(UTxOSchema),
+    utxoToCommit: Schema.optional(Schema.NullOr(UTxOSchema)),
+    utxoToDecommit: Schema.optional(Schema.NullOr(UTxOSchema)),
   }),
   seq: Schema.Int,
   timestamp: Schema.DateTimeUtc,
@@ -712,6 +712,40 @@ export type WebSocketResponseMessage =
 // HTTP API Response Schemas
 // =============================================================================
 
+/** 
+ * Chain point from node (blockHash, slot, tag).
+ * 
+ * @category schemas
+ */
+const ChainPointSchema = Schema.Struct({
+  blockHash: Schema.String,
+  slot: Schema.Number,
+  tag: Schema.Literal("ChainPoint"),
+});
+
+/**
+ * chainState can be a string or object with recordedAt and spendableUTxO (see sample.json).
+ *
+ * @category schemas
+ */
+const ChainStateSchema = Schema.Union(
+  Schema.String,
+  Schema.Struct({
+    recordedAt: Schema.NullOr(ChainPointSchema),
+    spendableUTxO: UTxOSchema,
+  }),
+);
+
+/**
+ * Record type used in coordinatedHeadState where values are not further typed.
+ *
+ * @category schemas
+ */
+const StringRecordSchema = Schema.Record({
+  key: Schema.String,
+  value: Schema.Unknown,
+});
+
 /**
  * Response from the `/head` HTTP endpoint.
  *
@@ -722,7 +756,7 @@ export const HeadResponseSchema = Schema.Union(
   Schema.Struct({
     tag: Schema.Literal("Idle"),
     contents: Schema.Struct({
-      chainState: Schema.String,
+      chainState: ChainStateSchema,
     }),
   }),
   Schema.Struct({
@@ -734,7 +768,7 @@ export const HeadResponseSchema = Schema.Union(
       }),
       pendingCommits: Schema.Array(PartySchema),
       commited: PartySchema,
-      chainState: Schema.String,
+      chainState: ChainStateSchema,
       headId: Schema.String,
       headSeed: Schema.String,
     }),
@@ -748,24 +782,18 @@ export const HeadResponseSchema = Schema.Union(
       }),
       coordinatedHeadState: Schema.Struct({
         localUTxO: UTxOSchema,
-        localTxs: Common.TransactionMessageSchema,
-        allTxs: Schema.Record({ key: Schema.String, value: Schema.Any }),
+        localTxs: Schema.Array(Common.TransactionMessageSchema),
+        allTxs: StringRecordSchema,
         confirmedSnapshot: Common.ConfirmedSnapshotSchema,
         seenSnapshot: Common.SeenSnapshotSchema,
-        pendingDeposits: Schema.Record({
-          key: Schema.String,
-          value: Schema.Any,
-        }),
-        currentDepositTxId: Schema.Record({
-          key: Schema.String,
-          value: Schema.Any,
-        }),
+        pendingDeposits: Schema.optional(StringRecordSchema),
+        currentDepositTxId: Schema.NullOr(StringRecordSchema),
         decommitTx: Schema.NullOr(Common.TransactionMessageSchema),
         version: Schema.Int,
       }),
-      chainState: Schema.String,
+      chainState: ChainStateSchema,
       headId: Schema.String,
-      currentSlot: Schema.Int,
+      currentSlot: Schema.optional(Schema.Int),
       headSeed: Schema.String,
     }),
   }),
@@ -779,7 +807,7 @@ export const HeadResponseSchema = Schema.Union(
       confirmedSnapshot: Common.ConfirmedSnapshotSchema,
       contestationDeadline: Schema.DateTimeUtc,
       readyToFanoutSent: Schema.Boolean,
-      chainState: Schema.Any,
+      chainState: ChainStateSchema,
       headId: Schema.String,
       headSeed: Schema.String,
       version: Schema.Int,

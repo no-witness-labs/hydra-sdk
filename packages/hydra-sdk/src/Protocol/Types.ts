@@ -49,10 +49,12 @@ export type Value = typeof ValueSchema.Type;
 export const TxOutSchema = Schema.Struct({
   address: Schema.String,
   value: ValueSchema,
-  datum: Schema.optional(Schema.String),
-  datumHash: Schema.optional(Schema.String),
+  datum: Schema.optional(Schema.NullOr(Schema.String)),
+  datumHash: Schema.optional(Schema.NullOr(Schema.String)),
+  datumhash: Schema.optional(Schema.NullOr(Schema.String)),
   inlineDatum: Schema.optional(Schema.Unknown),
-  inlineDatumRaw: Schema.optional(Schema.String),
+  inlineDatumRaw: Schema.optional(Schema.NullOr(Schema.String)),
+  inlineDatumhash: Schema.optional(Schema.NullOr(Schema.String)),
   referenceScript: Schema.optional(Schema.Unknown),
 });
 export type TxOut = typeof TxOutSchema.Type;
