@@ -5,10 +5,10 @@ description: Core SDK for Hydra Head protocol management
 
 # @no-witness-labs/hydra-sdk
 
-Core SDK for managing Hydra Head protocol interactions. Exports four namespaces:
+Core SDK for managing Hydra Head protocol interactions. Exports three namespaces:
 
 ```ts
-import { Config, Socket, Protocol, Head } from "@no-witness-labs/hydra-sdk";
+import { Protocol, Head, Provider } from "@no-witness-labs/hydra-sdk";
 ```
 
 ---
@@ -111,11 +111,15 @@ interface HydraHead {
 
   // Lifecycle commands (Promise API)
   init(params?: InitParams): Promise<void>;
-  commit(utxos: unknown): Promise<void>;
+  commit(body: CommitRequest): Promise<unknown>;
   close(): Promise<void>;
   safeClose(): Promise<void>;
   fanout(): Promise<void>;
   abort(): Promise<void>;
+  newTx(transaction: { type: string; description: string; cborHex: string; txId: string }): Promise<void>;
+  recover(recoverTxId: string): Promise<void>;
+  decommit(decommitTx: { type: string; description: string; cborHex: string; txId: string }): Promise<void>;
+  contest(): Promise<void>;
 
   // Event subscription
   subscribe(callback: (event: ServerOutput) => void): Unsubscribe;
@@ -127,12 +131,16 @@ interface HydraHead {
   // Effect API
   readonly effect: {
     init(params?: InitParams): Effect<void, HeadError>;
-    commit(utxos: unknown): Effect<void, HeadError>;
+    commit(body: CommitRequest): Effect<unknown, HeadError>;
     close(): Effect<void, HeadError>;
     safeClose(): Effect<void, HeadError>;
     fanout(): Effect<void, HeadError>;
     awaitReadyToFanout(): Effect<void, HeadError>;
     abort(): Effect<void, HeadError>;
+    newTx(transaction: { type: string; description: string; cborHex: string; txId: string }): Effect<void, HeadError>;
+    recover(recoverTxId: string): Effect<void, HeadError>;
+    decommit(decommitTx: { type: string; description: string; cborHex: string; txId: string }): Effect<void, HeadError>;
+    contest(): Effect<void, HeadError>;
     events(): Stream<ServerOutput>;
     dispose(): Effect<void, HeadError>;
   };
@@ -253,56 +261,3 @@ type Status =
   | "FINAL";
 ```
 
----
-
-## Socket
-
-WebSocket connection management with automatic reconnection and message queuing.
-
-### SocketController
-
-```ts
-class SocketController {
-  // Send a message through the WebSocket
-  sendMessage(chunk: string | Uint8Array): Effect<void, SocketError>;
-
-  // Close the WebSocket connection
-  sendClose(): Effect<void, SocketError>;
-
-  // Incoming message queue (PubSub)
-  readonly messageQueue: PubSub<Uint8Array>;
-
-  // Connection lifecycle fiber
-  readonly socketFiber: RuntimeFiber<void, SocketError>;
-}
-```
-
-Features:
-- Automatic reconnection with exponential backoff (up to 20 retries)
-- `PubSub`-based message distribution for multiple consumers
-- Comprehensive connection lifecycle logging
-
----
-
-## Config
-
-Connection configuration service.
-
-### Config.Config
-
-```ts
-class Config extends Effect.Service<Config>()("Config", {
-  effect: (url: string) => Effect.gen(function* () {
-    const wsUrl = "ws://" + url;
-    const httpUrl = "http://" + url;
-    return { wsUrl, httpUrl };
-  }),
-}) {}
-```
-
-Derives WebSocket and HTTP URLs from a base URL string. Used as a dependency by Socket and Head modules.
-
-```ts
-// Provide to Effect programs
-Effect.provide(Config.Config.Default("localhost:4001"))
-```

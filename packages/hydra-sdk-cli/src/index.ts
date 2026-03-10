@@ -20,7 +20,7 @@ const withHead = (
           Effect.ensuring(head.effect.dispose().pipe(Effect.orDie)),
         ),
       ),
-      Effect.catchAll((e) => Effect.logError(`Connection failed: ${e}`)),
+      Effect.orDie,
     );
 
 export const statusCommand = Command.make("status", {}).pipe(
