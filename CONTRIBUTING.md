@@ -119,6 +119,46 @@ Follow the prompts to:
 2. Choose version bump type (patch/minor/major)
 3. Write a summary of the change
 
+## Integration Tests
+
+Integration tests run against a real Hydra devnet (Docker-based) and exercise the full Head lifecycle.
+
+### Prerequisites
+
+- **Docker** must be running (Docker Desktop, OrbStack, or similar)
+- If using OrbStack, set `DOCKER_HOST=unix:///var/run/docker.sock` (dockerode defaults to the Docker Desktop socket)
+
+### Running Integration Tests
+
+```bash
+# From the repo root
+pnpm --filter @no-witness-labs/hydra-sdk test:integration
+
+# Or from the hydra-sdk package directory
+cd packages/hydra-sdk
+pnpm test:integration
+```
+
+Integration tests are **excluded** from the default `pnpm test` run. They use a separate vitest config (`vitest.integration.config.ts`) with extended timeouts (600s per test, 300s for setup hooks).
+
+### What the Tests Cover
+
+| Test | Flow |
+|------|------|
+| Full lifecycle | Init → Commit → Open → Close → Fanout |
+| NewTx rejection | Open → NewTx (invalid) → stays Open |
+| Abort path | Init → Abort → Aborted |
+| Event subscription | `subscribe()` delivers lifecycle events |
+| Reconnection | Hydra-node restart → SDK reconnects with state preserved |
+
+### How It Works
+
+Each test suite spins up its own `@no-witness-labs/hydra-devnet` cluster with unique ports. The cluster includes a Cardano node and Hydra node running in Docker containers. Tests use the SDK's `Head.create()` API to connect and drive the protocol.
+
+### CI
+
+Integration tests run automatically in CI via the `integration.yml` workflow on pushes to `main` and pull requests.
+
 ## Questions?
 
 Feel free to open an issue for any questions or concerns.

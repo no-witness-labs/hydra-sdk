@@ -129,6 +129,54 @@ describe("Hydra SDK — Head Lifecycle Integration", () => {
     },
     600_000,
   );
+
+  // -------------------------------------------------------------------------
+  // 2. NewTx: open head → submit invalid tx → verify rejection
+  // -------------------------------------------------------------------------
+  it(
+    "newTx rejects invalid transaction in Open head",
+    async () => {
+      // Fresh cluster for this test since the previous one finalized
+      await cluster.remove();
+      cluster = makeCluster("hydra-sdk-newtx", {
+        node: 9006,
+        submit: 9095,
+        api: 9406,
+        peer: 9506,
+        mon: 9606,
+      });
+      await cluster.start();
+
+      const head = await Head.create({ url: cluster.hydraApiUrl });
+
+      try {
+        await head.init();
+
+        const events = head.subscribeEvents();
+        await commitEmpty(cluster);
+        for await (const event of events) {
+          if (event.tag === "HeadIsOpen") break;
+        }
+        expect(head.getState()).toBe("Open");
+
+        // Submit an invalid transaction — empty head has no UTxOs to spend
+        await expect(
+          head.newTx({
+            type: "Tx ConwayEra",
+            description: "Ledger Cddl Format",
+            cborHex: "84a400d9010280018002000300a0f5f6",
+            txId: "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+          }),
+        ).rejects.toThrow();
+
+        // Head should remain Open after a rejected transaction
+        expect(head.getState()).toBe("Open");
+      } finally {
+        await head.dispose();
+      }
+    },
+    600_000,
+  );
 });
 
 describe("Hydra SDK — Abort Path", () => {
