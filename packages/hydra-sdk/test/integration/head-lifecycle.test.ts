@@ -1,12 +1,8 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import {
-  Address,
-  Assets,
-  KeyHash,
-  Transaction,
-} from "@evolution-sdk/evolution";
+import type { KeyHash } from "@evolution-sdk/evolution";
+import { Assets, Transaction } from "@evolution-sdk/evolution";
 import { makeTxBuilder } from "@evolution-sdk/evolution/sdk/builders/TransactionBuilder";
 import { Cluster, Container } from "@no-witness-labs/hydra-devnet";
 import { Head, Provider } from "@no-witness-labs/hydra-sdk";
