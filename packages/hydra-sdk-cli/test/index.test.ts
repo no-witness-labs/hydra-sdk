@@ -1,4 +1,4 @@
-import { Head } from "@no-witness-labs/hydra-sdk-cli";
+import { Head } from "@no-witness-labs/hydra-sdk";
 import { describe, expect, it } from "vitest";
 
 describe("CLI / Head integration", () => {
