@@ -1,8 +1,16 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import {
+  Address,
+  Assets,
+  KeyHash,
+  Transaction,
+} from "@evolution-sdk/evolution";
+import { makeTxBuilder } from "@evolution-sdk/evolution/sdk/builders/TransactionBuilder";
 import { Cluster, Container } from "@no-witness-labs/hydra-devnet";
-import { Head } from "@no-witness-labs/hydra-sdk";
+import { Head, Provider } from "@no-witness-labs/hydra-sdk";
+import { Effect } from "effect";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 /**
@@ -40,21 +48,15 @@ async function signAndSubmitCommit(cluster: Cluster.Cluster): Promise<void> {
   ]);
 }
 
-/** Draft an empty commit, sign, and submit to L1. */
+/** Draft an empty commit via hydra-sdk Provider, sign, and submit to L1. */
 async function commitEmpty(cluster: Cluster.Cluster): Promise<void> {
-  const response = await fetch(`${cluster.hydraHttpUrl}/commit`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({}),
-  });
-  if (!response.ok) {
-    throw new Error(
-      `Commit draft failed: ${response.status} ${await response.text()}`,
-    );
-  }
+  const draftTx = (await Effect.runPromise(
+    Provider.postCommit(cluster.hydraHttpUrl, {}),
+  )) as { cborHex: string };
+
   await writeFile(
     join(cluster.tempDir!, "commit-draft.json"),
-    await response.text(),
+    JSON.stringify(draftTx),
   );
   await signAndSubmitCommit(cluster);
 }
@@ -65,7 +67,7 @@ async function commitEmpty(cluster: Cluster.Cluster): Promise<void> {
  * 1. Derive payment address
  * 2. Split genesis UTxO: 10 ADA for commit, rest stays as L1 fuel
  * 3. Build blueprint tx for the 10 ADA UTxO
- * 4. POST /commit with blueprint + UTxO
+ * 4. POST /commit via hydra-sdk Provider
  * 5. Sign and submit the draft commit tx
  */
 async function commitFunds(cluster: Cluster.Cluster): Promise<void> {
@@ -160,102 +162,37 @@ async function commitFunds(cluster: Cluster.Cluster): Promise<void> {
     await Container.exec(cluster.cardanoNode!, ["cat", "/tmp/blueprint.json"]),
   );
 
-  // 6. POST /commit with blueprint + UTxO
-  const response = await fetch(`${cluster.hydraHttpUrl}/commit`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
+  // 6. POST /commit via hydra-sdk Provider
+  const draftTx = (await Effect.runPromise(
+    Provider.postCommit(cluster.hydraHttpUrl, {
       blueprintTx: blueprintEnvelope,
-      utxo: { [commitRef]: { address: commitAddr, value: { lovelace: commitVal } } },
+      utxo: {
+        [commitRef]: {
+          address: commitAddr,
+          value: { lovelace: commitVal },
+        },
+      },
     }),
-  });
-  if (!response.ok) {
-    throw new Error(
-      `Commit draft failed: ${response.status} ${await response.text()}`,
-    );
-  }
+  )) as { cborHex: string };
+
   await writeFile(
     join(cluster.tempDir!, "commit-draft.json"),
-    await response.text(),
+    JSON.stringify(draftTx),
   );
 
   // 7. Sign and submit the draft
   await signAndSubmitCommit(cluster);
 }
 
-/**
- * Build and sign a simple L2 transaction inside the open head.
- *
- * Queries /snapshot/utxo, picks the first UTxO, and builds a tx
- * that sends the full value back to the same address (fee=0 in head).
- * Returns the signed tx envelope and its txId.
- */
-async function buildL2Tx(
-  cluster: Cluster.Cluster,
-): Promise<{ type: string; description: string; cborHex: string; txId: string }> {
-  // 1. Query head UTxOs
-  const utxoResponse = await fetch(`${cluster.hydraHttpUrl}/snapshot/utxo`);
-  const headUtxo = await utxoResponse.json();
-  const utxoRef = Object.keys(headUtxo)[0];
-  if (!utxoRef) throw new Error("No UTxOs in head");
-  const [txHash, txIx] = utxoRef.split("#");
-  const addr: string = headUtxo[utxoRef].address;
-  const lovelace: number = headUtxo[utxoRef].value.lovelace;
-
-  // 2. Build raw tx (fees are 0 inside Hydra head)
-  await Container.exec(cluster.cardanoNode!, [
-    "sh",
-    "-c",
-    "cardano-cli conway transaction build-raw" +
-      ` --tx-in ${txHash}#${txIx}` +
-      ` --tx-out ${addr}+${lovelace}` +
-      " --fee 0" +
-      " --out-file /tmp/l2-tx.json",
-  ]);
-
-  // 3. Sign with payment key (skey is on the read-only config mount)
-  await Container.exec(cluster.cardanoNode!, [
-    "sh",
-    "-c",
-    "cardano-cli conway transaction sign" +
-      " --tx-file /tmp/l2-tx.json" +
-      " --signing-key-file /opt/cardano/config/payment.skey" +
-      " --out-file /tmp/l2-tx-signed.json",
-  ]);
-
-  // 4. Read signed tx envelope
-  const txEnvelopeRaw = await Container.exec(cluster.cardanoNode!, [
-    "cat",
-    "/tmp/l2-tx-signed.json",
-  ]);
-  const txEnvelope = JSON.parse(txEnvelopeRaw);
-
-  // 5. Get txId (cardano-cli may return plain hex or JSON {"txhash": "..."})
-  const txIdRaw = (
-    await Container.exec(cluster.cardanoNode!, [
-      "sh",
-      "-c",
-      "cardano-cli conway transaction txid --tx-file /tmp/l2-tx-signed.json",
-    ])
-  ).trim();
-  let txId: string;
-  try {
-    txId = (JSON.parse(txIdRaw) as { txhash: string }).txhash;
-  } catch {
-    txId = txIdRaw;
-  }
-
-  return {
-    type: txEnvelope.type,
-    description: txEnvelope.description,
-    cborHex: txEnvelope.cborHex,
-    txId,
-  };
-}
-
 function makeCluster(
   name: string,
-  ports: { node: number; submit: number; api: number; peer: number; mon: number },
+  ports: {
+    node: number;
+    submit: number;
+    api: number;
+    peer: number;
+    mon: number;
+  },
 ): Cluster.Cluster {
   return Cluster.make({
     clusterName: name,
@@ -299,79 +236,126 @@ describe("Hydra SDK — Head Lifecycle Integration", () => {
   // -------------------------------------------------------------------------
   // 1. Full lifecycle: connect → init → commit → open → close → fanout
   // -------------------------------------------------------------------------
-  it(
-    "full lifecycle: init → commit → open → close → fanout",
-    async () => {
-      const head = await Head.create({ url: cluster.hydraApiUrl });
+  it("full lifecycle: init → commit → open → close → fanout", async () => {
+    const head = await Head.create({ url: cluster.hydraApiUrl });
 
-      try {
-        expect(head.getState()).toBe("Idle");
+    try {
+      expect(head.getState()).toBe("Idle");
 
-        await head.init();
-        expect(head.getState()).toBe("Initializing");
+      await head.init();
+      expect(head.getState()).toBe("Initializing");
 
-        const events = head.subscribeEvents();
-        await commitEmpty(cluster);
+      const events = head.subscribeEvents();
+      await commitEmpty(cluster);
 
-        for await (const event of events) {
-          if (event.tag === "HeadIsOpen") break;
-        }
-        expect(head.getState()).toBe("Open");
-
-        await head.close();
-        expect(head.getState()).toBe("Closed");
-
-        await head.fanout();
-        expect(head.getState()).toBe("Final");
-      } finally {
-        await head.dispose();
+      for await (const event of events) {
+        if (event.tag === "HeadIsOpen") break;
       }
-    },
-    600_000,
-  );
+      expect(head.getState()).toBe("Open");
+
+      await head.close();
+      expect(head.getState()).toBe("Closed");
+
+      await head.fanout();
+      expect(head.getState()).toBe("Final");
+    } finally {
+      await head.dispose();
+    }
+  }, 600_000);
 
   // -------------------------------------------------------------------------
-  // 2. NewTx: commit funds → open → submit valid L2 tx → TxValid
+  // 2. NewTx: commit funds → open → submit valid L2 tx via HydraProvider
   // -------------------------------------------------------------------------
-  it(
-    "newTx succeeds with a valid L2 transaction",
-    async () => {
-      // Fresh cluster since the previous test finalized
-      await cluster.remove();
-      cluster = makeCluster("hydra-sdk-newtx", {
-        node: 9006,
-        submit: 9095,
-        api: 9406,
-        peer: 9506,
-        mon: 9606,
-      });
-      await cluster.start();
+  it("newTx succeeds with a valid L2 transaction", async () => {
+    // Fresh cluster since the previous test finalized
+    await cluster.remove();
+    cluster = makeCluster("hydra-sdk-newtx", {
+      node: 9006,
+      submit: 9095,
+      api: 9406,
+      peer: 9506,
+      mon: 9606,
+    });
+    await cluster.start();
 
-      const head = await Head.create({ url: cluster.hydraApiUrl });
+    const head = await Head.create({ url: cluster.hydraApiUrl });
+    const hydraProvider = new Provider.HydraProvider({
+      head,
+      httpUrl: cluster.hydraHttpUrl,
+    });
 
-      try {
-        await head.init();
+    try {
+      await head.init();
 
-        // Commit real UTxOs so the head has funds to transact
-        const events = head.subscribeEvents();
-        await commitFunds(cluster);
-        for await (const event of events) {
-          if (event.tag === "HeadIsOpen") break;
-        }
-        expect(head.getState()).toBe("Open");
-
-        // Build and submit a valid L2 transaction
-        const tx = await buildL2Tx(cluster);
-        await head.newTx(tx);
-
-        // Head stays Open after a successful transaction
-        expect(head.getState()).toBe("Open");
-      } finally {
-        await head.dispose();
+      // Commit real UTxOs so the head has funds to transact
+      const events = head.subscribeEvents();
+      await commitFunds(cluster);
+      for await (const event of events) {
+        if (event.tag === "HeadIsOpen") break;
       }
-    },
-    600_000,
-  );
+      expect(head.getState()).toBe("Open");
+
+      // Query L2 UTxOs via HydraProvider
+      const l2Utxos = await hydraProvider.getSnapshotUtxos();
+      expect(l2Utxos.length).toBeGreaterThan(0);
+
+      // Build unsigned tx using evolution-sdk: send funds back to same address
+      const firstUtxo = l2Utxos[0];
+      const lovelace = Assets.lovelaceOf(firstUtxo.assets);
+      const utxoAddr = firstUtxo.address;
+      const paymentCred = utxoAddr.paymentCredential;
+      if (paymentCred._tag !== "KeyHash") {
+        throw new Error("Expected KeyHash credential");
+      }
+      const built = await makeTxBuilder({
+        provider: hydraProvider,
+        network: "Custom",
+      })
+        .payToAddress({
+          address: utxoAddr,
+          assets: Assets.fromLovelace(lovelace),
+        })
+        .addSigner({ keyHash: paymentCred as KeyHash.KeyHash })
+        .build({
+          changeAddress: utxoAddr,
+          availableUtxos: l2Utxos,
+          drainTo: 0,
+        });
+
+      const unsignedTx = await built.toTransaction();
+      const unsignedCbor = Transaction.toCBORHex(unsignedTx);
+
+      // Write unsigned CBOR to container, sign with cardano-cli, read back
+      await Container.exec(cluster.cardanoNode!, [
+        "sh",
+        "-c",
+        `echo '{"type":"Tx ConwayEra","description":"Ledger Cddl Format","cborHex":"${unsignedCbor}"}' > /tmp/l2-unsigned.json`,
+      ]);
+      await Container.exec(cluster.cardanoNode!, [
+        "sh",
+        "-c",
+        "cardano-cli conway transaction sign" +
+          " --tx-file /tmp/l2-unsigned.json" +
+          " --signing-key-file /opt/cardano/config/payment.skey" +
+          " --out-file /tmp/l2-signed.json",
+      ]);
+      const signedEnvelope = JSON.parse(
+        await Container.exec(cluster.cardanoNode!, [
+          "cat",
+          "/tmp/l2-signed.json",
+        ]),
+      );
+      const signedTx = Transaction.fromCBORHex(signedEnvelope.cborHex);
+
+      // Submit via HydraProvider (exercises both Provider and Head.newTx)
+      await hydraProvider.submitTx(signedTx);
+
+      // Head stays Open after a successful transaction
+      expect(head.getState()).toBe("Open");
+    } finally {
+      await head.dispose();
+    }
+  }, 600_000);
 });
 
 describe("Hydra SDK — Abort Path", () => {
@@ -399,25 +383,21 @@ describe("Hydra SDK — Abort Path", () => {
   // -------------------------------------------------------------------------
   // 2. Abort path: init → abort
   // -------------------------------------------------------------------------
-  it(
-    "init → abort transitions to Aborted",
-    async () => {
-      const head = await Head.create({ url: cluster.hydraApiUrl });
+  it("init → abort transitions to Aborted", async () => {
+    const head = await Head.create({ url: cluster.hydraApiUrl });
 
-      try {
-        expect(head.getState()).toBe("Idle");
+    try {
+      expect(head.getState()).toBe("Idle");
 
-        await head.init();
-        expect(head.getState()).toBe("Initializing");
+      await head.init();
+      expect(head.getState()).toBe("Initializing");
 
-        await head.abort();
-        expect(head.getState()).toBe("Aborted");
-      } finally {
-        await head.dispose();
-      }
-    },
-    600_000,
-  );
+      await head.abort();
+      expect(head.getState()).toBe("Aborted");
+    } finally {
+      await head.dispose();
+    }
+  }, 600_000);
 });
 
 describe("Hydra SDK — Event Subscription", () => {
@@ -445,30 +425,26 @@ describe("Hydra SDK — Event Subscription", () => {
   // -------------------------------------------------------------------------
   // 3. Event subscription: verify callback subscription delivers events
   // -------------------------------------------------------------------------
-  it(
-    "subscribe() delivers lifecycle events via callback",
-    async () => {
-      const head = await Head.create({ url: cluster.hydraApiUrl });
-      const collectedTags: Array<string> = [];
+  it("subscribe() delivers lifecycle events via callback", async () => {
+    const head = await Head.create({ url: cluster.hydraApiUrl });
+    const collectedTags: Array<string> = [];
 
-      try {
-        // Subscribe synchronously before any command — guarantees no events missed
-        const unsub = head.subscribe((event) => {
-          collectedTags.push(event.tag);
-        });
+    try {
+      // Subscribe synchronously before any command — guarantees no events missed
+      const unsub = head.subscribe((event: { tag: string }) => {
+        collectedTags.push(event.tag);
+      });
 
-        // init() only resolves after HeadIsInitializing is received and dispatched,
-        // so by this point the callback has already been invoked
-        await head.init();
-        unsub();
+      // init() only resolves after HeadIsInitializing is received and dispatched,
+      // so by this point the callback has already been invoked
+      await head.init();
+      unsub();
 
-        expect(collectedTags).toContain("HeadIsInitializing");
-      } finally {
-        await head.dispose();
-      }
-    },
-    600_000,
-  );
+      expect(collectedTags).toContain("HeadIsInitializing");
+    } finally {
+      await head.dispose();
+    }
+  }, 600_000);
 });
 
 describe("Hydra SDK — Reconnection", () => {
@@ -496,40 +472,36 @@ describe("Hydra SDK — Reconnection", () => {
   // -------------------------------------------------------------------------
   // 4. Reconnection: disconnect and reconnect preserves state
   // -------------------------------------------------------------------------
-  it(
-    "reconnects after hydra-node restart and preserves state",
-    async () => {
-      const head = await Head.create({
-        url: cluster.hydraApiUrl,
-        reconnect: {
-          maxRetries: 10,
-          initialDelayMs: 200,
-          maxDelayMs: 5_000,
-        },
-      });
+  it("reconnects after hydra-node restart and preserves state", async () => {
+    const head = await Head.create({
+      url: cluster.hydraApiUrl,
+      reconnect: {
+        maxRetries: 10,
+        initialDelayMs: 200,
+        maxDelayMs: 5_000,
+      },
+    });
 
-      try {
-        expect(head.getState()).toBe("Idle");
+    try {
+      expect(head.getState()).toBe("Idle");
 
-        await head.init();
-        expect(head.getState()).toBe("Initializing");
+      await head.init();
+      expect(head.getState()).toBe("Initializing");
 
-        // Restart hydra-node to force disconnect + reconnect
-        await Container.stop(cluster.hydraNode!);
-        await Container.start(cluster.hydraNode!);
+      // Restart hydra-node to force disconnect + reconnect
+      await Container.stop(cluster.hydraNode!);
+      await Container.start(cluster.hydraNode!);
 
-        // Wait for reconnection + Greetings with restored state
-        await new Promise((r) => setTimeout(r, 15_000));
-        expect(head.getState()).toBe("Initializing");
+      // Wait for reconnection + Greetings with restored state
+      await new Promise((r) => setTimeout(r, 15_000));
+      expect(head.getState()).toBe("Initializing");
 
-        // Prove the connection is live by executing a command that requires
-        // a working WebSocket — abort() sends Abort and awaits HeadIsAborted
-        await head.abort();
-        expect(head.getState()).toBe("Aborted");
-      } finally {
-        await head.dispose();
-      }
-    },
-    600_000,
-  );
+      // Prove the connection is live by executing a command that requires
+      // a working WebSocket — abort() sends Abort and awaits HeadIsAborted
+      await head.abort();
+      expect(head.getState()).toBe("Aborted");
+    } finally {
+      await head.dispose();
+    }
+  }, 600_000);
 });
