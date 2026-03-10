@@ -6,6 +6,7 @@
 import {
   Context,
   Data,
+  Deferred,
   Effect,
   Exit,
   Fiber,
@@ -777,6 +778,10 @@ const createEffect = (
     const { queue: projected, unsubscribe: unsubscribeProjected } =
       yield* transport.events.subscribe;
 
+    // Deferred that resolves once the first Greetings has been processed,
+    // so callers know the FSM reflects the node's actual state.
+    const greetingsReceived = yield* Deferred.make<void>();
+
     const projectorFiber = yield* Effect.forkDaemon(
       Effect.forever(
         Queue.take(projected).pipe(
@@ -794,15 +799,30 @@ const createEffect = (
               // On reconnect/greeting, force-sync FSM to the server's state.
               // Use the output tag so applyOutputTag can validate/log if needed.
               const tag = outputTagFromStatus(event.greetings.headStatus);
-              return tag !== undefined
-                ? fsm.applyOutputTag(tag)
-                : Ref.set(fsm.status, event.greetings.headStatus);
+              const updateFsm =
+                tag !== undefined
+                  ? fsm.applyOutputTag(tag)
+                  : Ref.set(fsm.status, event.greetings.headStatus);
+              return updateFsm.pipe(
+                Effect.tap(() => Deferred.succeed(greetingsReceived, void 0)),
+              );
             }
 
             return Effect.void;
           }),
         ),
       ),
+    );
+
+    // Start the WebSocket connection AFTER the projector is subscribed,
+    // ensuring Greetings (and any replayed history) is captured by the FSM.
+    yield* transport.connect;
+
+    // Wait for the first Greetings to be processed so the FSM reflects
+    // the node's actual state before returning the head to callers.
+    yield* Deferred.await(greetingsReceived).pipe(
+      Effect.timeout("10 seconds"),
+      Effect.catchAll(() => Effect.void),
     );
 
     // -----------------------------------------------------------------------
