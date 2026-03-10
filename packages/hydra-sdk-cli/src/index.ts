@@ -7,13 +7,21 @@ import { Head, Protocol } from "@no-witness-labs/hydra-sdk";
 import { Schedule } from "effect";
 import * as Effect from "effect/Effect";
 
-const URL = "ws://172.16.238.30:4001";
+const getUrl = (): string => {
+  const url = process.env.HYDRA_NODE_URL;
+  if (!url) {
+    throw new Error(
+      "HYDRA_NODE_URL environment variable is required (e.g. ws://localhost:4001)",
+    );
+  }
+  return url;
+};
 
 const withHead = (
   fn: (head: Head.HydraHead) => Effect.Effect<void>,
 ): Effect.Effect<void> =>
   Head.effect
-    .create({ url: URL })
+    .create({ url: getUrl() })
     .pipe(
       Effect.flatMap((head) =>
         fn(head).pipe(
