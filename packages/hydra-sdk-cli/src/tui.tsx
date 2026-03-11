@@ -66,7 +66,7 @@ const formatUtxoEntry = (u: UTxO.UTxO): UtxoEntry => {
 const wsToHttp = (wsUrl: string): string =>
   wsUrl.replace(/^ws(s?):\/\//, "http$1://");
 
-const validCommands: Record<Head.HeadStatus, Head.ClientInputTag[]> = {
+const validCommands: Record<Head.HeadStatus, Array<Head.ClientInputTag>> = {
   Idle: ["Init"],
   Initializing: ["Commit", "Abort"],
   Open: ["Close", "SafeClose", "Decommit"],
@@ -107,7 +107,7 @@ const Header = () => (
   </Box>
 );
 
-const StatusBar = ({ state, headId }: { state: Head.HeadStatus; headId: string }) => (
+const StatusBar = ({ headId, state }: { state: Head.HeadStatus; headId: string }) => (
   <Box borderStyle="single" paddingX={1} flexDirection="row" gap={2}>
     <Box>
       <Text bold>Status: </Text>
@@ -120,7 +120,7 @@ const StatusBar = ({ state, headId }: { state: Head.HeadStatus; headId: string }
   </Box>
 );
 
-const EventLog = ({ events }: { events: EventEntry[] }) => (
+const EventLog = ({ events }: { events: Array<EventEntry> }) => (
   <Box borderStyle="single" flexDirection="column" paddingX={1} height={10}>
     <Text bold underline>Event Log</Text>
     {events.length === 0 ? (
@@ -137,7 +137,7 @@ const EventLog = ({ events }: { events: EventEntry[] }) => (
   </Box>
 );
 
-const CommandHelp = ({ state, hasWallet }: { state: Head.HeadStatus; hasWallet: boolean }) => {
+const CommandHelp = ({ hasWallet, state }: { state: Head.HeadStatus; hasWallet: boolean }) => {
   const available = validCommands[state];
 
   const commandKeys: Array<{ key: string; label: string; command: Head.ClientInputTag }> = [
@@ -154,7 +154,7 @@ const CommandHelp = ({ state, hasWallet }: { state: Head.HeadStatus; hasWallet: 
     <Box borderStyle="single" paddingX={1} flexDirection="column">
       <Text bold underline>Commands</Text>
       <Box flexDirection="row" gap={1} flexWrap="wrap">
-        {commandKeys.map(({ key, label, command }) => {
+        {commandKeys.map(({ command, key, label }) => {
           const enabled = available.includes(command);
           return (
             <Box key={key}>
@@ -182,9 +182,9 @@ const Feedback = ({ message }: { message: string }) => (
 // UTxO List View
 // ---------------------------------------------------------------------------
 
-const UtxoListView = ({ title, utxos, loading, error }: {
+const UtxoListView = ({ error, loading, title, utxos }: {
   title: string;
-  utxos: UtxoEntry[];
+  utxos: Array<UtxoEntry>;
   loading: boolean;
   error: string | null;
 }) => (
@@ -216,8 +216,8 @@ const UtxoListView = ({ title, utxos, loading, error }: {
 // Commit Selection View
 // ---------------------------------------------------------------------------
 
-const CommitSelectView = ({ utxos, selected, cursor, loading, error }: {
-  utxos: UtxoEntry[];
+const CommitSelectView = ({ cursor, error, loading, selected, utxos }: {
+  utxos: Array<UtxoEntry>;
   selected: Set<number>;
   cursor: number;
   loading: boolean;
@@ -265,8 +265,8 @@ interface L2UtxoEntry {
   lovelace: bigint;
 }
 
-const L2UtxoListView = ({ utxos, loading, error }: {
-  utxos: L2UtxoEntry[];
+const L2UtxoListView = ({ error, loading, utxos }: {
+  utxos: Array<L2UtxoEntry>;
   loading: boolean;
   error: string | null;
 }) => (
@@ -297,14 +297,14 @@ const L2UtxoListView = ({ utxos, loading, error }: {
 // App Root
 // ---------------------------------------------------------------------------
 
-const App = ({ head, config }: { head: Head.HydraHead; config: TuiConfig }) => {
+const App = ({ config, head }: { head: Head.HydraHead; config: TuiConfig }) => {
   const { exit } = useApp();
   const hasWallet = Boolean(config.mnemonic && config.blockfrostKey);
 
   // Dashboard state
   const [state, setState] = useState<Head.HeadStatus>(head.getState());
   const [headId, setHeadId] = useState(head.headId ?? "none");
-  const [events, setEvents] = useState<EventEntry[]>([]);
+  const [events, setEvents] = useState<Array<EventEntry>>([]);
   const [feedback, setFeedback] = useState("Connected. Waiting for input...");
   const sendingRef = useRef(false);
 
@@ -312,12 +312,12 @@ const App = ({ head, config }: { head: Head.HydraHead; config: TuiConfig }) => {
   const [view, setView] = useState<ViewMode>("dashboard");
 
   // L1 UTxO state
-  const [l1Utxos, setL1Utxos] = useState<UtxoEntry[]>([]);
+  const [l1Utxos, setL1Utxos] = useState<Array<UtxoEntry>>([]);
   const [l1Loading, setL1Loading] = useState(false);
   const [l1Error, setL1Error] = useState<string | null>(null);
 
   // L2 UTxO state
-  const [l2Utxos, setL2Utxos] = useState<L2UtxoEntry[]>([]);
+  const [l2Utxos, setL2Utxos] = useState<Array<L2UtxoEntry>>([]);
   const [l2Loading, setL2Loading] = useState(false);
   const [l2Error, setL2Error] = useState<string | null>(null);
 
