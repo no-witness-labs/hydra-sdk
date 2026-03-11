@@ -60,7 +60,7 @@ const output = (json: boolean, data: Record<string, unknown>): string =>
         .join(", ");
 
 /**
- * Create a Head, run a program with it, then exit.
+ * Create a Head via layer, run a program with it, then exit.
  * The CLI entry point handles process.exit() via custom teardown.
  */
 const withHead = (
@@ -68,9 +68,11 @@ const withHead = (
   program: (head: Head.HydraHead) => Effect.Effect<void, Head.HeadError>,
 ): Effect.Effect<void> =>
   Effect.gen(function* () {
-    const head = yield* Head.effect.create({ url });
+    const head = yield* Head.HydraHeadService;
     yield* program(head);
   }).pipe(
+    Effect.provide(Head.layer({ url })),
+    Effect.scoped,
     Effect.catchTag("HeadError", (e) =>
       Effect.logError(`Error: ${e.message}`),
     ),
