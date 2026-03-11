@@ -1,6 +1,7 @@
 {
   "name": "@no-witness-labs/hydra-sdk-cli",
   "version": "0.0.5",
+  "type": "module",
   "description": "",
   "main": "./dist/cli.js",
   "types": "./dist/cli.d.ts",
@@ -21,7 +22,7 @@
     "dist/**/*.d.ts.map"
   ],
   "scripts": {
-    "build": "tsc -b tsconfig.build.json && babel dist --plugins annotate-pure-calls --out-dir dist --source-maps",
+    "build": "tsc -b tsconfig.build.json && babel dist --plugins annotate-pure-calls --out-dir dist --source-maps && chmod +x dist/index.js",
     "start": "pnpm build && node dist/index.js",
     "dev": "tsc -b tsconfig.build.json --watch",
     "type-check": "tsc --noEmit",

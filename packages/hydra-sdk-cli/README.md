@@ -5,118 +5,121 @@ CLI for managing Hydra head lifecycle, built on [`@no-witness-labs/hydra-sdk`](.
 ## Installation
 
 ```bash
-# Global install
-npm i -g @no-witness-labs/hydra-sdk-cli
+# From the monorepo root — build and link globally
+pnpm --filter @no-witness-labs/hydra-sdk-cli build
+cd packages/hydra-sdk-cli && pnpm link --global
 
-# Or run directly
-npx @no-witness-labs/hydra-sdk-cli --help
+# Verify
+hydra --help
+
+# Unlink later
+pnpm unlink --global @no-witness-labs/hydra-sdk-cli
 ```
+
+## Configuration
+
+The CLI uses a three-tier fallback for options: **CLI flag > environment variable > config file**.
+
+Config file location: `~/.config/hydra-sdk/config.yaml`
+
+### Config commands
+
+```bash
+hydra config set --key url --value ws://localhost:4001
+hydra config set --key blockfrostKey --value preprodXXXXXX
+hydra config set --key mnemonic --value "word1 word2 ... word24"
+hydra config set --key network --value preprod
+
+hydra config get --key url
+hydra config list
+hydra config path
+hydra config remove --key url
+```
+
+### Environment variables
+
+| Variable | Description |
+|---|---|
+| `HYDRA_NODE_URL` | Hydra node WebSocket URL |
+| `HYDRA_MNEMONIC` | BIP39 seed phrase |
+| `HYDRA_BLOCKFROST_KEY` | Blockfrost project ID |
 
 ## Usage
 
-Every command requires a Hydra node WebSocket URL, provided via `--url` or the `HYDRA_NODE_URL` environment variable:
+Every command that connects to a Hydra node accepts `--url` and `--json` flags. When configured via `hydra config set` or environment variables, `--url` can be omitted.
 
 ```bash
-# Using --url flag
 hydra status --url ws://localhost:4001
-
-# Using environment variable
-export HYDRA_NODE_URL=ws://localhost:4001
-hydra status
-```
-
-Add `--json` to any command for machine-readable JSON output:
-
-```bash
 hydra status --json
 ```
 
 ## Commands
 
-### status
-
-Show current head status.
+### Connection
 
 ```bash
+# Test connection
+hydra connect --url ws://localhost:4001
+
+# Check head status
 hydra status --url ws://localhost:4001
 
-# Watch mode — polls every 1s
-hydra status --url ws://localhost:4001 --watch
+# Watch status continuously (1s interval)
+hydra status --watch
 ```
 
-### connect
-
-Test connection to a Hydra node without performing any action.
+### Head lifecycle
 
 ```bash
-hydra connect --url ws://localhost:4001
+hydra init                          # Initialize a new head
+hydra abort                         # Abort initialization
+hydra close                         # Close the head
+hydra contest                       # Contest closure with newer snapshot
+hydra fanout                        # Fan out from closed head to L1
 ```
 
-### init
-
-Initialize a new Hydra head.
+### Commits
 
 ```bash
-hydra init --url ws://localhost:4001
+# Empty commit
+hydra commit
+
+# Commit specific UTxOs (requires wallet credentials)
+hydra commit \
+  --utxo "txhash1#0,txhash2#1" \
+  --mnemonic "word1 word2 ... word24" \
+  --blockfrost-key preprodXXXXXX
 ```
 
-### abort
-
-Abort head initialization (before all participants have committed).
+### Incremental commits & decommits
 
 ```bash
-hydra abort --url ws://localhost:4001
+# Recover a failed deposit
+hydra recover --tx-id <deposit-tx-id>
+
+# Decommit UTxOs back to L1
+hydra decommit --tx-cbor <cbor-hex> --tx-id <tx-id>
 ```
 
-### commit
-
-Send an empty commit to the head (via REST).
+### UTxO queries
 
 ```bash
-hydra commit --url ws://localhost:4001
+# List L1 wallet UTxOs
+hydra l1-utxo --mnemonic "..." --blockfrost-key preprodXXXXXX
+
+# List L2 UTxOs in the head snapshot
+hydra l2-utxo --url ws://localhost:4001
 ```
 
-### close
+### TUI
 
-Close the Hydra head, initiating the contestation period.
+Interactive terminal UI for real-time head monitoring. Press `q` to quit.
 
 ```bash
-hydra close --url ws://localhost:4001
+hydra tui --url ws://localhost:4001
 ```
 
-### contest
-
-Contest head closure with a newer snapshot during the contestation period.
-
-```bash
-hydra contest --url ws://localhost:4001
-```
-
-### fanout
-
-Fan out from a closed head back to L1 (after contestation period ends).
-
-```bash
-hydra fanout --url ws://localhost:4001
-```
-
-### recover
-
-Recover a failed incremental commit deposit.
-
-```bash
-hydra recover --url ws://localhost:4001 --tx-id <TRANSACTION_ID>
-```
-
-### decommit
-
-Decommit UTxOs from the head back to L1.
-
-```bash
-hydra decommit --url ws://localhost:4001 --tx-id <TX_ID> --tx-cbor <CBOR_HEX>
-```
-
-## Full Lifecycle Example
+## Full lifecycle example
 
 ```bash
 export HYDRA_NODE_URL=ws://localhost:4001

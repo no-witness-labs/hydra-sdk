@@ -14,6 +14,7 @@ import { Head, Provider } from "@no-witness-labs/hydra-sdk";
 import { Config, Duration, Effect, Schedule } from "effect";
 
 import * as HydraConfig from "./config.js";
+import type { TuiConfig } from "./tui.js";
 import { runTui } from "./tui.js";
 
 // ---------------------------------------------------------------------------
@@ -701,11 +702,20 @@ export const configCommand = Command.make("config").pipe(
 // TUI Command
 // ---------------------------------------------------------------------------
 
-export const tuiCommand = Command.make("tui", { url: urlOption }).pipe(
-  Command.withDescription("Launch interactive terminal UI for head monitoring"),
-  Command.withHandler(({ url }) =>
-    Effect.tryPromise({
-      try: () => runTui(url),
+export const tuiCommand = Command.make("tui", {
+  url: urlOption,
+  mnemonic: commitMnemonicOption,
+  blockfrostKey: commitBlockfrostKeyOption,
+}).pipe(
+  Command.withDescription("Launch interactive terminal UI for head monitoring and management"),
+  Command.withHandler(({ blockfrostKey: bfKeyOpt, mnemonic: mnemonicOpt, url }) => {
+    const tuiConfig: TuiConfig = {
+      url,
+      mnemonic: mnemonicOpt._tag === "Some" ? mnemonicOpt.value : undefined,
+      blockfrostKey: bfKeyOpt._tag === "Some" ? bfKeyOpt.value : undefined,
+    };
+    return Effect.tryPromise({
+      try: () => runTui(tuiConfig),
       catch: (e) =>
         new Head.HeadError({
           message: `TUI error: ${e instanceof Error ? e.message : String(e)}`,
@@ -714,8 +724,8 @@ export const tuiCommand = Command.make("tui", { url: urlOption }).pipe(
       Effect.catchTag("HeadError", (e) =>
         Effect.logError(`Error: ${e.message}`),
       ),
-    ),
-  ),
+    );
+  }),
 );
 
 // ---------------------------------------------------------------------------
