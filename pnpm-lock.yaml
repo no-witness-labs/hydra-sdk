@@ -301,9 +301,18 @@ importers:
       '@effect/platform-node':
         specifier: ^0.104.1
         version: 0.104.1(@effect/cluster@0.56.3(@effect/platform@0.94.4(effect@3.19.16))(@effect/rpc@0.73.0(@effect/platform@0.94.4(effect@3.19.16))(effect@3.19.16))(@effect/sql@0.49.0(@effect/experimental@0.58.0(@effect/platform@0.94.4(effect@3.19.16))(effect@3.19.16))(@effect/platform@0.94.4(effect@3.19.16))(effect@3.19.16))(@effect/workflow@0.16.0(@effect/experimental@0.58.0(@effect/platform@0.94.4(effect@3.19.16))(effect@3.19.16))(@effect/platform@0.94.4(effect@3.19.16))(@effect/rpc@0.73.0(@effect/platform@0.94.4(effect@3.19.16))(effect@3.19.16))(effect@3.19.16))(effect@3.19.16))(@effect/platform@0.94.4(effect@3.19.16))(@effect/rpc@0.73.0(@effect/platform@0.94.4(effect@3.19.16))(effect@3.19.16))(@effect/sql@0.49.0(@effect/experimental@0.58.0(@effect/platform@0.94.4(effect@3.19.16))(effect@3.19.16))(@effect/platform@0.94.4(effect@3.19.16))(effect@3.19.16))(bufferutil@4.1.0)(effect@3.19.16)(utf-8-validate@6.0.6)
+      '@evolution-sdk/evolution':
+        specifier: ^0.3.22
+        version: 0.3.22(@effect/cluster@0.56.3(@effect/platform@0.90.10(effect@3.19.16))(@effect/rpc@0.73.0(@effect/platform@0.90.10(effect@3.19.16))(effect@3.19.16))(@effect/sql@0.49.0(@effect/experimental@0.58.0(@effect/platform@0.90.10(effect@3.19.16))(effect@3.19.16))(@effect/platform@0.90.10(effect@3.19.16))(effect@3.19.16))(@effect/workflow@0.16.0(@effect/experimental@0.58.0(@effect/platform@0.90.10(effect@3.19.16))(effect@3.19.16))(@effect/platform@0.90.10(effect@3.19.16))(@effect/rpc@0.73.0(@effect/platform@0.90.10(effect@3.19.16))(effect@3.19.16))(effect@3.19.16))(effect@3.19.16))(@effect/rpc@0.73.0(@effect/platform@0.90.10(effect@3.19.16))(effect@3.19.16))(@effect/sql@0.49.0(@effect/experimental@0.58.0(@effect/platform@0.90.10(effect@3.19.16))(effect@3.19.16))(@effect/platform@0.90.10(effect@3.19.16))(effect@3.19.16))(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       '@no-witness-labs/hydra-sdk':
         specifier: workspace:*
         version: link:../hydra-sdk
+      '@noble/hashes':
+        specifier: ^1.8.0
+        version: 1.8.0
+      '@scure/bip39':
+        specifier: ^1.5.4
+        version: 1.6.0
     devDependencies:
       '@babel/cli':
         specifier: ^7.28.6

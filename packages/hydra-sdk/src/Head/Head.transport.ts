@@ -280,7 +280,10 @@ const parseApiEvent = (raw: string): Effect.Effect<ApiEvent, HeadError> =>
             parseHeadStatus(decoded.headStatus) ?? decoded.headStatus;
           return {
             _tag: "Greetings",
-            greetings: { headStatus: normalizedStatus as HeadStatus },
+            greetings: {
+              headStatus: normalizedStatus as HeadStatus,
+              headId: decoded.hydraHeadId,
+            },
           };
         }
         // Fallback: extract headStatus manually
@@ -288,7 +291,13 @@ const parseApiEvent = (raw: string): Effect.Effect<ApiEvent, HeadError> =>
         if (status === null) {
           throw new Error(`Unsupported head status: ${parsed.headStatus}`);
         }
-        return { _tag: "Greetings", greetings: { headStatus: status } };
+        return {
+          _tag: "Greetings",
+          greetings: {
+            headStatus: status,
+            headId: typeof parsed.hydraHeadId === "string" ? parsed.hydraHeadId : undefined,
+          },
+        };
       }
 
       // 2. InvalidInput — reason without tag (legacy) or tag: "InvalidInput"
