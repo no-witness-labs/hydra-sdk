@@ -57,9 +57,5 @@
     "@effect/docgen": "^0.5.2",
     "@effect/platform": "^0.94.2"
   },
-  "pnpm": {
-    "overrides": {
-      "@evolution-sdk/evolution": "^0.3.22"
-    }
-  }
+  "pnpm": {}
 }

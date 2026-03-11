@@ -4,18 +4,13 @@ import type { UTxO } from "@evolution-sdk/evolution";
 import {
   AssetName,
   Assets,
-  Bip32PrivateKey,
   createClient,
   PolicyId,
-  PrivateKey,
   Transaction,
   TransactionHash,
   TransactionWitnessSet,
 } from "@evolution-sdk/evolution";
 import { Head, Provider } from "@no-witness-labs/hydra-sdk";
-import { blake2b } from "@noble/hashes/blake2b";
-import { mnemonicToEntropy } from "@scure/bip39";
-import { wordlist } from "@scure/bip39/wordlists/english";
 import { Config, Duration, Effect, Schedule } from "effect";
 
 // ---------------------------------------------------------------------------
@@ -107,99 +102,6 @@ const makeWalletClient = (mnemonic: string, blockfrostKey: string) =>
     },
     wallet: { type: "seed" as const, mnemonic },
   });
-
-/**
- * Extract the raw body bytes from a Cardano TX CBOR hex string.
- * A TX is a 4-element CBOR array [body, witnessSet, isValid, auxiliaryData].
- * We must extract the original bytes to avoid re-encoding (which can change
- * the hash and break script integrity checks).
- */
-const extractBodyBytes = (txHex: string): Uint8Array => {
-  const bytes = Buffer.from(txHex, "hex");
-  // Skip the outer array tag (0x84 = 4-element array)
-  let offset = 1;
-  const bodyStart = offset;
-  offset = skipCborItem(bytes, offset);
-  return bytes.subarray(bodyStart, offset);
-};
-
-/** Skip one complete CBOR item and return the offset after it. */
-const skipCborItem = (buf: Buffer, offset: number): number => {
-  const major = buf[offset] >> 5;
-  const additional = buf[offset] & 0x1f;
-  offset++;
-
-  let length: number;
-  if (additional < 24) {
-    length = additional;
-  } else if (additional === 24) {
-    length = buf[offset++];
-  } else if (additional === 25) {
-    length = buf.readUInt16BE(offset);
-    offset += 2;
-  } else if (additional === 26) {
-    length = buf.readUInt32BE(offset);
-    offset += 4;
-  } else if (additional === 27) {
-    length = Number(buf.readBigUInt64BE(offset));
-    offset += 8;
-  } else if (additional === 31) {
-    if (major === 2 || major === 3) {
-      while (buf[offset] !== 0xff) offset = skipCborItem(buf, offset);
-      return offset + 1;
-    }
-    while (buf[offset] !== 0xff) {
-      offset = skipCborItem(buf, offset);
-      if (major === 5) offset = skipCborItem(buf, offset);
-    }
-    return offset + 1;
-  } else {
-    throw new Error(`Unsupported CBOR additional info: ${additional}`);
-  }
-
-  if (major === 0 || major === 1 || major === 7) return offset;
-  if (major === 2 || major === 3) return offset + length;
-  if (major === 4) {
-    for (let i = 0; i < length; i++) offset = skipCborItem(buf, offset);
-    return offset;
-  }
-  if (major === 5) {
-    for (let i = 0; i < length; i++) {
-      offset = skipCborItem(buf, offset);
-      offset = skipCborItem(buf, offset);
-    }
-    return offset;
-  }
-  if (major === 6) return skipCborItem(buf, offset);
-  throw new Error(`Unsupported CBOR major type: ${major}`);
-};
-
-/**
- * Sign a draft TX preserving the original CBOR bytes.
- * Uses BIP32-Ed25519 derivation (same as createClient with seed wallet).
- */
-const signDraftTx = (draftCborHex: string, mnemonic: string): string => {
-  // 1. Derive payment key via BIP32-Ed25519 (matches createClient seed wallet)
-  const entropy = mnemonicToEntropy(mnemonic, wordlist);
-  const rootXPrv = Bip32PrivateKey.fromBip39Entropy(entropy, "");
-  const paymentNode = Bip32PrivateKey.derive(
-    rootXPrv,
-    Bip32PrivateKey.CardanoPath.paymentIndices(0, 0),
-  );
-  const paymentKey = Bip32PrivateKey.toPrivateKey(paymentNode);
-
-  // 2. Hash the ORIGINAL body bytes (preserves hydra-node encoding)
-  const bodyBytes = extractBodyBytes(draftCborHex);
-  const bodyHash = blake2b(bodyBytes, { dkLen: 32 });
-
-  // 3. Sign and build witness set
-  const signature = PrivateKey.sign(paymentKey, bodyHash);
-  const vkey = PrivateKey.toPublicKey(paymentKey);
-  const witnessSet = TransactionWitnessSet.fromVKeyWitnesses([
-    new TransactionWitnessSet.VKeyWitness({ vkey, signature }),
-  ]);
-  return TransactionWitnessSet.toCBORHex(witnessSet);
-};
 
 /** Shared wallet options for commands that need L1 wallet access. */
 const walletOptions = {
@@ -424,14 +326,22 @@ export const commitCommand = Command.make("commit", {
         };
         yield* Effect.logInfo("Draft TX received from hydra node.");
 
-        // 5. Sign draft TX (byte-level: preserves original CBOR from hydra-node)
-        const witnessHex = signDraftTx(draftCborHex, mnemonic);
+        // 5. Sign draft TX (evolution-sdk preserves original CBOR bytes for hashing)
+        const witnessSet = yield* Effect.tryPromise({
+          try: () =>
+            client.signTx(draftCborHex, { utxos: allUtxos }),
+          catch: (e) =>
+            new Head.HeadError({
+              message: `Failed to sign TX: ${e instanceof Error ? e.message : String(e)}`,
+            }),
+        });
+        const witnessHex = TransactionWitnessSet.toCBORHex(witnessSet);
         const signedCborHex = Transaction.addVKeyWitnessesHex(
           draftCborHex,
           witnessHex,
         );
 
-        // 6. Submit raw CBOR to Blockfrost (avoids re-encoding)
+        // 6. Submit raw CBOR to Blockfrost (provider submitTx re-encodes, so we submit directly)
         const txHash = yield* Effect.tryPromise({
           try: async () => {
             const res = await fetch(
