@@ -14,6 +14,7 @@ import { Head, Provider } from "@no-witness-labs/hydra-sdk";
 import { Config, Duration, Effect, Schedule } from "effect";
 
 import * as HydraConfig from "./config.js";
+import { runTui } from "./tui.js";
 
 // ---------------------------------------------------------------------------
 // Config-aware fallback: CLI flag → env var → config file
@@ -697,6 +698,27 @@ export const configCommand = Command.make("config").pipe(
 );
 
 // ---------------------------------------------------------------------------
+// TUI Command
+// ---------------------------------------------------------------------------
+
+export const tuiCommand = Command.make("tui", { url: urlOption }).pipe(
+  Command.withDescription("Launch interactive terminal UI for head monitoring"),
+  Command.withHandler(({ url }) =>
+    Effect.tryPromise({
+      try: () => runTui(url),
+      catch: (e) =>
+        new Head.HeadError({
+          message: `TUI error: ${e instanceof Error ? e.message : String(e)}`,
+        }),
+    }).pipe(
+      Effect.catchTag("HeadError", (e) =>
+        Effect.logError(`Error: ${e.message}`),
+      ),
+    ),
+  ),
+);
+
+// ---------------------------------------------------------------------------
 // Root Command
 // ---------------------------------------------------------------------------
 
@@ -716,6 +738,7 @@ export const rootCommand = Command.make("hydra").pipe(
     l1UtxoCommand,
     l2UtxoCommand,
     configCommand,
+    tuiCommand,
   ]),
 );
 
