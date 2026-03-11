@@ -2,18 +2,18 @@ import * as Command from "@effect/cli/Command";
 import * as Options from "@effect/cli/Options";
 import type { UTxO } from "@evolution-sdk/evolution";
 import {
+  AssetName,
   Assets,
   Bip32PrivateKey,
   createClient,
   PolicyId,
-  AssetName,
   PrivateKey,
   Transaction,
   TransactionHash,
   TransactionWitnessSet,
 } from "@evolution-sdk/evolution";
-import { blake2b } from "@noble/hashes/blake2b";
 import { Head, Provider } from "@no-witness-labs/hydra-sdk";
+import { blake2b } from "@noble/hashes/blake2b";
 import { mnemonicToEntropy } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { Config, Duration, Effect, Schedule } from "effect";
@@ -312,7 +312,7 @@ export const commitCommand = Command.make("commit", {
   Command.withDescription(
     "Commit UTxOs to the head. Use --utxo with txhash#index refs, or omit for empty commit.",
   ),
-  Command.withHandler(({ json, url, utxo: utxoOpt, mnemonic: mnemonicOpt, blockfrostKey: bfKeyOpt }) =>
+  Command.withHandler(({ blockfrostKey: bfKeyOpt, json, mnemonic: mnemonicOpt, url, utxo: utxoOpt }) =>
     withHead(url, (head) =>
       Effect.gen(function* () {
         const utxoRefs =
@@ -350,7 +350,7 @@ export const commitCommand = Command.make("commit", {
         });
 
         const requestedRefs = utxoRefs.split(",").map((s) => s.trim());
-        const selected: UTxO.UTxO[] = [];
+        const selected: Array<UTxO.UTxO> = [];
         for (const ref of requestedRefs) {
           const found = allWalletUtxos.find(
             (u) => `${TransactionHash.toHex(u.transactionId)}#${u.index}` === ref,
@@ -593,7 +593,7 @@ export const l1UtxoCommand = Command.make("l1-utxo", {
   ...walletOptions,
 }).pipe(
   Command.withDescription("List L1 wallet UTxOs"),
-  Command.withHandler(({ json, mnemonic, blockfrostKey }) =>
+  Command.withHandler(({ blockfrostKey, json, mnemonic }) =>
     Effect.gen(function* () {
       const client = makeWalletClient(mnemonic, blockfrostKey);
       const utxos = yield* Effect.tryPromise({
