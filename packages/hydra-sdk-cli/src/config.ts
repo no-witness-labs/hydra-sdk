@@ -22,7 +22,7 @@ export interface HydraConfig {
 const configDir = (): string => {
   const xdg = process.env.XDG_CONFIG_HOME;
   const base = xdg || path.join(os.homedir(), ".config");
-  return path.join(base, "hydra");
+  return path.join(base, "hydra-sdk");
 };
 
 export const configPath = (): string => path.join(configDir(), "config.yaml");

@@ -23,7 +23,7 @@ describe("Config", () => {
 
   it("configPath uses XDG_CONFIG_HOME", () => {
     expect(HydraConfig.configPath()).toBe(
-      path.join(tmpDir, "hydra", "config.yaml"),
+      path.join(tmpDir, "hydra-sdk", "config.yaml"),
     );
   });
 
