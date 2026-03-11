@@ -13,14 +13,31 @@ import {
 import { Head, Provider } from "@no-witness-labs/hydra-sdk";
 import { Config, Duration, Effect, Schedule } from "effect";
 
+import * as HydraConfig from "./config.js";
+
+// ---------------------------------------------------------------------------
+// Config-aware fallback: CLI flag → env var → config file
+// ---------------------------------------------------------------------------
+
+const configFallback = (envKey: string, configKey: keyof HydraConfig.HydraConfig): Config.Config<string> =>
+  Config.string(envKey).pipe(
+    Config.orElse(() =>
+      Config.sync(() => {
+        const v = HydraConfig.get(configKey);
+        if (v === undefined) throw new Error(`No ${configKey} in config`);
+        return v;
+      }),
+    ),
+  );
+
 // ---------------------------------------------------------------------------
 // Global Options (shared by all commands that need a head connection)
 // ---------------------------------------------------------------------------
 
 const urlOption = Options.text("url").pipe(
-  Options.withFallbackConfig(Config.string("HYDRA_NODE_URL")),
+  Options.withFallbackConfig(configFallback("HYDRA_NODE_URL", "url")),
   Options.withDescription(
-    "Hydra node WebSocket URL (e.g. ws://localhost:4001). Falls back to HYDRA_NODE_URL env var.",
+    "Hydra node WebSocket URL (e.g. ws://localhost:4001). Falls back to HYDRA_NODE_URL env var or config file.",
   ),
 );
 
@@ -106,15 +123,15 @@ const makeWalletClient = (mnemonic: string, blockfrostKey: string) =>
 /** Shared wallet options for commands that need L1 wallet access. */
 const walletOptions = {
   mnemonic: Options.text("mnemonic").pipe(
-    Options.withFallbackConfig(Config.string("HYDRA_MNEMONIC")),
+    Options.withFallbackConfig(configFallback("HYDRA_MNEMONIC", "mnemonic")),
     Options.withDescription(
-      "BIP39 seed phrase. Falls back to HYDRA_MNEMONIC env var.",
+      "BIP39 seed phrase. Falls back to HYDRA_MNEMONIC env var or config file.",
     ),
   ),
   blockfrostKey: Options.text("blockfrost-key").pipe(
-    Options.withFallbackConfig(Config.string("HYDRA_BLOCKFROST_KEY")),
+    Options.withFallbackConfig(configFallback("HYDRA_BLOCKFROST_KEY", "blockfrostKey")),
     Options.withDescription(
-      "Blockfrost project ID. Falls back to HYDRA_BLOCKFROST_KEY env var.",
+      "Blockfrost project ID. Falls back to HYDRA_BLOCKFROST_KEY env var or config file.",
     ),
   ),
 };
@@ -190,18 +207,18 @@ const commitUtxoOption = Options.text("utxo").pipe(
 );
 
 const commitMnemonicOption = Options.text("mnemonic").pipe(
-  Options.withFallbackConfig(Config.string("HYDRA_MNEMONIC")),
+  Options.withFallbackConfig(configFallback("HYDRA_MNEMONIC", "mnemonic")),
   Options.optional,
   Options.withDescription(
-    "BIP39 seed phrase. Falls back to HYDRA_MNEMONIC env var.",
+    "BIP39 seed phrase. Falls back to HYDRA_MNEMONIC env var or config file.",
   ),
 );
 
 const commitBlockfrostKeyOption = Options.text("blockfrost-key").pipe(
-  Options.withFallbackConfig(Config.string("HYDRA_BLOCKFROST_KEY")),
+  Options.withFallbackConfig(configFallback("HYDRA_BLOCKFROST_KEY", "blockfrostKey")),
   Options.optional,
   Options.withDescription(
-    "Blockfrost project ID. Falls back to HYDRA_BLOCKFROST_KEY env var.",
+    "Blockfrost project ID. Falls back to HYDRA_BLOCKFROST_KEY env var or config file.",
   ),
 );
 
