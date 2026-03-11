@@ -14,6 +14,7 @@ import {
   recoverCommand,
   rootCommand,
   statusCommand,
+  tuiCommand,
 } from "../src/cli.js";
 
 // ---------------------------------------------------------------------------
@@ -40,6 +41,10 @@ describe("CLI — Command Structure", () => {
 
   it("config command is exported", () => {
     expect(configCommand).toBeDefined();
+  });
+
+  it("tui command is exported", () => {
+    expect(tuiCommand).toBeDefined();
   });
 });
 
