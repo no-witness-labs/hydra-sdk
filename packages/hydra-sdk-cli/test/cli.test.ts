@@ -5,6 +5,7 @@ import {
   abortCommand,
   closeCommand,
   commitCommand,
+  configCommand,
   connectCommand,
   contestCommand,
   decommitCommand,
@@ -35,6 +36,10 @@ describe("CLI — Command Structure", () => {
     expect(recoverCommand).toBeDefined();
     expect(decommitCommand).toBeDefined();
     expect(connectCommand).toBeDefined();
+  });
+
+  it("config command is exported", () => {
+    expect(configCommand).toBeDefined();
   });
 });
 
