@@ -593,6 +593,108 @@ export const l2UtxoCommand = Command.make("l2-utxo", headOptions).pipe(
 );
 
 // ---------------------------------------------------------------------------
+// Config Commands
+// ---------------------------------------------------------------------------
+
+const configKeyArg = Options.text("key").pipe(
+  Options.withDescription(
+    "Config key (url, mnemonic, blockfrostKey, network)",
+  ),
+);
+
+const configValueArg = Options.text("value").pipe(
+  Options.withDescription("Value to set"),
+);
+
+export const configSetCommand = Command.make("set", {
+  key: configKeyArg,
+  value: configValueArg,
+}).pipe(
+  Command.withDescription("Set a config value"),
+  Command.withHandler(({ key, value }) =>
+    Effect.gen(function* () {
+      if (!HydraConfig.isValidKey(key)) {
+        yield* Effect.logError(
+          `Invalid key: ${key}. Valid keys: url, mnemonic, blockfrostKey, network`,
+        );
+        return;
+      }
+      HydraConfig.set(key, value);
+      yield* Effect.logInfo(`Set ${key} = ${key === "mnemonic" ? "***" : value}`);
+    }),
+  ),
+);
+
+export const configGetCommand = Command.make("get", {
+  key: configKeyArg,
+}).pipe(
+  Command.withDescription("Get a config value"),
+  Command.withHandler(({ key }) =>
+    Effect.gen(function* () {
+      if (!HydraConfig.isValidKey(key)) {
+        yield* Effect.logError(
+          `Invalid key: ${key}. Valid keys: url, mnemonic, blockfrostKey, network`,
+        );
+        return;
+      }
+      const value = HydraConfig.get(key);
+      yield* Effect.logInfo(value ?? "(not set)");
+    }),
+  ),
+);
+
+export const configListCommand = Command.make("list", {}).pipe(
+  Command.withDescription("List all config values"),
+  Command.withHandler(() =>
+    Effect.gen(function* () {
+      const config = HydraConfig.load();
+      const entries = Object.entries(config);
+      if (entries.length === 0) {
+        yield* Effect.logInfo("(empty config)");
+        return;
+      }
+      for (const [k, v] of entries) {
+        yield* Effect.logInfo(`${k}: ${k === "mnemonic" ? "***" : v}`);
+      }
+    }),
+  ),
+);
+
+export const configPathCommand = Command.make("path", {}).pipe(
+  Command.withDescription("Show config file path"),
+  Command.withHandler(() => Effect.logInfo(HydraConfig.configPath())),
+);
+
+export const configRemoveCommand = Command.make("remove", {
+  key: configKeyArg,
+}).pipe(
+  Command.withDescription("Remove a config value"),
+  Command.withHandler(({ key }) =>
+    Effect.gen(function* () {
+      if (!HydraConfig.isValidKey(key)) {
+        yield* Effect.logError(
+          `Invalid key: ${key}. Valid keys: url, mnemonic, blockfrostKey, network`,
+        );
+        return;
+      }
+      HydraConfig.remove(key);
+      yield* Effect.logInfo(`Removed ${key}`);
+    }),
+  ),
+);
+
+export const configCommand = Command.make("config").pipe(
+  Command.withDescription("Manage CLI configuration"),
+  Command.withSubcommands([
+    configSetCommand,
+    configGetCommand,
+    configListCommand,
+    configPathCommand,
+    configRemoveCommand,
+  ]),
+);
+
+// ---------------------------------------------------------------------------
 // Root Command
 // ---------------------------------------------------------------------------
 
@@ -611,6 +713,7 @@ export const rootCommand = Command.make("hydra").pipe(
     connectCommand,
     l1UtxoCommand,
     l2UtxoCommand,
+    configCommand,
   ]),
 );
 
