@@ -5,6 +5,7 @@ import {
   abortCommand,
   closeCommand,
   commitCommand,
+  configCommand,
   connectCommand,
   contestCommand,
   decommitCommand,
@@ -13,6 +14,7 @@ import {
   recoverCommand,
   rootCommand,
   statusCommand,
+  tuiCommand,
 } from "../src/cli.js";
 
 // ---------------------------------------------------------------------------
@@ -35,6 +37,14 @@ describe("CLI — Command Structure", () => {
     expect(recoverCommand).toBeDefined();
     expect(decommitCommand).toBeDefined();
     expect(connectCommand).toBeDefined();
+  });
+
+  it("config command is exported", () => {
+    expect(configCommand).toBeDefined();
+  });
+
+  it("tui command is exported", () => {
+    expect(tuiCommand).toBeDefined();
   });
 });
 

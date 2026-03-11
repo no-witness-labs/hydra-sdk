@@ -13,14 +13,33 @@ import {
 import { Head, Provider } from "@no-witness-labs/hydra-sdk";
 import { Config, Duration, Effect, Schedule } from "effect";
 
+import * as HydraConfig from "./config.js";
+import type { TuiConfig } from "./tui.js";
+import { runTui } from "./tui.js";
+
+// ---------------------------------------------------------------------------
+// Config-aware fallback: CLI flag → env var → config file
+// ---------------------------------------------------------------------------
+
+const configFallback = (envKey: string, configKey: keyof HydraConfig.HydraConfig): Config.Config<string> =>
+  Config.string(envKey).pipe(
+    Config.orElse(() =>
+      Config.sync(() => {
+        const v = HydraConfig.get(configKey);
+        if (v === undefined) throw new Error(`No ${configKey} in config`);
+        return v;
+      }),
+    ),
+  );
+
 // ---------------------------------------------------------------------------
 // Global Options (shared by all commands that need a head connection)
 // ---------------------------------------------------------------------------
 
 const urlOption = Options.text("url").pipe(
-  Options.withFallbackConfig(Config.string("HYDRA_NODE_URL")),
+  Options.withFallbackConfig(configFallback("HYDRA_NODE_URL", "url")),
   Options.withDescription(
-    "Hydra node WebSocket URL (e.g. ws://localhost:4001). Falls back to HYDRA_NODE_URL env var.",
+    "Hydra node WebSocket URL (e.g. ws://localhost:4001). Falls back to HYDRA_NODE_URL env var or config file.",
   ),
 );
 
@@ -43,7 +62,7 @@ const output = (json: boolean, data: Record<string, unknown>): string =>
         .join(", ");
 
 /**
- * Create a Head, run a program with it, then exit.
+ * Create a Head via layer, run a program with it, then exit.
  * The CLI entry point handles process.exit() via custom teardown.
  */
 const withHead = (
@@ -51,9 +70,11 @@ const withHead = (
   program: (head: Head.HydraHead) => Effect.Effect<void, Head.HeadError>,
 ): Effect.Effect<void> =>
   Effect.gen(function* () {
-    const head = yield* Head.effect.create({ url });
+    const head = yield* Head.HydraHeadService;
     yield* program(head);
   }).pipe(
+    Effect.provide(Head.layer({ url })),
+    Effect.scoped,
     Effect.catchTag("HeadError", (e) =>
       Effect.logError(`Error: ${e.message}`),
     ),
@@ -106,15 +127,15 @@ const makeWalletClient = (mnemonic: string, blockfrostKey: string) =>
 /** Shared wallet options for commands that need L1 wallet access. */
 const walletOptions = {
   mnemonic: Options.text("mnemonic").pipe(
-    Options.withFallbackConfig(Config.string("HYDRA_MNEMONIC")),
+    Options.withFallbackConfig(configFallback("HYDRA_MNEMONIC", "mnemonic")),
     Options.withDescription(
-      "BIP39 seed phrase. Falls back to HYDRA_MNEMONIC env var.",
+      "BIP39 seed phrase. Falls back to HYDRA_MNEMONIC env var or config file.",
     ),
   ),
   blockfrostKey: Options.text("blockfrost-key").pipe(
-    Options.withFallbackConfig(Config.string("HYDRA_BLOCKFROST_KEY")),
+    Options.withFallbackConfig(configFallback("HYDRA_BLOCKFROST_KEY", "blockfrostKey")),
     Options.withDescription(
-      "Blockfrost project ID. Falls back to HYDRA_BLOCKFROST_KEY env var.",
+      "Blockfrost project ID. Falls back to HYDRA_BLOCKFROST_KEY env var or config file.",
     ),
   ),
 };
@@ -190,18 +211,18 @@ const commitUtxoOption = Options.text("utxo").pipe(
 );
 
 const commitMnemonicOption = Options.text("mnemonic").pipe(
-  Options.withFallbackConfig(Config.string("HYDRA_MNEMONIC")),
+  Options.withFallbackConfig(configFallback("HYDRA_MNEMONIC", "mnemonic")),
   Options.optional,
   Options.withDescription(
-    "BIP39 seed phrase. Falls back to HYDRA_MNEMONIC env var.",
+    "BIP39 seed phrase. Falls back to HYDRA_MNEMONIC env var or config file.",
   ),
 );
 
 const commitBlockfrostKeyOption = Options.text("blockfrost-key").pipe(
-  Options.withFallbackConfig(Config.string("HYDRA_BLOCKFROST_KEY")),
+  Options.withFallbackConfig(configFallback("HYDRA_BLOCKFROST_KEY", "blockfrostKey")),
   Options.optional,
   Options.withDescription(
-    "Blockfrost project ID. Falls back to HYDRA_BLOCKFROST_KEY env var.",
+    "Blockfrost project ID. Falls back to HYDRA_BLOCKFROST_KEY env var or config file.",
   ),
 );
 
@@ -576,6 +597,138 @@ export const l2UtxoCommand = Command.make("l2-utxo", headOptions).pipe(
 );
 
 // ---------------------------------------------------------------------------
+// Config Commands
+// ---------------------------------------------------------------------------
+
+const configKeyArg = Options.text("key").pipe(
+  Options.withDescription(
+    "Config key (url, mnemonic, blockfrostKey, network)",
+  ),
+);
+
+const configValueArg = Options.text("value").pipe(
+  Options.withDescription("Value to set"),
+);
+
+export const configSetCommand = Command.make("set", {
+  key: configKeyArg,
+  value: configValueArg,
+}).pipe(
+  Command.withDescription("Set a config value"),
+  Command.withHandler(({ key, value }) =>
+    Effect.gen(function* () {
+      if (!HydraConfig.isValidKey(key)) {
+        yield* Effect.logError(
+          `Invalid key: ${key}. Valid keys: url, mnemonic, blockfrostKey, network`,
+        );
+        return;
+      }
+      HydraConfig.set(key, value);
+      yield* Effect.logInfo(`Set ${key} = ${key === "mnemonic" ? "***" : value}`);
+    }),
+  ),
+);
+
+export const configGetCommand = Command.make("get", {
+  key: configKeyArg,
+}).pipe(
+  Command.withDescription("Get a config value"),
+  Command.withHandler(({ key }) =>
+    Effect.gen(function* () {
+      if (!HydraConfig.isValidKey(key)) {
+        yield* Effect.logError(
+          `Invalid key: ${key}. Valid keys: url, mnemonic, blockfrostKey, network`,
+        );
+        return;
+      }
+      const value = HydraConfig.get(key);
+      yield* Effect.logInfo(value ?? "(not set)");
+    }),
+  ),
+);
+
+export const configListCommand = Command.make("list", {}).pipe(
+  Command.withDescription("List all config values"),
+  Command.withHandler(() =>
+    Effect.gen(function* () {
+      const config = HydraConfig.load();
+      const entries = Object.entries(config);
+      if (entries.length === 0) {
+        yield* Effect.logInfo("(empty config)");
+        return;
+      }
+      for (const [k, v] of entries) {
+        yield* Effect.logInfo(`${k}: ${k === "mnemonic" ? "***" : v}`);
+      }
+    }),
+  ),
+);
+
+export const configPathCommand = Command.make("path", {}).pipe(
+  Command.withDescription("Show config file path"),
+  Command.withHandler(() => Effect.logInfo(HydraConfig.configPath())),
+);
+
+export const configRemoveCommand = Command.make("remove", {
+  key: configKeyArg,
+}).pipe(
+  Command.withDescription("Remove a config value"),
+  Command.withHandler(({ key }) =>
+    Effect.gen(function* () {
+      if (!HydraConfig.isValidKey(key)) {
+        yield* Effect.logError(
+          `Invalid key: ${key}. Valid keys: url, mnemonic, blockfrostKey, network`,
+        );
+        return;
+      }
+      HydraConfig.remove(key);
+      yield* Effect.logInfo(`Removed ${key}`);
+    }),
+  ),
+);
+
+export const configCommand = Command.make("config").pipe(
+  Command.withDescription("Manage CLI configuration"),
+  Command.withSubcommands([
+    configSetCommand,
+    configGetCommand,
+    configListCommand,
+    configPathCommand,
+    configRemoveCommand,
+  ]),
+);
+
+// ---------------------------------------------------------------------------
+// TUI Command
+// ---------------------------------------------------------------------------
+
+export const tuiCommand = Command.make("tui", {
+  url: urlOption,
+  mnemonic: commitMnemonicOption,
+  blockfrostKey: commitBlockfrostKeyOption,
+}).pipe(
+  Command.withDescription("Launch interactive terminal UI for head monitoring and management"),
+  Command.withHandler(({ blockfrostKey: bfKeyOpt, mnemonic: mnemonicOpt, url }) => {
+    const tuiConfig: TuiConfig = {
+      url,
+      mnemonic: mnemonicOpt._tag === "Some" ? mnemonicOpt.value : undefined,
+      blockfrostKey: bfKeyOpt._tag === "Some" ? bfKeyOpt.value : undefined,
+    };
+    return Effect.tryPromise({
+      try: () => runTui(tuiConfig),
+      catch: (e) =>
+        new Head.HeadError({
+          message: `TUI error: ${e instanceof Error ? e.message : String(e)}`,
+        }),
+    }).pipe(
+      Effect.catchTag("HeadError", (e) =>
+        Effect.logError(`Error: ${e.message}`),
+      ),
+    );
+  }),
+);
+
+// ---------------------------------------------------------------------------
 // Root Command
 // ---------------------------------------------------------------------------
 
@@ -594,10 +747,12 @@ export const rootCommand = Command.make("hydra").pipe(
     connectCommand,
     l1UtxoCommand,
     l2UtxoCommand,
+    configCommand,
+    tuiCommand,
   ]),
 );
 
 export const runCli = Command.run(rootCommand, {
   name: "hydra",
-  version: "0.1.0",
+  version: "0.0.5",
 });
