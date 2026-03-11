@@ -18,6 +18,7 @@ export const GreetingsMessageSchema = Schema.Struct({
   me: PartySchema,
   headStatus: Schema.Literal(
     "Idle",
+    "Initial",
     "Initializing",
     "Open",
     "Closed",

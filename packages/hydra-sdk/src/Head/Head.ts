@@ -6,6 +6,7 @@
 import {
   Context,
   Data,
+  Deferred,
   Effect,
   Exit,
   Fiber,
@@ -174,6 +175,8 @@ export interface ClientMessage {
 export interface Greetings {
   /** The head state as known by hydra-node at the time of the greeting. */
   readonly headStatus: HeadStatus;
+  /** The head ID, present when the head has been initialized. */
+  readonly headId?: string;
 }
 
 /**
@@ -547,6 +550,13 @@ export interface HydraHead {
   contest(): Promise<void>;
 
   /**
+   * Fire-and-forget: validate the FSM guard and send a command without
+   * waiting for a response. Useful in CLI / scripting contexts where
+   * the caller checks status separately.
+   */
+  send(command: ClientInputTag, payload?: unknown): Promise<void>;
+
+  /**
    * Registers a callback that is invoked for every `ServerOutput` event
    * published by the head.
    *
@@ -683,6 +693,15 @@ export interface HydraHead {
       txId: string;
     }): Effect.Effect<void, HeadError>;
     contest(): Effect.Effect<void, HeadError>;
+    /**
+     * Fire-and-forget: validate the FSM guard and send a command without
+     * waiting for a response. Useful in CLI / scripting contexts where
+     * the caller checks status separately.
+     */
+    send(
+      command: ClientInputTag,
+      payload?: unknown,
+    ): Effect.Effect<void, HeadError>;
     events(): Stream.Stream<ServerOutput>;
     dispose(): Effect.Effect<void, HeadError>;
   };
@@ -777,6 +796,10 @@ const createEffect = (
     const { queue: projected, unsubscribe: unsubscribeProjected } =
       yield* transport.events.subscribe;
 
+    // Deferred that resolves once the first Greetings has been processed,
+    // so callers know the FSM reflects the node's actual state.
+    const greetingsReceived = yield* Deferred.make<void>();
+
     const projectorFiber = yield* Effect.forkDaemon(
       Effect.forever(
         Queue.take(projected).pipe(
@@ -794,15 +817,36 @@ const createEffect = (
               // On reconnect/greeting, force-sync FSM to the server's state.
               // Use the output tag so applyOutputTag can validate/log if needed.
               const tag = outputTagFromStatus(event.greetings.headStatus);
-              return tag !== undefined
-                ? fsm.applyOutputTag(tag)
-                : Ref.set(fsm.status, event.greetings.headStatus);
+              const updateFsm =
+                tag !== undefined
+                  ? fsm.applyOutputTag(tag)
+                  : Ref.set(fsm.status, event.greetings.headStatus);
+              return updateFsm.pipe(
+                Effect.tap(() => {
+                  if (event.greetings.headId) {
+                    return Ref.set(headIdRef, event.greetings.headId);
+                  }
+                  return Effect.void;
+                }),
+                Effect.tap(() => Deferred.succeed(greetingsReceived, void 0)),
+              );
             }
 
             return Effect.void;
           }),
         ),
       ),
+    );
+
+    // Start the WebSocket connection AFTER the projector is subscribed,
+    // ensuring Greetings (and any replayed history) is captured by the FSM.
+    yield* transport.connect;
+
+    // Wait for the first Greetings to be processed so the FSM reflects
+    // the node's actual state before returning the head to callers.
+    yield* Deferred.await(greetingsReceived).pipe(
+      Effect.timeout("10 seconds"),
+      Effect.catchAll(() => Effect.void),
     );
 
     // -----------------------------------------------------------------------
@@ -1112,6 +1156,20 @@ const createEffect = (
       );
 
     // -----------------------------------------------------------------------
+    // Fire-and-forget send
+    // -----------------------------------------------------------------------
+
+    const sendEffect = (
+      command: ClientInputTag,
+      payload?: unknown,
+    ): Effect.Effect<void, HeadError> =>
+      Effect.gen(function* () {
+        yield* assertNotDisposed;
+        yield* fsm.assertCommandAllowed(command);
+        yield* transport.send(command, payload);
+      });
+
+    // -----------------------------------------------------------------------
     // Event streams – derived from PubSub, no manual bookkeeping
     // -----------------------------------------------------------------------
 
@@ -1228,6 +1286,7 @@ const createEffect = (
       recover: recoverEffect,
       decommit: decommitEffect,
       contest: contestEffect,
+      send: sendEffect,
       events: eventsStream,
       dispose: disposeEffect,
     };
@@ -1252,6 +1311,7 @@ const createEffect = (
       recover: (recoverTxId) => runEffect(effectApi.recover(recoverTxId)),
       decommit: (decommitTx) => runEffect(effectApi.decommit(decommitTx)),
       contest: () => runEffect(effectApi.contest()),
+      send: (command, payload) => runEffect(effectApi.send(command, payload)),
       subscribe,
       subscribeEvents,
       dispose: () => runEffect(effectApi.dispose()),

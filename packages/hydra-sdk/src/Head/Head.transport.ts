@@ -41,6 +41,8 @@ export interface HeadTransport {
     payload?: unknown,
   ) => Effect.Effect<void, HeadError>;
   readonly dispose: Effect.Effect<void, never>;
+  /** Start the WebSocket connection. Must be called after subscribing to events. */
+  readonly connect: Effect.Effect<void>;
 }
 
 interface NormalizedReconnect {
@@ -197,6 +199,9 @@ const parseHeadStatus = (value: unknown): HeadStatus | null => {
     case "Final":
     case "Aborted":
       return value;
+    // Hydra node sends "Initial" in Greetings headStatus
+    case "Initial":
+      return "Initializing";
     default:
       return null;
   }
@@ -271,9 +276,14 @@ const parseApiEvent = (raw: string): Effect.Effect<ApiEvent, HeadError> =>
       ) {
         const decoded = tryDecode(GreetingsMessageSchema, parsed);
         if (decoded) {
+          const normalizedStatus =
+            parseHeadStatus(decoded.headStatus) ?? decoded.headStatus;
           return {
             _tag: "Greetings",
-            greetings: { headStatus: decoded.headStatus },
+            greetings: {
+              headStatus: normalizedStatus as HeadStatus,
+              headId: decoded.hydraHeadId,
+            },
           };
         }
         // Fallback: extract headStatus manually
@@ -281,7 +291,13 @@ const parseApiEvent = (raw: string): Effect.Effect<ApiEvent, HeadError> =>
         if (status === null) {
           throw new Error(`Unsupported head status: ${parsed.headStatus}`);
         }
-        return { _tag: "Greetings", greetings: { headStatus: status } };
+        return {
+          _tag: "Greetings",
+          greetings: {
+            headStatus: status,
+            headId: typeof parsed.hydraHeadId === "string" ? parsed.hydraHeadId : undefined,
+          },
+        };
       }
 
       // 2. InvalidInput — reason without tag (legacy) or tag: "InvalidInput"
@@ -485,7 +501,6 @@ export const makeHeadTransport = (
           headStatus: "Idle" satisfies HeadStatus,
         },
       };
-      yield* events.publish(greeting);
 
       const send = (
         tag: ClientInputTag,
@@ -507,6 +522,7 @@ export const makeHeadTransport = (
       const dispose = events.shutdown.pipe(Effect.orDie);
 
       return {
+        connect: events.publish(greeting),
         events,
         generation,
         send,
@@ -586,34 +602,39 @@ export const makeHeadTransport = (
         }),
       ).pipe(Effect.provide(webSocketConstructorLayer));
 
-    const reconnectFiber = yield* Effect.forkDaemon(
-      Effect.gen(function* () {
-        let firstConnection = true;
+    const reconnectFiberRef = yield* Ref.make<Fiber.Fiber<void> | null>(null);
 
-        while (!(yield* Ref.get(isDisposed))) {
-          const useHistory = firstConnection
-            ? (config.historyOnConnect ?? false)
-            : (config.historyOnReconnect ?? true);
-          const socketUrl = withHistoryQuery(url, useHistory);
+    const reconnectEffect = Effect.gen(function* () {
+      let firstConnection = true;
 
-          const result = yield* Effect.exit(
-            socketSession(socketUrl).pipe(Effect.retry(reconnectPolicy)),
-          );
-          if (result._tag === "Success") {
-            firstConnection = false;
-            continue;
-          }
+      while (!(yield* Ref.get(isDisposed))) {
+        const useHistory = firstConnection
+          ? (config.historyOnConnect ?? false)
+          : (config.historyOnReconnect ?? true);
+        const socketUrl = withHistoryQuery(url, useHistory);
 
-          yield* events.publish({
-            _tag: "InvalidInput",
-            invalidInput: {
-              reason: `Websocket reconnect attempts exhausted after ${reconnect.maxRetries} retries`,
-            },
-          });
-          break;
+        const result = yield* Effect.exit(
+          socketSession(socketUrl).pipe(Effect.retry(reconnectPolicy)),
+        );
+        if (result._tag === "Success") {
+          firstConnection = false;
+          continue;
         }
-      }),
-    );
+
+        yield* events.publish({
+          _tag: "InvalidInput",
+          invalidInput: {
+            reason: `Websocket reconnect attempts exhausted after ${reconnect.maxRetries} retries`,
+          },
+        });
+        break;
+      }
+    });
+
+    const connect = Effect.gen(function* () {
+      const fiber = yield* Effect.forkDaemon(reconnectEffect);
+      yield* Ref.set(reconnectFiberRef, fiber);
+    });
 
     const send = (
       tag: ClientInputTag,
@@ -634,12 +655,16 @@ export const makeHeadTransport = (
 
     const dispose = Effect.gen(function* () {
       yield* Ref.set(isDisposed, true);
-      yield* Fiber.interrupt(reconnectFiber);
+      const fiber = yield* Ref.get(reconnectFiberRef);
+      if (fiber !== null) {
+        yield* Fiber.interrupt(fiber);
+      }
       yield* Queue.shutdown(outbound).pipe(Effect.orDie);
       yield* events.shutdown;
     }).pipe(Effect.orDie);
 
     return {
+      connect,
       events,
       generation,
       send,
