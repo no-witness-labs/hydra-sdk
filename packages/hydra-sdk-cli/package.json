@@ -36,10 +36,8 @@
     "@effect/cli": "^0.73.2",
     "@effect/platform": "^0.94.4",
     "@effect/platform-node": "^0.104.1",
-    "@evolution-sdk/evolution": ">=0.3.22",
-    "@noble/hashes": "^1.8.0",
-    "@no-witness-labs/hydra-sdk": "workspace:*",
-    "@scure/bip39": "^1.5.4"
+    "@evolution-sdk/evolution": ">=0.3.25",
+    "@no-witness-labs/hydra-sdk": "workspace:*"
   },
   "devDependencies": {
     "@babel/cli": "^7.28.6",
