@@ -222,6 +222,17 @@ export class HeadError extends Data.TaggedError("HeadError")<{
   readonly message: string;
   /** Optional underlying cause (transport error, protocol violation, etc.). */
   readonly cause?: unknown;
+  /** Optional structured failure details from the Hydra node response. */
+  readonly details?: {
+    /** The failure event tag (e.g. "CommandFailed", "TxInvalid", "PostTxOnChainFailed"). */
+    readonly tag?: string;
+    /** The command that triggered the failure. */
+    readonly command?: string;
+    /** Transaction ID associated with the failure, when applicable. */
+    readonly txId?: string;
+    /** Validation error details from the Hydra node. */
+    readonly validationError?: unknown;
+  };
 }> {}
 
 /**
@@ -711,13 +722,21 @@ export interface HydraHead {
 // Command matching helpers
 // ---------------------------------------------------------------------------
 
-const isCommandFailure = (
+/** @internal Exported for testing only. */
+export const isCommandFailure = (
   event: ApiEvent,
   command: ClientInputTag,
 ): MatchResult<never> => {
   if (event._tag === "InvalidInput") {
     return matchFailure(
-      new HeadError({ message: `Invalid input: ${event.invalidInput.reason}` }),
+      new HeadError({
+        message: `Invalid input: ${event.invalidInput.reason}`,
+        details: {
+          tag: "InvalidInput",
+          command,
+          validationError: event.invalidInput.reason,
+        },
+      }),
     );
   }
 
@@ -730,6 +749,10 @@ const isCommandFailure = (
         message:
           event.message.reason ??
           `Command ${command} failed with ${event.message.tag}`,
+        details: {
+          tag: event.message.tag,
+          command,
+        },
       }),
     );
   }
@@ -737,7 +760,8 @@ const isCommandFailure = (
   return matchContinue();
 };
 
-const matchServerTag = (
+/** @internal Exported for testing only. */
+export const matchServerTag = (
   event: ApiEvent,
   successTag: string,
   command: ClientInputTag,
@@ -747,6 +771,29 @@ const matchServerTag = (
   }
 
   return isCommandFailure(event, command);
+};
+
+/** @internal Exported for testing only. */
+export const matchCommit = (event: ApiEvent): MatchResult<void> => {
+  if (event._tag === "ServerOutput" && event.output.tag === "HeadIsOpen") {
+    return matchSuccess(undefined);
+  }
+  if (event._tag === "ServerOutput" && event.output.tag === "DepositExpired") {
+    const payload = event.output.payload as
+      | { depositTxId?: string }
+      | undefined;
+    return matchFailure(
+      new HeadError({
+        message: `Deposit expired for commit transaction ${payload?.depositTxId ?? "unknown"}`,
+        details: {
+          tag: "DepositExpired",
+          command: "Commit",
+          txId: payload?.depositTxId,
+        },
+      }),
+    );
+  }
+  return isCommandFailure(event, "Commit");
 };
 
 // ---------------------------------------------------------------------------
@@ -926,7 +973,7 @@ const createEffect = (
               _tag: "ServerOutput",
               output: { tag: "HeadIsOpen", payload: body },
             }),
-            (event) => matchServerTag(event, "HeadIsOpen", "Commit"),
+            matchCommit,
             30_000,
           );
           return undefined;
@@ -951,7 +998,7 @@ const createEffect = (
             ),
             Effect.asVoid,
           ),
-          (event) => matchServerTag(event, "HeadIsOpen", "Commit"),
+          matchCommit,
           30_000,
         );
 
@@ -1060,6 +1107,12 @@ const createEffect = (
                     message:
                       payload.validationError?.reason ??
                       `Transaction ${transaction.txId} was invalid`,
+                    details: {
+                      tag: "TxInvalid",
+                      command: "NewTx",
+                      txId: transaction.txId,
+                      validationError: payload.validationError,
+                    },
                   }),
                 );
               }
@@ -1090,6 +1143,24 @@ const createEffect = (
               if (payload?.recoveredTxId === recoverTxId) {
                 return matchSuccess(undefined);
               }
+            }
+            if (
+              event._tag === "ServerOutput" &&
+              event.output.tag === "DepositExpired"
+            ) {
+              const payload = event.output.payload as
+                | { depositTxId?: string }
+                | undefined;
+              return matchFailure(
+                new HeadError({
+                  message: `Deposit expired for transaction ${payload?.depositTxId ?? recoverTxId}`,
+                  details: {
+                    tag: "DepositExpired",
+                    command: "Recover",
+                    txId: payload?.depositTxId ?? recoverTxId,
+                  },
+                }),
+              );
             }
             return isCommandFailure(event, "Recover");
           },
@@ -1137,6 +1208,12 @@ const createEffect = (
                     message:
                       payload.decommitInvalidReason?.tag ??
                       `Decommit transaction ${decommitTx.txId} was invalid`,
+                    details: {
+                      tag: "DecommitInvalid",
+                      command: "Decommit",
+                      txId: decommitTx.txId,
+                      validationError: payload.decommitInvalidReason,
+                    },
                   }),
                 );
               }
