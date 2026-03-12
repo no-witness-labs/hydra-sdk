@@ -1,0 +1,171 @@
+---
+title: L1 + L2 Patterns
+description: Commit flow, fanout flow, and hybrid applications with Hydra and evolution-sdk.
+---
+
+# L1 + L2 Patterns
+
+This page describes common patterns: moving value **into** a head (commit), moving value **out** (fanout), and building hybrid apps that use both L1 and L2 with `evolution-sdk`.
+
+## Commit flow (L1 → L2)
+
+**Commit** is the process of locking UTxOs on L1 so they appear in the Hydra Head and can be spent on L2.
+
+### 1. Head is open
+
+Ensure the head has been initialized and all participants have committed. The head state must be **Open** before you submit L2 transactions.
+
+```ts
+import { Head } from "@no-witness-labs/hydra-sdk";
+
+const head = await Head.create({ url: "ws://localhost:4001" });
+
+// Wait until head is open (e.g. via subscribe or after init + commits)
+console.log(head.getState()); // "Open"
+```
+
+### 2. Commit UTxOs into the head
+
+Use the Hydra node's commit endpoint to post a commit transaction on L1. The SDK exposes `postCommit` for the HTTP call; the commit payload format is defined by the hydra-node API.
+
+```ts
+import { Provider } from "@no-witness-labs/hydra-sdk";
+import { Effect } from "effect";
+
+const httpUrl = "http://localhost:4001";
+
+// Build the commit payload per hydra-node API (UTxOs in the format the node expects)
+const commitPayload = { /* ... */ };
+
+// Post commit request; the node will post the commit tx on L1
+await Effect.runPromise(Provider.postCommit(httpUrl, commitPayload));
+
+// After the commit is confirmed on L1, the UTxOs appear in the head snapshot.
+const provider = new Provider.HydraProvider({ head, httpUrl });
+const l2Utxos = await provider.getSnapshotUtxos();
+```
+
+### 3. Use L2 (HydraProvider) for transactions
+
+Once UTxOs are in the head, use **HydraProvider** with `evolution-sdk` to build and submit L2 transactions. No L1 fees, instant finality.
+
+```ts
+const utxos = await provider.getUtxos(address);
+// const signedTx = ...
+const txHash = await provider.submitTx(signedTx);
+await provider.awaitTx(txHash);
+```
+
+## Fanout flow (L2 → L1)
+
+**Fanout** is the process of closing the head and distributing the final UTxO set back onto L1.
+
+### 1. Close the head
+
+One participant closes the head. All parties must agree on the final snapshot (or contest within the contestation period).
+
+```ts
+await head.close();
+// Or safeClose() to wait for pending transactions first
+await head.safeClose();
+```
+
+### 2. Wait for contestation period
+
+The head moves to **Closed**, then after the contestation period to **FanoutPossible**. Wait for this in code:
+
+```ts
+// Event-based
+head.subscribe((event) => {
+  if (event.tag === "ReadyToFanout") {
+    console.log("Ready to fanout");
+  }
+});
+
+// Or with Effect
+yield* head.effect.awaitReadyToFanout();
+```
+
+### 3. Run fanout
+
+Run fanout to post the fanout transaction on L1 and distribute UTxOs back to L1 addresses.
+
+```ts
+await head.fanout();
+// Head is now Final; UTxOs are on L1 again
+```
+
+After fanout, users can spend the resulting L1 UTxOs with any L1 provider (Blockfrost, Kupmios, etc.).
+
+## Hybrid applications
+
+In a hybrid app, part of the logic runs on L1 and part on L2. Use two providers and the same `evolution-sdk` types.
+
+### Pattern: L1 for setup, L2 for high-throughput moves
+
+```ts
+import * as Hydra from "@no-witness-labs/hydra-sdk";
+import { Blockfrost } from "@evolution-sdk/evolution/sdk/provider/Blockfrost";
+import type { Provider } from "@evolution-sdk/evolution/sdk/provider/Provider";
+
+async function runHybrid() {
+  const l1Provider: Provider = new Blockfrost("preview", l1ApiKey);
+
+  // User holds funds on L1; commit them into the head (see Commit flow above)
+  // ...
+
+  const head = await Hydra.Head.create({ url: hydraWsUrl });
+  const l2Provider: Provider = new Hydra.Provider.HydraProvider({
+    head,
+    httpUrl: hydraHttpUrl,
+  });
+
+  // High-throughput or zero-fee logic on L2
+  const l2Utxos = await l2Provider.getUtxos(userAddress);
+  const txHash = await l2Provider.submitTx(signedL2Tx);
+  await l2Provider.awaitTx(txHash);
+
+  // When done, close and fanout so funds return to L1
+  await head.close();
+  // ... wait ReadyToFanout ...
+  await head.fanout();
+
+  // Now use l1Provider again to read the fanned-out UTxOs on L1
+}
+```
+
+### Pattern: Single code path, provider chosen by config
+
+Use one variable typed as `Provider` and assign either an L1 or L2 provider. All `evolution-sdk` build/sign logic stays the same.
+
+```ts
+import type { Provider } from "@evolution-sdk/evolution/sdk/provider/Provider";
+
+async function getProvider(): Promise<Provider> {
+  if (process.env.LAYER === "l2") {
+    const head = await Hydra.Head.create({
+      url: process.env.HYDRA_WS_URL!,
+    });
+    return new Hydra.Provider.HydraProvider({
+      head,
+      httpUrl: process.env.HYDRA_HTTP_URL!,
+    });
+  }
+  return new Blockfrost(
+    process.env.NETWORK ?? "preview",
+    process.env.BLOCKFROST_API_KEY!,
+  );
+}
+
+const provider = await getProvider();
+const utxos = await provider.getUtxos(address);
+// Build, sign, submit with evolution-sdk — unchanged
+```
+
+### What to avoid on L2
+
+- Do not call `evaluateTx()` when using HydraProvider; it throws. Use L1 for script evaluation if needed.
+- Do not rely on `getDelegation()` for staking on L2; it returns empty. Staking is L1-only.
+- If you need reference datums, ensure they are available in the head or handle missing-datum errors from `getDatum()`.
+
+See [Limits](/docs/providers/limits) and [Production Checklist](/docs/providers/production-checklist) for more.

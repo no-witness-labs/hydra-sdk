@@ -1,0 +1,127 @@
+---
+title: Provider/utxo.ts
+nav_order: 4
+parent: Modules
+---
+
+## utxo overview
+
+Bidirectional converters between hydra-node UTxO wire format and
+`@evolution-sdk/evolution` `UTxO.UTxO`.
+
+Use these when you consume `GET /snapshot/utxo` (or similar) and need to
+convert to evolution UTxOs, or when building payloads for hydra-node.
+
+---
+
+<h2 class="text-delta">Table of contents</h2>
+
+- [utils](#utils)
+  - [fromHydraUtxo](#fromhydrautxo)
+  - [fromHydraUtxoMap](#fromhydrautxomap)
+  - [toHydraUtxo](#tohydrautxo)
+  - [toHydraUtxoMap](#tohydrautxomap)
+
+---
+
+# utils
+
+## fromHydraUtxo
+
+Convert a single hydra-node UTxO entry into an evolution-sdk `UTxO.UTxO`.
+
+**Signature**
+
+```ts
+export declare const fromHydraUtxo: (key: string, txOut: TxOut) => UTxO.UTxO;
+```
+
+**Example**
+
+```ts
+import { Provider } from "@no-witness-labs/hydra-sdk";
+
+const txOut = {
+  address:
+    "addr_test1qz2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer3jcu5d8ps7zex2k2xt3uqxgjqnnj83ws8lhrn648jjxtwq2ytjqp",
+  value: { lovelace: 10_000_000 },
+};
+const key =
+  "a1b2c3d4e5f6789012345678901234567890123456789012345678901234abcd#0";
+const utxo = Provider.fromHydraUtxo(key, txOut);
+console.log(utxo.address, utxo.assets);
+```
+
+## fromHydraUtxoMap
+
+Convert an entire hydra-node UTxO map into an array of evolution-sdk UTxOs.
+
+**Signature**
+
+```ts
+export declare const fromHydraUtxoMap: (
+  utxoMap: Record<string, TxOut>,
+) => Array<UTxO.UTxO>;
+```
+
+**Example**
+
+```ts
+import { Provider } from "@no-witness-labs/hydra-sdk";
+
+const utxoMap = {
+  "a1b2c3d4e5f6789012345678901234567890123456789012345678901234abcd#0": {
+    address:
+      "addr_test1qz2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer3jcu5d8ps7zex2k2xt3uqxgjqnnj83ws8lhrn648jjxtwq2ytjqp",
+    value: { lovelace: 5_000_000 },
+  },
+};
+const utxos = Provider.fromHydraUtxoMap(utxoMap);
+console.log(utxos.length);
+```
+
+## toHydraUtxo
+
+Convert an evolution-sdk `UTxO.UTxO` into the hydra-node wire format.
+
+**Signature**
+
+```ts
+export declare const toHydraUtxo: (
+  utxo: UTxO.UTxO,
+) => [string, Record<string, unknown>];
+```
+
+**Example**
+
+```ts
+import type { UTxO } from "@evolution-sdk/evolution";
+import { Provider } from "@no-witness-labs/hydra-sdk";
+
+function toHydraPayload(utxo: UTxO.UTxO) {
+  return Provider.toHydraUtxo(utxo);
+}
+```
+
+## toHydraUtxoMap
+
+Convert an array of evolution-sdk UTxOs into a hydra-node UTxO map.
+
+**Signature**
+
+```ts
+export declare const toHydraUtxoMap: (
+  utxos: ReadonlyArray<UTxO.UTxO>,
+) => Record<string, Record<string, unknown>>;
+```
+
+**Example**
+
+```ts
+import type { UTxO } from "@evolution-sdk/evolution";
+import { Provider } from "@no-witness-labs/hydra-sdk";
+
+function toHydraUtxoPayload(utxos: ReadonlyArray<UTxO.UTxO>) {
+  return Provider.toHydraUtxoMap(utxos);
+}
+```

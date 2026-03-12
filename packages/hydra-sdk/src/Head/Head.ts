@@ -250,7 +250,7 @@ export class HeadError extends Data.TaggedError("HeadError")<{
  *   const head = await Head.create({ url: "ws://localhost:4001" });
  *
  *   await head.init();
- *   await head.commit({ txHash: "abc...", txIx: 0 });
+ *   await head.commit({}); // or { blueprintTx: { ... }, utxo: { ... } }
  *   await head.close();
  *   await head.fanout();
  *   console.log(head.getState()); // "Final"
@@ -269,7 +269,7 @@ export class HeadError extends Data.TaggedError("HeadError")<{
  *   const head = yield* Head.effect.create({ url: "ws://localhost:4001" });
  *
  *   yield* head.effect.init();
- *   yield* head.effect.commit({ txHash: "abc...", txIx: 0 });
+ *   yield* head.effect.commit({}); // or { blueprintTx: { ... }, utxo: { ... } }
  *   yield* head.effect.close();
  *   yield* head.effect.fanout();
  *   console.log(head.getState()); // "Final"

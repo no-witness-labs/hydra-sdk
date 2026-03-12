@@ -1,11 +1,28 @@
 /**
  * HTTP client helpers for hydra-node REST endpoints.
+ *
+ * Use these when you need to call the hydra-node HTTP API directly (e.g. snapshot
+ * UTxO, protocol parameters, or commit) without going through `HydraProvider`.
  */
 import { Data, Effect } from "effect";
 
 import type { ProtocolParametersResponse } from "../Protocol/ResponseMessage.js";
 import type { UTxO } from "../Protocol/Types.js";
 
+/**
+ * Error thrown when an HTTP request to hydra-node fails.
+ *
+ * @example
+ * ```ts
+ * import { Effect } from "effect";
+ * import { Provider } from "@no-witness-labs/hydra-sdk";
+ *
+ * const program = Provider.getSnapshotUtxo("http://localhost:4001").pipe(
+ *   Effect.catchAll((err) => Effect.log(`HTTP failed: ${err.message}`))
+ * );
+ * // Run with: Effect.runPromise(program)
+ * ```
+ */
 export class HydraHttpError extends Data.TaggedError("HydraHttpError")<{
   readonly message: string;
   readonly cause?: unknown;
@@ -58,6 +75,17 @@ const postJson = (
 
 /**
  * `GET /snapshot/utxo` — returns the current snapshot UTxO set.
+ *
+ * @example
+ * ```ts
+ * import { Effect } from "effect";
+ * import { Provider } from "@no-witness-labs/hydra-sdk";
+ *
+ * const program = Provider.getSnapshotUtxo("http://localhost:4001").pipe(
+ *   Effect.map((utxo) => console.log("UTxO keys:", Object.keys(utxo)))
+ * );
+ * // Run with: Effect.runPromise(program)
+ * ```
  */
 export const getSnapshotUtxo = (
   httpUrl: string,
@@ -66,6 +94,17 @@ export const getSnapshotUtxo = (
 
 /**
  * `GET /protocol-parameters` — returns the head's protocol parameters.
+ *
+ * @example
+ * ```ts
+ * import { Effect } from "effect";
+ * import { Provider } from "@no-witness-labs/hydra-sdk";
+ *
+ * const program = Provider.getProtocolParameters("http://localhost:4001").pipe(
+ *   Effect.map((params) => console.log("Max tx size:", params.maxTxSize))
+ * );
+ * // Run with: Effect.runPromise(program)
+ * ```
  */
 export const getProtocolParameters = (
   httpUrl: string,
@@ -77,6 +116,15 @@ export const getProtocolParameters = (
 
 /**
  * `POST /commit` — submit a commit request.
+ *
+ * @example
+ * ```ts
+ * import { Effect } from "effect";
+ * import { Provider } from "@no-witness-labs/hydra-sdk";
+ *
+ * const program = Provider.postCommit("http://localhost:4001", {});
+ * // Run with: Effect.runPromise(program)
+ * ```
  */
 export const postCommit = (
   httpUrl: string,

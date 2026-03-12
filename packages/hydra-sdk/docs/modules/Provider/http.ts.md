@@ -1,0 +1,119 @@
+---
+title: Provider/http.ts
+nav_order: 2
+parent: Modules
+---
+
+## http overview
+
+HTTP client helpers for hydra-node REST endpoints.
+
+Use these when you need to call the hydra-node HTTP API directly (e.g. snapshot
+UTxO, protocol parameters, or commit) without going through `HydraProvider`.
+
+---
+
+<h2 class="text-delta">Table of contents</h2>
+
+- [utils](#utils)
+  - [HydraHttpError (class)](#hydrahttperror-class)
+  - [getProtocolParameters](#getprotocolparameters)
+  - [getSnapshotUtxo](#getsnapshotutxo)
+  - [postCommit](#postcommit)
+
+---
+
+# utils
+
+## HydraHttpError (class)
+
+Error thrown when an HTTP request to hydra-node fails.
+
+**Signature**
+
+```ts
+export declare class HydraHttpError
+```
+
+**Example**
+
+```ts
+import { Effect } from "effect";
+import { Provider } from "@no-witness-labs/hydra-sdk";
+
+const program = Provider.getSnapshotUtxo("http://localhost:4001").pipe(
+  Effect.catchAll((err) => Effect.log(`HTTP failed: ${err.message}`)),
+);
+// Run with: Effect.runPromise(program)
+```
+
+## getProtocolParameters
+
+`GET /protocol-parameters` — returns the head's protocol parameters.
+
+**Signature**
+
+```ts
+export declare const getProtocolParameters: (
+  httpUrl: string,
+) => Effect.Effect<ProtocolParametersResponse, HydraHttpError>;
+```
+
+**Example**
+
+```ts
+import { Effect } from "effect";
+import { Provider } from "@no-witness-labs/hydra-sdk";
+
+const program = Provider.getProtocolParameters("http://localhost:4001").pipe(
+  Effect.map((params) => console.log("Max tx size:", params.maxTxSize)),
+);
+// Run with: Effect.runPromise(program)
+```
+
+## getSnapshotUtxo
+
+`GET /snapshot/utxo` — returns the current snapshot UTxO set.
+
+**Signature**
+
+```ts
+export declare const getSnapshotUtxo: (
+  httpUrl: string,
+) => Effect.Effect<UTxO, HydraHttpError>;
+```
+
+**Example**
+
+```ts
+import { Effect } from "effect";
+import { Provider } from "@no-witness-labs/hydra-sdk";
+
+const program = Provider.getSnapshotUtxo("http://localhost:4001").pipe(
+  Effect.map((utxo) => console.log("UTxO keys:", Object.keys(utxo))),
+);
+// Run with: Effect.runPromise(program)
+```
+
+## postCommit
+
+`POST /commit` — submit a commit request.
+
+**Signature**
+
+```ts
+export declare const postCommit: (
+  httpUrl: string,
+  body: unknown,
+) => Effect.Effect<unknown, HydraHttpError>;
+```
+
+**Example**
+
+```ts
+import { Effect } from "effect";
+import { Provider } from "@no-witness-labs/hydra-sdk";
+
+const program = Provider.postCommit("http://localhost:4001", {});
+// Run with: Effect.runPromise(program)
+```

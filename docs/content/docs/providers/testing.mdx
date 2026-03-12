@@ -1,0 +1,187 @@
+---
+title: Testing
+description: Set up local Hydra node for testing, testnet integration, and mocking providers.
+---
+
+# Testing
+
+This guide covers setting up a local Hydra environment for development and tests, running integration tests against a real node or testnet, and mocking the `evolution-sdk` Provider in unit tests.
+
+## Setting up local Hydra node for testing
+
+The easiest way to get a full Cardano + Hydra stack locally is **@no-witness-labs/hydra-devnet**. It runs Cardano node and Hydra node in Docker and wires them together.
+
+### Install
+
+```bash
+pnpm add -D @no-witness-labs/hydra-devnet
+# or
+pnpm add @no-witness-labs/hydra-devnet
+```
+
+### Start a cluster
+
+```ts
+import { Cluster } from "@no-witness-labs/hydra-devnet";
+import { Head, Provider } from "@no-witness-labs/hydra-sdk";
+
+await Cluster.withCluster({}, async (cluster) => {
+  console.log("Hydra WebSocket:", cluster.hydraApiUrl);   // ws://localhost:4001
+  console.log("Hydra HTTP:    ", cluster.hydraHttpUrl);   // http://localhost:4001
+
+  const head = await Head.create({ url: cluster.hydraApiUrl });
+  await head.init();
+  // Commit UTxOs as needed, then use the head for L2 transactions
+
+  const provider = new Provider.HydraProvider({
+    head,
+    httpUrl: cluster.hydraHttpUrl,
+  });
+
+  const utxos = await provider.getSnapshotUtxos();
+  // ... run your tests or scripts ...
+
+  await head.dispose();
+});
+```
+
+When `withCluster` exits, the cluster is stopped and removed. Use this in a test file or a short-lived script.
+
+### Devnet configuration
+
+Customize images, ports, and contestation period:
+
+```ts
+const cluster = Cluster.make({
+  clusterName: "my-testnet",
+  cardanoNode: {
+    image: "ghcr.io/intersectmbo/cardano-node:10.5.3",
+    port: 3001,
+    networkMagic: 42,
+  },
+  hydraNode: {
+    image: "ghcr.io/cardano-scaling/hydra-node:1.2.0",
+    apiPort: 4001,
+    contestationPeriod: 60,
+  },
+});
+await cluster.start();
+// ...
+await cluster.stop();
+await cluster.remove();
+```
+
+See [@no-witness-labs/hydra-devnet](/docs/modules/devnet) for full options.
+
+### Manual Hydra node
+
+If you already run hydra-node yourself (e.g. from source or another Docker setup), point the SDK at its WebSocket and HTTP URLs:
+
+```ts
+const head = await Head.create({ url: "ws://localhost:4001" });
+const provider = new Provider.HydraProvider({
+  head,
+  httpUrl: "http://localhost:4001",
+});
+```
+
+## Testnet integration testing
+
+For integration tests that hit a real Hydra node (e.g. a shared testnet or a long-lived devnet):
+
+1. **Environment variables**: Use config for WebSocket and HTTP URLs so the same test suite can run against local or testnet:
+
+```ts
+const hydraWsUrl = process.env.HYDRA_WS_URL ?? "ws://localhost:4001";
+const hydraHttpUrl = process.env.HYDRA_HTTP_URL ?? "http://localhost:4001";
+
+const head = await Head.create({ url: hydraWsUrl });
+const provider = new Provider.HydraProvider({
+  head,
+  httpUrl: hydraHttpUrl,
+});
+```
+
+2. **Head state**: Ensure the head is **Open** before submitting L2 transactions. In testnet, the head may already be open; in local devnet, run `init()` and commits first.
+
+3. **Cleanup**: Dispose the head and (if applicable) stop the cluster in `afterAll` or similar so connections and containers don't leak.
+
+```ts
+import { afterAll, beforeAll } from "vitest";
+
+let head: HydraHead;
+
+beforeAll(async () => {
+  head = await Head.create({ url: process.env.HYDRA_WS_URL! });
+});
+
+afterAll(async () => {
+  await head?.dispose();
+});
+```
+
+## Mocking providers for unit tests
+
+For unit tests you often want to avoid a real node. Two approaches:
+
+### 1. Mock the `evolution-sdk` Provider
+
+Your code depends on `evolution-sdk`'s `Provider` interface. Implement a minimal in-memory provider and pass it in (e.g. via dependency injection or a test helper).
+
+```ts
+import type { Provider } from "@evolution-sdk/evolution/sdk/provider/Provider";
+
+const createMockProvider = (overrides: Partial<Provider> = {}): Provider => ({
+  getProtocolParameters: async () => ({ /* ... */ }),
+  getUtxos: async () => [],
+  getUtxosWithUnit: async () => [],
+  getUtxoByUnit: async () => { throw new Error("not found"); },
+  getUtxosByOutRef: async () => [],
+  getDelegation: async () => ({ poolId: null, rewards: 0n }),
+  getDatum: async () => { throw new Error("not found"); },
+  awaitTx: async () => true,
+  submitTx: async () => ({ hash: new Uint8Array(32) } as any),
+  evaluateTx: async () => { throw new Error("not supported"); },
+  Effect: { /* same methods returning Effect.succeed / Effect.fail */ },
+  ...overrides,
+});
+
+// In tests
+const provider = createMockProvider({
+  getUtxos: async () => [mockUtxo],
+});
+await yourFunction(provider);
+```
+
+This keeps tests fast and deterministic and doesn't require Hydra or a real node.
+
+### 2. Mock WebSocket and HTTP in HydraProvider tests
+
+The hydra-sdk test suite uses a mock WebSocket URL (`mock://localhost:4001`) so that no real server is needed when testing HydraProvider's interface and error paths:
+
+```ts
+import { Head, Provider } from "@no-witness-labs/hydra-sdk";
+
+const head = await Head.create({ url: "mock://localhost:4001" });
+const provider = new Provider.HydraProvider({
+  head,
+  httpUrl: "http://localhost:4001",
+});
+
+// Test that HydraProvider conforms to Provider interface
+const providerAsEvolution: Provider = provider;
+expect(typeof providerAsEvolution.getUtxos).toBe("function");
+expect(typeof providerAsEvolution.submitTx).toBe("function");
+```
+
+For methods that actually call HTTP (e.g. `getUtxos`), use a real local node (e.g. devnet) or stub `fetch` in the test environment so the provider returns controlled data.
+
+### Summary
+
+| Goal | Approach |
+|------|----------|
+| Local Hydra + Cardano | Use `@no-witness-labs/hydra-devnet` with `Cluster.withCluster`. |
+| Integration tests vs real node | Set `HYDRA_WS_URL` / `HYDRA_HTTP_URL`, ensure head is Open, dispose in `afterAll`. |
+| Unit tests, no node | Implement a mock `Provider` or use a mock WebSocket URL and stub HTTP. |
+
+See [Production Checklist](/docs/providers/production-checklist) and [Limits](/docs/providers/limits) for production and protocol constraints.

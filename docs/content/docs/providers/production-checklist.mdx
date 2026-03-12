@@ -1,0 +1,95 @@
+---
+title: Production Checklist
+description: Security, monitoring, error handling, and deployment recommendations for Hydra and HydraProvider.
+---
+
+# Production Checklist
+
+Before running Hydra heads and HydraProvider in production, work through security, observability, error handling, and deployment. This checklist summarizes recommendations.
+
+## Security considerations
+
+### Node access
+
+- **No built-in auth**: The hydra-node API (HTTP and WebSocket) has no built-in authentication. Anyone who can reach the node can query state and submit transactions (within the head's rules).
+- **Secure the network**: Restrict access with firewalls, VPNs, or a reverse proxy. Allow only trusted clients and operators to connect to the node.
+- **TLS**: Use `wss://` and `https://` in production. Configure hydra-node with `--tls-cert` and `--tls-key` (or equivalent) so the SDK connects to a TLS-enabled endpoint.
+
+### Keys and custody
+
+- **No custodial keys in the SDK**: The SDK does not store or transmit private keys. Signing stays in your application or wallet integration.
+- **Operator keys**: Hydra signing keys (used for init, commit, close, fanout) must be protected. Compromise can allow unauthorized closure or fanout. Use secure key storage and least-privilege access.
+
+### Provider and evolution-sdk
+
+- **API keys**: When using L1 providers (e.g. Blockfrost) in a hybrid setup, keep API keys in environment variables or a secrets manager, not in source code.
+- **ProviderError**: Evolution-sdk's Provider throws `ProviderError` on failures. Do not log or expose full error details (e.g. stack traces) to end users; handle and map to safe messages.
+
+## Monitoring and observability
+
+### Head and connection health
+
+- **WebSocket connection**: Monitor connection state and reconnection events. The SDK reconnects with backoff; track how often reconnects happen and alert on sustained failures.
+- **Head state**: Subscribe to head events and log or metric state transitions (`HeadIsOpen`, `HeadIsClosed`, `HeadIsFinalized`, `HeadIsAborted`). Detect when the head is stuck (e.g. long time in Initializing or Closed without progress).
+
+### Transactions and UTxOs
+
+- **Submit and confirm**: After `submitTx()`, use `awaitTx()` (or event subscription) to confirm success or failure. Metric submit latency and failure rate.
+- **TxInvalid**: Log and alert on `TxInvalid` events; include the reason from the payload for debugging. High invalid rates may indicate bad client logic or contention.
+
+### Logging
+
+- **Structured logs**: Use structured logging (e.g. JSON) with correlation IDs so you can trace a request from submit to confirmation.
+- **Sensitive data**: Do not log full transaction CBOR, private keys, or unredacted user addresses in production logs.
+
+## Error handling best practices
+
+### ProviderError
+
+- **Catch and handle**: All HydraProvider methods that can fail (e.g. `getUtxos`, `submitTx`, `awaitTx`, `getDatum`) may throw `ProviderError` or return a failed Effect. Catch and handle; do not let raw errors bubble to the UI unhandled.
+- **Retries**: For transient failures (e.g. HTTP timeout, WebSocket disconnect), implement retries with backoff. Do not retry indefinitely; cap retries and surface a clear failure to the user.
+
+### Head lifecycle errors
+
+- **HeadError**: Lifecycle commands (`init`, `close`, `fanout`, `abort`) can fail with `HeadError` (e.g. invalid state). Check head state before issuing commands and handle errors (e.g. "Head is not Open") with clear user messaging or recovery flows.
+- **L1 failures**: Init, close, and fanout post transactions on L1. If L1 is congested or fees are misconfigured, these can fail. Monitor L1 node/indexer health and fee settings.
+
+### evaluateTx and getDatum
+
+- **evaluateTx**: Not supported on L2; always throws when using HydraProvider. Do not call it in L2 code paths; use L1 provider for script evaluation if needed.
+- **getDatum**: Best-effort on L2. If `getDatum` fails (datum not found), have a fallback (e.g. fetch from another source or fail gracefully with a clear message).
+
+## Deployment recommendations
+
+### Infrastructure
+
+- **Hydra node**: Run hydra-node on stable, redundant infrastructure. Follow the [Hydra documentation](https://hydra.family/head-protocol/) for node deployment and Cardano node connectivity.
+- **SDK placement**: The SDK is a client: it connects to an existing hydra-node. Run your app (and thus the SDK) in a region/network with low latency to the node to reduce submit and confirmation latency.
+
+### Resource management
+
+- **Dispose the head**: When shutting down or reconfiguring, call `head.dispose()` to close the WebSocket and release resources. Use `Head.withHead()` or Effect scoped APIs so disposal is automatic on exit or error.
+- **Provider lifetime**: HydraProvider holds a reference to the head. When the head is disposed, the provider should not be used for new operations. Create a new head and provider after reconnect if you use long-lived processes.
+
+### Configuration
+
+- **URLs**: Configure WebSocket and HTTP URLs via environment variables or config (e.g. `HYDRA_WS_URL`, `HYDRA_HTTP_URL`). Use the same host/port with `ws(s)://` and `http(s)://`.
+- **Reconnection**: Tune reconnection (e.g. `maxRetries`, `initialDelayMs`, `maxDelayMs`) so the client recovers from short outages without hammering the node.
+
+### Testing before production
+
+- **Load and failure testing**: Run integration tests against a devnet or testnet with realistic load. Test reconnection, submit/await under failure, and head lifecycle (init, close, fanout).
+- **Limits**: Respect [Limits](/docs/providers/limits): participant count, transaction size, asset count at fanout, and minted-token rules. Validate your use case against these before production.
+
+## Summary checklist
+
+- [ ] Node access restricted (firewall/VPN/reverse proxy); TLS in production
+- [ ] No private keys in SDK or logs; operator keys stored securely
+- [ ] ProviderError and HeadError handled; retries with backoff for transient failures
+- [ ] WebSocket and head state monitored; TxInvalid and state transitions logged/metriced
+- [ ] Head and provider disposed on shutdown; `Head.withHead` or scoped Effect where appropriate
+- [ ] Config from environment; reconnection tuned
+- [ ] evaluateTx not used on L2; getDatum failure handled
+- [ ] Load and limits validated before production
+
+For protocol limits, see [Limits](/docs/providers/limits). For L1/L2 flows, see [L1 + L2 Patterns](/docs/providers/l1-l2-patterns).

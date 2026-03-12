@@ -1,0 +1,198 @@
+---
+title: Providers
+description: Use L1 and L2 providers with evolution-sdk for Cardano and Hydra transactions.
+---
+
+# Providers
+
+The [`evolution-sdk`](https://github.com/No-Witness-Labs/evolution) uses a **Provider** abstraction to fetch UTxOs, protocol parameters, and submit transactions. You can use **L1 providers** (Blockfrost, Kupmios, Koios, Maestro) for Cardano mainnet/preview, or **HydraProvider** for L2 transactions against an open Hydra Head. The same `evolution-sdk` transaction-building API works with either.
+
+## L1 providers (Cardano)
+
+`evolution-sdk` supports several L1 backends. Each implements the same `Provider` interface:
+
+| Provider | Package / import | Use case |
+|----------|------------------|----------|
+| **Blockfrost** | `@evolution-sdk/evolution/sdk/provider/Blockfrost` | Mainnet/preview via Blockfrost API |
+| **Kupmios** | `@evolution-sdk/evolution/sdk/provider/Kupmios` | Local Ogmios + Kupo |
+| **Koios** | `@evolution-sdk/evolution/sdk/provider/Koios` | Community Koios API |
+| **Maestro** | `@evolution-sdk/evolution/sdk/provider/Maestro` | Maestro API |
+
+Example with Blockfrost:
+
+```ts
+import { Blockfrost } from "@evolution-sdk/evolution/sdk/provider/Blockfrost";
+
+const provider = new Blockfrost("preview", process.env.BLOCKFROST_API_KEY!);
+const utxos = await provider.getUtxos(address);
+const txHash = await provider.submitTx(signedTx);
+```
+
+L1 providers talk to Cardano nodes or indexers over HTTP/WebSocket. They charge fees, have block-based finality, and support delegation and script evaluation.
+
+## L2 HydraProvider setup and configuration
+
+**HydraProvider** targets a single open Hydra Head. You need a connected `HydraHead` (WebSocket) and the head's HTTP API URL.
+
+### Install dependencies
+
+```bash
+pnpm add @no-witness-labs/hydra-sdk @evolution-sdk/evolution
+```
+
+`@evolution-sdk/evolution` is a peer dependency when using the provider.
+
+### Create head and provider
+
+```ts
+import { Head, Provider } from "@no-witness-labs/hydra-sdk";
+
+const head = await Head.create({ url: "ws://localhost:4001" });
+
+const provider = new Provider.HydraProvider({
+  head,
+  httpUrl: "http://localhost:4001",
+});
+
+// Same evolution-sdk API as L1
+const utxos = await provider.getUtxos(address);
+const txHash = await provider.submitTx(signedTx);
+const confirmed = await provider.awaitTx(txHash);
+```
+
+### Configuration
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `head` | `HydraHead` | A connected `HydraHead` instance (used for submitting transactions via WebSocket). |
+| `httpUrl` | `string` | HTTP base URL of the hydra-node API (e.g. `"http://localhost:4001"`). Same host/port as WebSocket with `http://` instead of `ws://`. |
+
+Subpath import (if you want to avoid pulling in Head/Protocol):
+
+```ts
+import { HydraProvider } from "@no-witness-labs/hydra-sdk/provider";
+```
+
+## Swapping L1 provider for L2
+
+Because **HydraProvider** implements the same `Provider` interface as `evolution-sdk`'s L1 providers, you can swap the provider to switch between L1 and L2 without changing transaction-building code.
+
+```ts
+import * as Hydra from "@no-witness-labs/hydra-sdk";
+import { Blockfrost } from "@evolution-sdk/evolution/sdk/provider/Blockfrost";
+
+// L1 provider
+const l1Provider = new Blockfrost("preview", apiKey);
+
+// L2 provider — same interface
+const head = await Hydra.Head.create({ url: "ws://localhost:4001" });
+const l2Provider = new Hydra.Provider.HydraProvider({
+  head,
+  httpUrl: "http://localhost:4001",
+});
+
+// Both work identically for getUtxos, submitTx, awaitTx, etc.
+const l1Utxos = await l1Provider.getUtxos(address);
+const l2Utxos = await l2Provider.getUtxos(address);
+```
+
+Use a single variable typed as `Provider` and assign either L1 or L2 depending on environment:
+
+```ts
+import type { Provider } from "@evolution-sdk/evolution/sdk/provider/Provider";
+
+async function getProvider(): Promise<Provider> {
+  if (process.env.USE_HYDRA === "true") {
+    const head = await Head.create({ url: process.env.HYDRA_WS_URL! });
+    return new Hydra.Provider.HydraProvider({
+      head,
+      httpUrl: process.env.HYDRA_HTTP_URL!,
+    });
+  }
+  return new Blockfrost("preview", process.env.BLOCKFROST_API_KEY!);
+}
+
+const provider = await getProvider();
+// Rest of your evolution-sdk code is unchanged
+```
+
+## L2-specific considerations
+
+When using HydraProvider instead of an L1 provider:
+
+- **No fees**: Hydra heads do not charge transaction fees.
+- **Instant finality**: Transactions are confirmed when all head participants validate them. `awaitTx(txHash)` resolves on the `TxValid` event; there is no block wait.
+- **No delegation**: Staking is not applicable on L2. `getDelegation()` returns `{ poolId: null, rewards: 0n }` so `evolution-sdk` code that calls it does not throw.
+- **No script evaluation**: `evaluateTx()` is not supported on Hydra L2 and throws `ProviderError`. Hydra heads do not expose a Plutus evaluation endpoint via the provider API.
+- **Datum lookup**: `getDatum(datumHash)` is best-effort: the provider scans the current L2 snapshot for an inline datum with the given hash. Handle "datum not found" if you rely on reference datums.
+
+## Provider comparison (L1 vs HydraProvider)
+
+| Method | L1 (Blockfrost, etc.) | HydraProvider (L2) |
+|--------|------------------------|---------------------|
+| `getProtocolParameters()` | From node/indexer | From head HTTP API, mapped to `evolution-sdk` format |
+| `getUtxos(addr)` | Indexer/chain | Snapshot UTxOs filtered by address |
+| `getUtxosWithUnit(addr, unit)` | Supported | Supported |
+| `getUtxoByUnit(unit)` | Supported | Supported |
+| `getUtxosByOutRef(inputs)` | Supported | Supported |
+| `getDelegation()` | Real delegation data | Returns `{ poolId: null, rewards: 0n }` |
+| `getDatum(hash)` | Indexer | Best-effort: scan snapshot for inline datum |
+| `submitTx(tx)` | Post to node/indexer | Send `NewTx` via WebSocket |
+| `awaitTx(txHash)` | Poll/wait for block | Resolves on `TxValid` / `TxInvalid` event |
+| `evaluateTx()` | Supported (e.g. Blockfrost) | **Not supported** — throws `ProviderError` |
+
+## Provider API reference
+
+- **Constructor:** `new HydraProvider({ head, httpUrl })`
+- **Promise API:** `getUtxos`, `getUtxosWithUnit`, `getUtxoByUnit`, `getUtxosByOutRef`, `getProtocolParameters`, `getDelegation`, `getDatum`, `submitTx`, `awaitTx`, `evaluateTx` (throws on L2).
+- **Effect API:** Same methods under `provider.Effect.*`, e.g. `provider.Effect.getUtxos(address)`, `provider.Effect.submitTx(tx)`.
+- **Extra:** `getSnapshotUtxos()` — returns every UTxO in the current L2 snapshot (no address filter). Not part of the `evolution-sdk` `Provider` interface.
+
+Full API details: [modules](/docs/modules) (run the doc copy script to include the generated HydraProvider API page from the package).
+
+## Example: build and submit on L2
+
+```ts
+import { Head, Provider } from "@no-witness-labs/hydra-sdk";
+import { Address } from "@evolution-sdk/evolution";
+
+const head = await Head.create({ url: "ws://localhost:4001" });
+const provider = new Provider.HydraProvider({
+  head,
+  httpUrl: "http://localhost:4001",
+});
+
+const address = Address.fromBech32("addr_test1...");
+const utxos = await provider.getUtxos(address);
+const pp = await provider.getProtocolParameters();
+
+// Build and sign with evolution-sdk (same as L1)
+// const signed = ...
+const txHash = await provider.submitTx(signed);
+await provider.awaitTx(txHash);
+```
+
+## Example: Effect-based flow
+
+```ts
+import { Effect } from "effect";
+import { Head, Provider } from "@no-witness-labs/hydra-sdk";
+
+const program = Effect.gen(function* () {
+  const head = yield* Head.effect.create({ url: "ws://localhost:4001" });
+  const provider = new Provider.HydraProvider({
+    head,
+    httpUrl: "http://localhost:4001",
+  });
+
+  const utxos = yield* provider.Effect.getUtxos(address);
+  // Build and sign with evolution-sdk (same as L1)
+  // const signedTx = ...
+  const txHash = yield* provider.Effect.submitTx(signedTx);
+  yield* provider.Effect.awaitTx(txHash);
+});
+
+await Effect.runPromise(program);
+```
+
+Next: [L1 + L2 Patterns](/docs/providers/l1-l2-patterns) for commit/fanout flows, [Testing](/docs/providers/testing) for local setup and mocking.
