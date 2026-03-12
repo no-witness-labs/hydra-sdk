@@ -101,7 +101,7 @@ Use a single variable typed as `Provider` and assign either L1 or L2 depending o
 ```ts
 import type { Provider } from "@evolution-sdk/evolution/sdk/provider/Provider";
 
-function getProvider(): Provider {
+async function getProvider(): Promise<Provider> {
   if (process.env.USE_HYDRA === "true") {
     const head = await Head.create({ url: process.env.HYDRA_WS_URL! });
     return new Hydra.Provider.HydraProvider({
@@ -112,7 +112,7 @@ function getProvider(): Provider {
   return new Blockfrost("preview", process.env.BLOCKFROST_API_KEY!);
 }
 
-const provider = getProvider();
+const provider = await getProvider();
 // Rest of your evolution-sdk code is unchanged
 ```
 
@@ -195,4 +195,4 @@ const program = Effect.gen(function* () {
 await Effect.runPromise(program);
 ```
 
-Next: [L1 + L2 Patterns](/docs/provider/l1-l2-patterns) for commit/fanout flows, [Testing](/docs/provider/testing) for local setup and mocking.
+Next: [L1 + L2 Patterns](/docs/providers/l1-l2-patterns) for commit/fanout flows, [Testing](/docs/providers/testing) for local setup and mocking.

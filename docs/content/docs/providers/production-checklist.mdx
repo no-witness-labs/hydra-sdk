@@ -40,7 +40,7 @@ Before running Hydra heads and HydraProvider in production, work through securit
 ### Logging
 
 - **Structured logs**: Use structured logging (e.g. JSON) with correlation IDs so you can trace a request from submit to confirmation.
-- **Sensitive data*L: Do not log full transaction CBOR, private keys, or unredacted user addresses in production logs.
+- **Sensitive data**: Do not log full transaction CBOR, private keys, or unredacted user addresses in production logs.
 
 ## Error handling best practices
 
@@ -79,7 +79,7 @@ Before running Hydra heads and HydraProvider in production, work through securit
 ### Testing before production
 
 - **Load and failure testing**: Run integration tests against a devnet or testnet with realistic load. Test reconnection, submit/await under failure, and head lifecycle (init, close, fanout).
-- **Limits*L: Respect [Limits](/docs/provider/limits): participant count, transaction size, asset count at fanout, and minted-token rules. Validate your use case against these before production.
+- **Limits**: Respect [Limits](/docs/providers/limits): participant count, transaction size, asset count at fanout, and minted-token rules. Validate your use case against these before production.
 
 ## Summary checklist
 
@@ -92,4 +92,4 @@ Before running Hydra heads and HydraProvider in production, work through securit
 - [ ] evaluateTx not used on L2; getDatum failure handled
 - [ ] Load and limits validated before production
 
-For protocol limits, see [Limits](/docs/provider/limits). For L1/L2 flows, see [L1 + L2 Patterns](/docs/provider/l1-l2-patterns).
+For protocol limits, see [Limits](/docs/providers/limits). For L1/L2 flows, see [L1 + L2 Patterns](/docs/providers/l1-l2-patterns).
