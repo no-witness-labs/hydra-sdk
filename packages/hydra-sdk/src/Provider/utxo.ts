@@ -1,6 +1,9 @@
 /**
  * Bidirectional converters between hydra-node UTxO wire format and
  * `@evolution-sdk/evolution` `UTxO.UTxO`.
+ *
+ * Use these when you consume `GET /snapshot/utxo` (or similar) and need to
+ * convert to evolution UTxOs, or when building payloads for hydra-node.
  */
 import type { InlineDatum } from "@evolution-sdk/evolution";
 import {
@@ -28,6 +31,20 @@ import type { TxOut, Value } from "../Protocol/Types.js";
  *
  * @param key - The UTxO reference in `"txhash#index"` format.
  * @param txOut - The hydra-node `TxOut` value.
+ *
+ * @example
+ * ```ts
+ * import { Provider } from "@no-witness-labs/hydra-sdk";
+ *
+ * const txOut = {
+ *   address: "addr_test1qz2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer3jcu5d8ps7zex2k2xt3uqxgjqnnj83ws8lhrn648jjxtwq2ytjqp",
+ *   value: { lovelace: 10_000_000 },
+ * };
+ * const key =
+ *   "a1b2c3d4e5f6789012345678901234567890123456789012345678901234abcd#0";
+ * const utxo = Provider.fromHydraUtxo(key, txOut);
+ * console.log(utxo.address, utxo.assets);
+ * ```
  */
 export const fromHydraUtxo = (key: string, txOut: TxOut): UTxO.UTxO => {
   const [txHashHex, indexStr] = key.split("#");
@@ -61,6 +78,21 @@ export const fromHydraUtxo = (key: string, txOut: TxOut): UTxO.UTxO => {
 
 /**
  * Convert an entire hydra-node UTxO map into an array of evolution-sdk UTxOs.
+ *
+ * @example
+ * ```ts
+ * import { Provider } from "@no-witness-labs/hydra-sdk";
+ *
+ * const utxoMap = {
+ *   "a1b2c3d4e5f6789012345678901234567890123456789012345678901234abcd#0": {
+ *     address:
+ *       "addr_test1qz2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer3jcu5d8ps7zex2k2xt3uqxgjqnnj83ws8lhrn648jjxtwq2ytjqp",
+ *     value: { lovelace: 5_000_000 },
+ *   },
+ * };
+ * const utxos = Provider.fromHydraUtxoMap(utxoMap);
+ * console.log(utxos.length);
+ * ```
  */
 export const fromHydraUtxoMap = (
   utxoMap: Record<string, TxOut>,
@@ -75,6 +107,16 @@ export const fromHydraUtxoMap = (
  * Convert an evolution-sdk `UTxO.UTxO` into the hydra-node wire format.
  *
  * @returns A `[key, txOut]` tuple where `key` is `"txhash#index"`.
+ *
+ * @example
+ * ```ts
+ * import type { UTxO } from "@evolution-sdk/evolution";
+ * import { Provider } from "@no-witness-labs/hydra-sdk";
+ *
+ * function toHydraPayload(utxo: UTxO.UTxO) {
+ *   return Provider.toHydraUtxo(utxo);
+ * }
+ * ```
  */
 export const toHydraUtxo = (
   utxo: UTxO.UTxO,
@@ -119,6 +161,16 @@ export const toHydraUtxo = (
 
 /**
  * Convert an array of evolution-sdk UTxOs into a hydra-node UTxO map.
+ *
+ * @example
+ * ```ts
+ * import type { UTxO } from "@evolution-sdk/evolution";
+ * import { Provider } from "@no-witness-labs/hydra-sdk";
+ *
+ * function toHydraUtxoPayload(utxos: ReadonlyArray<UTxO.UTxO>) {
+ *   return Provider.toHydraUtxoMap(utxos);
+ * }
+ * ```
  */
 export const toHydraUtxoMap = (
   utxos: ReadonlyArray<UTxO.UTxO>,

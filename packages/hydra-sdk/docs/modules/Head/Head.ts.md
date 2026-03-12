@@ -24,6 +24,7 @@ routing, and state management.
   - [ApiEvent (type alias)](#apievent-type-alias)
   - [ClientInputTag (type alias)](#clientinputtag-type-alias)
   - [ClientMessage (interface)](#clientmessage-interface)
+  - [CommitRequest (interface)](#commitrequest-interface)
   - [Greetings (interface)](#greetings-interface)
   - [HeadConfig (interface)](#headconfig-interface)
   - [HeadStatus (type alias)](#headstatus-type-alias)
@@ -194,21 +195,23 @@ export type ApiEvent =
 
 ## ClientInputTag (type alias)
 
-Discriminated union of all WebSocket command tags a client can send to
-hydra-node.
+Discriminated union of all command tags a client can send to hydra-node.
+Most are WebSocket commands; `Commit` is routed through the REST API.
 
 **Signature**
 
 ```ts
 export type ClientInputTag =
   | "Init"
-  // TODO(protocol-schema): Commit is REST-based in Hydra; retained here as scaffold API surface.
   | "Commit"
+  | "NewTx"
   | "Close"
-  // TODO(protocol-schema): SafeClose is scaffold-only and not part of Hydra websocket commands.
   | "SafeClose"
   | "Fanout"
-  | "Abort";
+  | "Abort"
+  | "Recover"
+  | "Decommit"
+  | "Contest";
 ```
 
 ## ClientMessage (interface)
@@ -220,14 +223,33 @@ Failure envelope returned by hydra-node when a client command is rejected.
 ```ts
 export interface ClientMessage {
   /** Discriminating tag that identifies which command failed. */
-  readonly tag:
-    | "CommandFailed"
-    | "RejectedInputBecauseUnsynced"
-    | "PostTxOnChainFailed";
+  readonly tag: "CommandFailed" | "PostTxOnChainFailed";
   /** Optional tag of the client command that triggered this failure, if applicable. */
   readonly clientInputTag?: ClientInputTag;
   /** Optional human-readable explanation of why the command failed. */
   readonly reason?: string;
+}
+```
+
+## CommitRequest (interface)
+
+Request body for the Hydra Head REST `/commit` endpoint.
+
+Pass an empty object `{}` for an empty commit, or provide a blueprint
+transaction together with the UTxO set to commit into the head.
+
+**Signature**
+
+```ts
+export interface CommitRequest {
+  /** Blueprint transaction that references the UTxOs to commit. */
+  readonly blueprintTx?: {
+    readonly type: string;
+    readonly description: string;
+    readonly cborHex: string;
+  };
+  /** UTxO map (keyed by `"txHash#index"`) to commit into the head. */
+  readonly utxo?: UTxO;
 }
 ```
 
@@ -243,6 +265,8 @@ history.
 export interface Greetings {
   /** The head state as known by hydra-node at the time of the greeting. */
   readonly headStatus: HeadStatus;
+  /** The head ID, present when the head has been initialized. */
+  readonly headId?: string;
 }
 ```
 
@@ -256,6 +280,12 @@ Connection and reconnection configuration for a Hydra Head.
 export interface HeadConfig {
   /** WebSocket URL of the hydra-node API (e.g. `"ws://localhost:9944"`). */
   readonly url: string;
+  /**
+   * HTTP URL of the hydra-node REST API (e.g. `"http://localhost:9944"`).
+   * If omitted, derived automatically from `url` by replacing `ws(s)://`
+   * with `http(s)://`.
+   */
+  readonly httpUrl?: string;
   /**
    * When `true`, the hydra-node will replay all past server outputs upon the
    * initial WebSocket connection so the client can reconstruct current state.
@@ -379,17 +409,15 @@ export interface HydraHead {
   init(params?: InitParams): Promise<void>;
 
   /**
-   * Sends the `Commit` command to hydra-node to commit UTxOs into the head.
+   * Commits UTxOs into the Hydra Head via the REST `/commit` endpoint.
    *
-   * Resolves once `HeadIsOpen` is received, indicating all participants have
-   * committed and the head is ready for off-chain transactions.
+   * POSTs the commit body (blueprint transaction + UTxO map) to the
+   * hydra-node HTTP API. The returned draft transaction must be signed
+   * and submitted to L1 by the caller. Resolves once `HeadIsOpen` is
+   * received over WebSocket, indicating all participants have committed.
    *
-   * > **Note:** Commit is REST-driven in the Hydra protocol. This WebSocket
-   * > scaffold signature is temporary and will be replaced when protocol-schema
-   * > integration lands.
-   *
-   * @param utxos - UTxO set to commit; type will be narrowed to the protocol
-   *   Transaction type in a future release.
+   * @param body - Commit request body containing `blueprintTx` and `utxo`,
+   *   or an empty object `{}` for an empty commit.
    *
    * @example Promise API
    * ```ts
@@ -397,8 +425,8 @@ export interface HydraHead {
    *
    * const head = await Head.create({ url: "ws://localhost:9944" });
    * await head.init();
-   * await head.commit({ txHash: "abc...", txIx: 0 });
-   * console.log(head.getState()); // "Open"
+   * const draftTx = await head.commit({ blueprintTx: { ... }, utxo: { ... } });
+   * // sign and submit draftTx to L1
    * ```
    *
    * @example Effect API
@@ -409,13 +437,11 @@ export interface HydraHead {
    * const program = Effect.gen(function* () {
    *   const head = yield* Head.effect.create({ url: "ws://localhost:9944" });
    *   yield* head.effect.init();
-   *   yield* head.effect.commit({ txHash: "abc...", txIx: 0 });
+   *   const draftTx = yield* head.effect.commit({ blueprintTx: { ... }, utxo: { ... } });
    * });
    * ```
    */
-  // TODO(protocol-schema): replace unknown with protocol Transaction type.
-  // Commit is REST-driven in Hydra and this scaffold signature is temporary.
-  commit(utxos: unknown): Promise<void>;
+  commit(body: CommitRequest): Promise<unknown>;
 
   /**
    * Sends the `Close` command to request closing the Hydra Head on-chain.
@@ -542,6 +568,69 @@ export interface HydraHead {
   abort(): Promise<void>;
 
   /**
+   * Submits a new transaction to the open Hydra Head. Sends `NewTx` via
+   * WebSocket and resolves once `TxValid` is received for this transaction.
+   *
+   * @param transaction - The Cardano transaction in hydra-node envelope format.
+   *
+   * @example Promise API
+   * ```ts
+   * await head.newTx({
+   *   type: "Tx ConwayEra",
+   *   description: "Ledger Cddl Format",
+   *   cborHex: "84a400...",
+   *   txId: "abc123...",
+   * });
+   * ```
+   */
+  newTx(transaction: {
+    type: string;
+    description: string;
+    cborHex: string;
+    txId: string;
+  }): Promise<void>;
+
+  /**
+   * Recovers a failed incremental commit deposit by transaction ID.
+   *
+   * Sends the `Recover` command and resolves once `CommitRecovered` is
+   * received for the specified transaction.
+   *
+   * @param recoverTxId - The transaction ID of the deposit to recover.
+   */
+  recover(recoverTxId: string): Promise<void>;
+
+  /**
+   * Requests a decommit of UTxOs from the open Hydra Head back to L1.
+   *
+   * Sends the `Decommit` command and resolves once `DecommitApproved` is
+   * received. Fails if the decommit is invalid.
+   *
+   * @param decommitTx - The decommit transaction in hydra-node envelope format.
+   */
+  decommit(decommitTx: {
+    type: string;
+    description: string;
+    cborHex: string;
+    txId: string;
+  }): Promise<void>;
+
+  /**
+   * Contests the closure of the Hydra Head with a more recent snapshot.
+   *
+   * Sends the `Contest` command and resolves once `HeadIsContested` is
+   * received. Only allowed when the head is in `Closed` state.
+   */
+  contest(): Promise<void>;
+
+  /**
+   * Fire-and-forget: validate the FSM guard and send a command without
+   * waiting for a response. Useful in CLI / scripting contexts where
+   * the caller checks status separately.
+   */
+  send(command: ClientInputTag, payload?: unknown): Promise<void>;
+
+  /**
    * Registers a callback that is invoked for every `ServerOutput` event
    * published by the head.
    *
@@ -636,9 +725,7 @@ export interface HydraHead {
    */
   readonly effect: {
     init(params?: InitParams): Effect.Effect<void, HeadError>;
-    // TODO(protocol-schema): replace unknown with protocol Transaction type.
-    // Commit is REST-driven in Hydra and this scaffold signature is temporary.
-    commit(utxos: unknown): Effect.Effect<void, HeadError>;
+    commit(body: CommitRequest): Effect.Effect<unknown, HeadError>;
     close(): Effect.Effect<void, HeadError>;
     safeClose(): Effect.Effect<void, HeadError>;
     fanout(): Effect.Effect<void, HeadError>;
@@ -666,6 +753,29 @@ export interface HydraHead {
      */
     awaitReadyToFanout(): Effect.Effect<void, HeadError>;
     abort(): Effect.Effect<void, HeadError>;
+    newTx(transaction: {
+      type: string;
+      description: string;
+      cborHex: string;
+      txId: string;
+    }): Effect.Effect<void, HeadError>;
+    recover(recoverTxId: string): Effect.Effect<void, HeadError>;
+    decommit(decommitTx: {
+      type: string;
+      description: string;
+      cborHex: string;
+      txId: string;
+    }): Effect.Effect<void, HeadError>;
+    contest(): Effect.Effect<void, HeadError>;
+    /**
+     * Fire-and-forget: validate the FSM guard and send a command without
+     * waiting for a response. Useful in CLI / scripting contexts where
+     * the caller checks status separately.
+     */
+    send(
+      command: ClientInputTag,
+      payload?: unknown,
+    ): Effect.Effect<void, HeadError>;
     events(): Stream.Stream<ServerOutput>;
     dispose(): Effect.Effect<void, HeadError>;
   };
@@ -682,7 +792,7 @@ async function example() {
   const head = await Head.create({ url: "ws://localhost:4001" });
 
   await head.init();
-  await head.commit({ txHash: "abc...", txIx: 0 });
+  await head.commit({}); // or { blueprintTx: { ... }, utxo: { ... } }
   await head.close();
   await head.fanout();
   console.log(head.getState()); // "Final"
@@ -702,7 +812,7 @@ const program = Effect.gen(function* () {
   const head = yield* Head.effect.create({ url: "ws://localhost:4001" });
 
   yield* head.effect.init();
-  yield* head.effect.commit({ txHash: "abc...", txIx: 0 });
+  yield* head.effect.commit({}); // or { blueprintTx: { ... }, utxo: { ... } }
   yield* head.effect.close();
   yield* head.effect.fanout();
   console.log(head.getState()); // "Final"
@@ -720,8 +830,6 @@ chain.
 
 ```ts
 export interface InitParams {
-  // TODO(protocol-schema): Hydra websocket Init currently has no payload.
-  // Keep this reserved field scaffold-only until protocol schema integration.
   /** Optional contestation period in seconds; if provided, overrides the default configured in hydra-node. */
   readonly contestationPeriod?: number;
 }
