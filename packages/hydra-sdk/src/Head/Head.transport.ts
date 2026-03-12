@@ -323,15 +323,17 @@ const parseApiEvent = (raw: string): Effect.Effect<ApiEvent, HeadError> =>
       // 3. CommandFailed — decode with CommandFailedMessageSchema
       if (tag === "CommandFailed") {
         const decoded = tryDecode(CommandFailedMessageSchema, parsed);
+        const clientInputTag = decoded
+          ? parseClientInputTag(decoded.clientInput.tag)
+          : parseClientInputTag(
+              (parsed.clientInput as { tag?: unknown } | undefined)?.tag,
+            );
         return {
           _tag: "ClientMessage",
           message: {
             tag: "CommandFailed",
-            clientInputTag: decoded
-              ? parseClientInputTag(decoded.clientInput.tag)
-              : parseClientInputTag(
-                  (parsed.clientInput as { tag?: unknown } | undefined)?.tag,
-                ),
+            clientInputTag,
+            reason: `CommandFailed: ${clientInputTag} command was rejected by hydra-node`,
           },
         };
       }
