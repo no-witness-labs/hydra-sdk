@@ -99,7 +99,18 @@ export function waitForState(
 /** Init the head and wait for Initializing state. */
 export async function initHead(head: Head.HydraHead) {
   log("Init", "Sending Init command...");
-  await head.init();
+  try {
+    await head.init();
+  } catch {
+    // SDK's default init timeout (30s) can be tight on preprod.
+    // If the command was sent but confirmation was slow, check if
+    // the state transitioned anyway.
+    if (head.getState() === "Initializing") {
+      log("Init", "Init succeeded (state confirmed after timeout)");
+      return;
+    }
+    throw new Error("Init failed — head is not in Initializing state");
+  }
   log("Init", `State: ${head.getState()}`);
 }
 
@@ -237,7 +248,13 @@ export async function closeAndFanout(head: Head.HydraHead) {
 export async function teardown(head: Head.HydraHead) {
   const state = head.getState();
   if (state === "Open") {
-    await closeAndFanout(head);
+    try {
+      await closeAndFanout(head);
+    } catch (err) {
+      // Fanout may time out on slow testnets (contestation period + L1 confirmation).
+      // The SDK's default timeout (90s) can be too short for preprod.
+      log("Teardown", `Close/fanout error (may retry manually): ${err}`);
+    }
   }
   await head.dispose();
   log("Done", "Head disposed");

@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "transfer": "tsx src/transfer.ts",
-    "mint-burn": "tsx src/mint-burn.ts",
-    "state-update": "tsx src/state-update.ts",
+    "transfer": "tsx --env-file=.env src/transfer.ts",
+    "mint-burn": "tsx --env-file=.env src/mint-burn.ts",
+    "state-update": "tsx --env-file=.env src/state-update.ts",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
