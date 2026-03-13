@@ -30,11 +30,11 @@ Before running Hydra heads and HydraProvider in production, work through securit
 ### Head and connection health
 
 - **WebSocket connection**: Monitor connection state and reconnection events. The SDK reconnects with backoff; track how often reconnects happen and alert on sustained failures.
-- **Head state**: Subscribe to head events and log or metric state transitions (`HeadIsOpen`, `HeadIsClosed`, `HeadIsFinalized`, `HeadIsAborted`). Detect when the head is stuck (e.g. long time in Initializing or Closed without progress).
+- **Head state**: Subscribe to head events and log or track state transitions (`HeadIsOpen`, `HeadIsClosed`, `HeadIsFinalized`, `HeadIsAborted`). Detect when the head is stuck (e.g. long time in Initializing or Closed without progress).
 
 ### Transactions and UTxOs
 
-- **Submit and confirm**: After `submitTx()`, use `awaitTx()` (or event subscription) to confirm success or failure. Metric submit latency and failure rate.
+- **Submit and confirm**: After `submitTx()`, use `awaitTx()` (or event subscription) to confirm success or failure. Track submit latency and failure rate.
 - **TxInvalid**: Log and alert on `TxInvalid` events; include the reason from the payload for debugging. High invalid rates may indicate bad client logic or contention.
 
 ### Logging
@@ -86,7 +86,7 @@ Before running Hydra heads and HydraProvider in production, work through securit
 - [ ] Node access restricted (firewall/VPN/reverse proxy); TLS in production
 - [ ] No private keys in SDK or logs; operator keys stored securely
 - [ ] ProviderError and HeadError handled; retries with backoff for transient failures
-- [ ] WebSocket and head state monitored; TxInvalid and state transitions logged/metriced
+- [ ] WebSocket and head state monitored; TxInvalid and state transitions logged/tracked
 - [ ] Head and provider disposed on shutdown; `Head.withHead` or scoped Effect where appropriate
 - [ ] Config from environment; reconnection tuned
 - [ ] evaluateTx not used on L2; getDatum failure handled

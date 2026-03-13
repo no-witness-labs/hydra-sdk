@@ -13,7 +13,7 @@ The [Hydra Head protocol](https://hydra.family/head-protocol/) runs on Cardano a
 
 - **Head lifecycle is L1-anchored**: `Init`, `Close`, `Contest`, `Fanout`, and `Abort` are on-chain transactions. Their size and execution costs are bounded by Cardano network parameters.
 - **Participant set is fixed**: The number of parties is set at initialization and cannot be changed for that head. Adding or removing participants requires a new head.
-- **Consensus is multi-party**: All participants must agree on snapshots (or contest within the contestation period). A single party cannot unilaterally close or fanout in the default design.
+- **Consensus is multi-party**: All participants must agree on snapshots. Any party can initiate close, but others may contest within the contestation period before fanout.
 
 ## Transaction size limits
 
@@ -21,7 +21,7 @@ Cardano network parameters apply to all Hydra protocol transactions (`Init`, `Co
 
 | Parameter | Typical limit | Notes |
 |-----------|----------------|--------|
-| **Max transaction size** | 16,384 kB | Affects `CollectCom` and other multi-party transactions |
+| **Max transaction size** | 16,384 bytes | Affects `CollectCom` and other multi-party transactions |
 | **Max execution memory** | 14,000,000 units | Plutus execution budget |
 | **Max execution steps (CPU)** | 10,000,000,000 units | Plutus execution budget |
 
