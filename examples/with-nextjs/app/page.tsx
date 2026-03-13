@@ -30,10 +30,10 @@ function formatAda(lovelace: string): string {
 export default function Home() {
   const [state, setState] = useState<HeadState>("Disconnected");
   const [headId, setHeadId] = useState<string | null>(null);
-  const [utxos, setUtxos] = useState<L2Utxo[]>([]);
+  const [utxos, setUtxos] = useState<Array<L2Utxo>>([]);
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [logs, setLogs] = useState<Array<LogEntry>>([]);
 
   const addLog = useCallback((message: string) => {
     const ts = new Date().toLocaleTimeString();
@@ -313,8 +313,8 @@ export default function Home() {
 // ---------------------------------------------------------------------------
 
 function Section({
-  title,
   children,
+  title,
 }: {
   title: string;
   children: React.ReactNode;
@@ -346,9 +346,9 @@ function Section({
 
 function Button({
   children,
-  onClick,
-  disabled,
   color,
+  disabled,
+  onClick,
 }: {
   children: React.ReactNode;
   onClick: () => void;

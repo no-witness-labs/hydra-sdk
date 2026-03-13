@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+
 import * as hydra from "@/lib/hydra";
 
 /** GET /api/head — returns current head state. */

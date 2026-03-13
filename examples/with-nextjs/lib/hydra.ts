@@ -11,7 +11,6 @@ import {
   TransactionHash,
   TransactionWitnessSet,
 } from "@evolution-sdk/evolution";
-import type { UTxO } from "@evolution-sdk/evolution";
 import { Head, Provider } from "@no-witness-labs/hydra-sdk";
 import { Effect } from "effect";
 
@@ -127,7 +126,7 @@ function makeWalletClient() {
 export async function blueprintCommit() {
   if (!head) throw new Error("Not connected");
   const httpUrl = process.env.HYDRA_HTTP_URL!;
-  const { client, blockfrostKey } = makeWalletClient();
+  const { blockfrostKey, client } = makeWalletClient();
 
   // 1. Fetch wallet UTxOs
   const allUtxos = await client.getWalletUtxos();

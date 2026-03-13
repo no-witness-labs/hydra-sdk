@@ -11,7 +11,7 @@ const config: NextConfig = {
       },
     ];
   },
-  serverExternalPackages: ["@no-witness-labs/hydra-sdk", "effect"],
+  transpilePackages: ["@no-witness-labs/hydra-sdk", "effect"],
 };
 
 export default config;
