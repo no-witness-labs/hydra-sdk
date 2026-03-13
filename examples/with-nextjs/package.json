@@ -1,0 +1,25 @@
+{
+  "name": "@no-witness-labs/example-with-nextjs",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@evolution-sdk/evolution": "^0.3.22",
+    "@no-witness-labs/hydra-sdk": "workspace:*",
+    "effect": "^3.19.15",
+    "next": "^15.3.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "~5.9.0-beta"
+  }
+}
