@@ -1,0 +1,22 @@
+{
+  "name": "@no-witness-labs/example-node-scripts",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "transfer": "tsx --env-file=.env src/transfer.ts",
+    "mint-burn": "tsx --env-file=.env src/mint-burn.ts",
+    "state-update": "tsx --env-file=.env src/state-update.ts",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@evolution-sdk/evolution": "^0.3.22",
+    "@no-witness-labs/hydra-sdk": "workspace:*",
+    "effect": "^3.19.15"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "~5.9.0-beta"
+  }
+}

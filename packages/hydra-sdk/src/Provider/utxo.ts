@@ -188,7 +188,7 @@ export const toHydraUtxoMap = (
 // ---------------------------------------------------------------------------
 
 const hydraValueToAssets = (value: Value): Assets.Assets => {
-  let assets = Assets.fromLovelace(BigInt(value.lovelace));
+  let assets = Assets.fromLovelace(BigInt(value.lovelace ?? 0));
 
   for (const [policyIdHex, tokenMap] of Object.entries(value)) {
     if (policyIdHex === "lovelace") continue;
