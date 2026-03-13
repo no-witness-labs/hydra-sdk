@@ -170,7 +170,7 @@ Interactive keyboard-driven interface with real-time state updates, UTxO views, 
   table.header([*Evidence*], [*Link*]),
   [GitHub Repository (v0.2.0)], [#link("https://github.com/no-witness-labs/hydra-sdk/releases/tag/v0.2.0")],
   [Browser Demo Video (YouTube)], [#link("https://www.youtube.com/watch?v=kyO6wsSYY7k")],
-  [Fanout Demo Video], [Attached separately],
+  [Fanout Demo Video], [#link("https://github.com/no-witness-labs/hydra-sdk/releases/download/v0.2.0/fanout.mov")],
   [CLI Terminal Recording], [#link("https://asciinema.org/a/akYcaOZldCxsXWNr")],
   [Integration Tests Recording], [#link("https://asciinema.org/a/dqa4mQ6OYjeUkGpq")],
 )
