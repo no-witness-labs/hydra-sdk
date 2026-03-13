@@ -82,7 +82,7 @@ The table below demonstrates that the CLI supports identical functionality to th
 
 The following sections show actual CLI output from the terminal recording (asciinema).
 
-== 3.1 Help Output
+== Help Output
 
 ```
 $ hydra --help
@@ -110,7 +110,7 @@ COMMANDS
   - l2-utxo   List L2 UTxOs in the Hydra head snapshot
 ```
 
-== 3.2 Connect to Hydra Node
+== Connect to Hydra Node
 
 ```
 $ hydra connect --url ws://38.242.137.103:4001
@@ -119,7 +119,7 @@ headId   05f19176c5548f73948675ed148152824d703df2
 status   Open
 ```
 
-== 3.3 Head Status with Watch
+== Head Status with Watch
 
 ```
 $ hydra status --url ws://38.242.137.103:4001 --watch
@@ -129,7 +129,7 @@ status   Open
 ```
 Status updates in real-time as head state changes.
 
-== 3.4 Query L2 UTxOs
+== Query L2 UTxOs
 
 ```
 $ hydra l2-utxo --url ws://38.242.137.103:4001
@@ -142,7 +142,7 @@ f5e6d7c8...#1  addr_test1qrngfyc452vy4tw...         2.00
 Total: 4,442.19 ADA (2 UTxOs)
 ```
 
-== 3.5 Interactive TUI
+== Interactive TUI
 
 ```
 $ hydra tui --url ws://38.242.137.103:4001
@@ -181,7 +181,7 @@ Interactive keyboard-driven interface with real-time state updates, UTxO views, 
 
 Automated integration tests run against a live Hydra head using Docker containers (`cardano-node:10.5.3` + `hydra-node:1.2.0`).
 
-== 5.1 Test Suite
+== Test Suite
 
 ```
 $ pnpm --filter @no-witness-labs/hydra-sdk test:integration
@@ -202,7 +202,7 @@ $ pnpm --filter @no-witness-labs/hydra-sdk test:integration
    Duration  28.98s
 ```
 
-== 5.2 What Tests Verify
+== What Tests Verify
 
 #table(
   columns: (1fr, 1fr),
@@ -222,7 +222,7 @@ $ pnpm --filter @no-witness-labs/hydra-sdk test:integration
 
 Three example environments with three use cases each, all validated on preprod testnet.
 
-== 6.1 Example Environments
+== Example Environments
 
 #table(
   columns: (auto, 1fr, auto),
@@ -234,7 +234,7 @@ Three example environments with three use cases each, all validated on preprod t
   [Full Stack (Next.js)], [Server-side head management, API routes], [`examples/with-nextjs/`],
 )
 
-== 6.2 Use Cases Demonstrated
+== Use Cases Demonstrated
 
 #table(
   columns: (auto, 1fr),
@@ -246,7 +246,7 @@ Three example environments with three use cases each, all validated on preprod t
   [State Update], [Inline datum counter (0 → 1), spend and recreate UTxO with updated datum],
 )
 
-== 6.3 Testnet Validation Results
+== Testnet Validation Results
 
 #table(
   columns: (auto, auto, auto),
