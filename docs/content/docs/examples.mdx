@@ -1,0 +1,123 @@
+---
+title: Examples
+description: Example projects demonstrating hydra-sdk usage in different environments
+---
+
+import { Card, Cards } from "fumadocs-ui/components/card"
+
+# Examples
+
+Ready-to-run example projects covering the three core Hydra L2 use cases — transfers, token minting, and state updates — across Node.js, browser, and full-stack environments.
+
+## Example Projects
+
+<Cards>
+  <Card
+    title="Node.js Scripts"
+    description="CLI scripts for transfer, mint/burn, and state updates with full head lifecycle"
+    href="https://github.com/no-witness-labs/hydra-sdk/tree/main/examples/node-scripts"
+  />
+  <Card
+    title="Browser (Vite + React)"
+    description="React app with CIP-30 wallet connection, L2 transactions, and real-time head state"
+    href="https://github.com/no-witness-labs/hydra-sdk/tree/main/examples/with-vite-react"
+  />
+  <Card
+    title="Full Stack (Next.js)"
+    description="Next.js App Router with server-side head management and client-side UI"
+    href="https://github.com/no-witness-labs/hydra-sdk/tree/main/examples/with-nextjs"
+  />
+</Cards>
+
+## Use Cases
+
+Each environment demonstrates the same three use cases:
+
+### Transfer
+
+Send ADA between participants inside a Hydra head. The Node.js script runs the full lifecycle — connect, init, commit, transfer on L2, close, and fanout.
+
+```ts
+// Build an L2 transaction
+const txBuilder = makeTxBuilder(provider);
+const tx = await txBuilder
+  .payTo({ address: recipientAddress, assets: { lovelace: 2_000_000n } })
+  .setChangeAddress(senderAddress)
+  .build();
+
+// Sign and submit to the head
+const signed = await client.signTx(tx);
+await provider.submitTx(signed);
+```
+
+### Mint & Burn
+
+Create a native script minting policy, mint tokens on L2, verify they appear in the UTxO set, then burn them.
+
+```ts
+// Create a minting policy
+const mintingScript = NativeScripts.makeScriptPubKey(keyHash.hash);
+const policyId = PolicyId.fromHex(ScriptHash.fromScript(mintingScript));
+
+// Mint tokens in the head
+const tx = await txBuilder
+  .mintAssets({ assets })
+  .attachScript({ script: mintingScript })
+  .build();
+```
+
+### State Update
+
+Datum-based state machine pattern — create a UTxO with an inline datum (counter), update it on L2, and verify the state transition.
+
+```ts
+// Create a UTxO with inline datum
+const datum = new InlineDatum.InlineDatum({ data: BigInt(0) });
+const tx = await txBuilder
+  .payTo({ address, assets: { lovelace: 2_000_000n }, datumOption: datum })
+  .build();
+```
+
+## Environment Comparison
+
+| Feature | Node.js Scripts | Browser (Vite) | Full Stack (Next.js) |
+|---------|----------------|----------------|---------------------|
+| **Wallet** | Seed phrase | CIP-30 browser wallet | Seed phrase (server-side) |
+| **Signing** | `evolution-sdk` | Browser wallet | `evolution-sdk` |
+| **Head management** | Direct | Direct | API routes |
+| **L2 transactions** | `HydraProvider` | `HydraProvider` | `HydraProvider` |
+| **UI** | Terminal output | React + Tailwind | React (inline styles) |
+| **Best for** | Scripts, automation | DApps, user-facing | Full-stack apps |
+
+## Getting Started
+
+All examples connect to a running Hydra node. Set the connection URL in your `.env` file:
+
+```bash
+# Node.js scripts
+cp examples/node-scripts/.env.example examples/node-scripts/.env
+
+# Browser (Vite)
+cp examples/with-vite-react/.env.example examples/with-vite-react/.env
+
+# Next.js
+cp examples/with-nextjs/.env.example examples/with-nextjs/.env
+```
+
+For local development, use `@no-witness-labs/hydra-devnet` to spin up a Cardano + Hydra cluster:
+
+```ts
+import { Cluster } from "@no-witness-labs/hydra-devnet";
+
+const cluster = await Cluster.start({ participants: 1 });
+// Use cluster.nodes[0].wsUrl and cluster.nodes[0].httpUrl
+```
+
+See each example's README for detailed setup instructions.
+
+## Next Steps
+
+- [Getting Started](/docs/getting-started) — Install the SDK and learn the basics
+- [Head Basics](/docs/head-basics) — Understand the head lifecycle
+- [Providers](/docs/providers/providers) — L1/L2 provider patterns
+- [API Reference](/docs/modules) — Complete API documentation

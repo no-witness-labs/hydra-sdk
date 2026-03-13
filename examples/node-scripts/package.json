@@ -6,7 +6,8 @@
   "scripts": {
     "transfer": "tsx src/transfer.ts",
     "mint-burn": "tsx src/mint-burn.ts",
-    "state-update": "tsx src/state-update.ts"
+    "state-update": "tsx src/state-update.ts",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@evolution-sdk/evolution": "^0.3.22",
