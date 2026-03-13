@@ -30,7 +30,7 @@
       "persistent": true
     },
     "type-check": {
-      "dependsOn": ["^type-check"],
+      "dependsOn": ["^type-check", "^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": []
     },
