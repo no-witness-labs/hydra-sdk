@@ -1,0 +1,237 @@
+---
+title: Build Your Own Hydra App
+description: Step-by-step tutorial for building a Hydra L2 application from scratch.
+---
+
+# Build Your Own Hydra App
+
+This tutorial walks through building a simple Hydra application that connects to a head, commits funds, sends an L2 transaction, and closes the head. By the end, you'll understand the full lifecycle.
+
+## Prerequisites
+
+- Node.js 18+
+- Docker (for local devnet)
+- pnpm
+
+## Step 1: Project Setup
+
+```bash
+mkdir my-hydra-app && cd my-hydra-app
+pnpm init
+pnpm add @no-witness-labs/hydra-sdk @no-witness-labs/hydra-devnet @evolution-sdk/evolution
+```
+
+Create `tsconfig.json`:
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "esModuleInterop": true,
+    "outDir": "dist"
+  },
+  "include": ["src"]
+}
+```
+
+Add to `package.json`:
+
+```json
+{
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts"
+  }
+}
+```
+
+Install tsx for running TypeScript directly:
+
+```bash
+pnpm add -D tsx
+```
+
+## Step 2: Start a Local Devnet
+
+Create `src/index.ts`:
+
+```ts
+import { Cluster } from "@no-witness-labs/hydra-devnet";
+import { Head, Provider } from "@no-witness-labs/hydra-sdk";
+
+async function main() {
+  // Start a local Cardano + Hydra cluster
+  await Cluster.withCluster(async (cluster) => {
+    console.log(`Hydra node running at ${cluster.hydraApiUrl}`);
+
+    // Your app code goes here (Steps 3-7)
+  });
+  // Cluster is automatically stopped on exit
+}
+
+main().catch(console.error);
+```
+
+Run it to verify the devnet starts:
+
+```bash
+pnpm start
+```
+
+You should see the Hydra node URL printed. The cluster spins up a Cardano node and Hydra node in Docker.
+
+## Step 3: Connect to the Head
+
+Inside the `withCluster` callback, create and connect a head:
+
+```ts
+// Connect to the Hydra head
+const head = await Head.create({ url: cluster.hydraApiUrl });
+console.log(`Connected — state: ${head.getState()}`); // "Idle"
+
+// Subscribe to events
+const unsubscribe = head.subscribe((event) => {
+  console.log(`[${event.tag}]`, event.payload ?? "");
+});
+```
+
+## Step 4: Initialize and Commit
+
+```ts
+// Initialize the head
+await head.init();
+console.log(`State after init: ${head.getState()}`); // "Initializing"
+
+// Commit (empty commit for this tutorial)
+await head.commit({});
+console.log(`State after commit: ${head.getState()}`); // "Open"
+```
+
+With an empty commit, the head opens without any L1 UTxOs. In a real app, you'd commit UTxOs from a wallet — see the [Wallet Setup](/docs/wallet-setup) guide.
+
+## Step 5: Query the Head State
+
+Once the head is open, you can query its state using `HydraProvider`:
+
+```ts
+const httpUrl = cluster.hydraApiUrl.replace(/^ws/, "http");
+const provider = new Provider.HydraProvider({ head, httpUrl });
+
+// Get L2 UTxOs
+const utxos = await provider.getSnapshotUtxos();
+console.log(`L2 UTxOs: ${utxos.length}`);
+
+// Get protocol parameters (L2 — no fees)
+const params = await provider.getProtocolParameters();
+console.log(`L2 min fee: ${params.minFeeA}`); // 0 on L2
+```
+
+## Step 6: Send an L2 Transaction
+
+If you committed funds, you can build and submit transactions on L2. Here's a simplified example using evolution-sdk:
+
+```ts
+import {
+  Address,
+  Assets,
+  Transaction,
+} from "@evolution-sdk/evolution";
+import { makeTxBuilder } from "@evolution-sdk/evolution/sdk/builders/TransactionBuilder";
+
+// Build an L2 transaction
+const built = await makeTxBuilder({ provider, network: "Custom" })
+  .payToAddress({
+    address: recipientAddress,
+    assets: Assets.fromLovelace(2_000_000n),
+  })
+  .build({ changeAddress, availableUtxos: utxos, drainTo: 0 });
+
+const unsignedTx = await built.toTransaction();
+const unsignedCbor = Transaction.toCBORHex(unsignedTx);
+
+// Sign and submit
+const witnessHex = await walletApi.signTx(unsignedCbor, true);
+const signedCbor = Transaction.addVKeyWitnessesHex(unsignedCbor, witnessHex);
+const signedTx = Transaction.fromCBORHex(signedCbor);
+const txHash = await provider.submitTx(signedTx);
+console.log(`L2 tx submitted: ${txHash}`);
+```
+
+> L2 transactions have zero fees and near-instant confirmation. No need to wait for block confirmations.
+
+## Step 7: Close and Fanout
+
+When you're done, close the head and return funds to L1:
+
+```ts
+// Close the head
+await head.close();
+console.log(`State: ${head.getState()}`); // "Closed"
+
+// Wait for contestation period, then fanout
+await head.fanout();
+console.log(`State: ${head.getState()}`); // "Final"
+
+// Clean up
+unsubscribe();
+await head.dispose();
+```
+
+After fanout, all L2 UTxOs are settled back to L1.
+
+## Complete Example
+
+Putting it all together:
+
+```ts
+import { Cluster } from "@no-witness-labs/hydra-devnet";
+import { Head, Provider } from "@no-witness-labs/hydra-sdk";
+
+async function main() {
+  await Cluster.withCluster(async (cluster) => {
+    console.log(`Hydra node: ${cluster.hydraApiUrl}`);
+
+    // Connect
+    const head = await Head.create({ url: cluster.hydraApiUrl });
+    const unsubscribe = head.subscribe((event) => {
+      console.log(`[${event.tag}]`);
+    });
+
+    try {
+      // Open the head
+      await head.init();
+      await head.commit({});
+      console.log(`Head is ${head.getState()}`); // "Open"
+
+      // Query L2 state
+      const httpUrl = cluster.hydraApiUrl.replace(/^ws/, "http");
+      const provider = new Provider.HydraProvider({ head, httpUrl });
+      const utxos = await provider.getSnapshotUtxos();
+      console.log(`L2 has ${utxos.length} UTxOs`);
+
+      // Close and settle
+      await head.close();
+      await head.fanout();
+      console.log(`Head finalized — funds returned to L1`);
+    } finally {
+      unsubscribe();
+      await head.dispose();
+    }
+  });
+}
+
+main().catch(console.error);
+```
+
+## Next Steps
+
+Once you have the basics working:
+
+- **Add wallet integration** — [Wallet Setup](/docs/wallet-setup) to commit real funds and sign L2 transactions
+- **Build a React frontend** — See the [Vite + React example](https://github.com/no-witness-labs/hydra-sdk/tree/main/examples/with-vite-react)
+- **Handle errors** — [Error Handling](/docs/error-handling) for production-grade resilience
+- **Use the CLI** — [CLI Usage](/docs/cli) for quick head management without code
+- **Go to production** — [Production Checklist](/docs/providers/production-checklist) for security and monitoring

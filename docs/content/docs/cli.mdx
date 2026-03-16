@@ -1,0 +1,200 @@
+---
+title: CLI Usage
+description: Command-line interface for managing Hydra head lifecycle, UTxO queries, and interactive monitoring.
+---
+
+# CLI Usage
+
+The `@no-witness-labs/hydra-sdk-cli` package provides a command-line interface for managing Hydra heads without writing code.
+
+## Installation
+
+```bash
+pnpm add -g @no-witness-labs/hydra-sdk-cli
+```
+
+Or run directly with `pnpm dlx`:
+
+```bash
+pnpm dlx @no-witness-labs/hydra-sdk-cli hydra status
+```
+
+## Configuration
+
+The CLI reads configuration from three sources (in priority order):
+
+1. **CLI flags** — `--url`, `--mnemonic`, `--blockfrost-key`
+2. **Environment variables** — `HYDRA_NODE_URL`, `HYDRA_MNEMONIC`, `HYDRA_BLOCKFROST_KEY`
+3. **Config file** — `~/.config/hydra-sdk/config.yaml`
+
+### Managing Config
+
+```bash
+# Set values
+hydra config set --key url --value ws://localhost:4001
+hydra config set --key blockfrostKey --value preprodXXXXXX
+hydra config set --key mnemonic --value "word1 word2 ... word24"
+
+# View values
+hydra config get --key url
+hydra config list           # all values (mnemonic masked)
+hydra config path           # show config file location
+
+# Remove a value
+hydra config remove --key mnemonic
+```
+
+## Connection
+
+```bash
+# Test connection to a Hydra node
+hydra connect --url ws://localhost:4001
+
+# Check head status
+hydra status
+hydra status --watch        # continuous monitoring (1s refresh)
+hydra status --json         # JSON output
+```
+
+## Head Lifecycle Commands
+
+All lifecycle commands accept `--url` and `--json` flags.
+
+```bash
+# Initialize a new head
+hydra init
+
+# Abort during initialization
+hydra abort
+
+# Close the head
+hydra close
+
+# Contest with a newer snapshot (during contestation period)
+hydra contest
+
+# Fanout — finalize and return UTxOs to L1
+hydra fanout
+```
+
+### State Requirements
+
+| Command | Valid From State |
+|---------|-----------------|
+| `init` | Idle |
+| `abort` | Idle, Initializing |
+| `close` | Open |
+| `contest` | Closed |
+| `fanout` | FanoutPossible |
+
+## Commit
+
+Empty commit (no UTxOs):
+
+```bash
+hydra commit
+```
+
+Commit specific UTxOs (requires wallet credentials):
+
+```bash
+hydra commit \
+  --utxo "txhash1#0,txhash2#1" \
+  --mnemonic "word1 word2 ... word24" \
+  --blockfrost-key preprodXXXXXX
+```
+
+The commit workflow:
+1. Fetches wallet UTxOs from Blockfrost
+2. Matches requested UTxO refs with wallet UTxOs
+3. Finds a fee UTxO (>= 2 ADA, not in selected set)
+4. Builds and signs the commit transaction
+5. Submits to L1 via Blockfrost
+
+## Decommit & Recover
+
+```bash
+# Withdraw UTxOs from L2 back to L1
+hydra decommit --tx-cbor <CBOR_HEX> --tx-id <TX_ID>
+
+# Recover a failed incremental commit deposit
+hydra recover --tx-id <DEPOSIT_TX_ID>
+```
+
+## UTxO Queries
+
+```bash
+# List L1 wallet UTxOs (requires wallet credentials)
+hydra l1-utxo --mnemonic "..." --blockfrost-key preprodXXXXXX
+
+# List L2 UTxOs in the current head snapshot
+hydra l2-utxo
+
+# JSON output for scripting
+hydra l2-utxo --json
+```
+
+## Interactive TUI
+
+The TUI provides a full dashboard for monitoring and managing a Hydra head:
+
+```bash
+hydra tui --url ws://localhost:4001
+```
+
+With wallet credentials for commit support:
+
+```bash
+hydra tui \
+  --url ws://localhost:4001 \
+  --mnemonic "..." \
+  --blockfrost-key preprodXXXXXX
+```
+
+### Keyboard Controls
+
+| Key | Action |
+|-----|--------|
+| `i` | Init |
+| `c` | Commit (opens UTxO selection if wallet configured) |
+| `x` | Close |
+| `s` | SafeClose |
+| `f` | Fanout |
+| `a` | Abort |
+| `t` | Contest |
+| `1` | View L1 UTxOs |
+| `2` | View L2 UTxOs |
+| `q` | Quit |
+
+In UTxO selection view:
+
+| Key | Action |
+|-----|--------|
+| Up/Down | Navigate UTxOs |
+| Space | Toggle selection |
+| Enter | Commit selected |
+| Esc | Back to dashboard |
+
+## Full Lifecycle Example
+
+```bash
+# Configure once
+hydra config set --key url --value ws://localhost:4001
+hydra config set --key blockfrostKey --value preprodXXXXXX
+hydra config set --key mnemonic --value "word1 word2 ... word24"
+
+# Run lifecycle
+hydra connect              # verify connection
+hydra init                 # initialize head
+hydra commit               # empty commit (or with --utxo)
+hydra status --watch       # wait for Open state
+hydra close                # close the head
+hydra status --watch       # wait for contestation period
+hydra fanout               # finalize to L1
+```
+
+## Next Steps
+
+- [Getting Started](/docs/getting-started) — SDK quick start
+- [Head Basics](/docs/head-basics) — Head lifecycle and state machine
+- [Wallet Setup](/docs/wallet-setup) — Wallet configuration for commit

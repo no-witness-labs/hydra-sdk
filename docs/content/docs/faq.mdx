@@ -1,0 +1,159 @@
+---
+title: FAQ
+description: Frequently asked questions about the Hydra SDK.
+---
+
+# FAQ
+
+## General
+
+### What is the Hydra SDK?
+
+A TypeScript SDK for interacting with [Hydra Head](https://hydra.family/) protocol nodes on Cardano. It manages the WebSocket connection, head lifecycle state machine, and provides a type-safe API for L2 operations.
+
+### Which Hydra node version is supported?
+
+The SDK targets **hydra-node v1.2.0**, which supports incremental commits, SafeClose, and the deposit lifecycle.
+
+### Does the SDK work in the browser?
+
+Yes. The SDK auto-detects the runtime and uses the native `WebSocket` in browsers or the `ws` package in Node.js. See the [Compatibility](/docs/compatibility) page for the full browser support matrix.
+
+### What is evolution-sdk?
+
+[`@evolution-sdk/evolution`](https://github.com/IntersectMBO/evolution-sdk) is a Cardano transaction building library. The Hydra SDK uses it for constructing and signing transactions (both L1 and L2). It's a peer dependency — install it alongside the SDK when you need transaction building.
+
+## Head Lifecycle
+
+### What are the head states?
+
+| State | Description |
+|-------|-------------|
+| Idle | Connected, waiting for Init |
+| Initializing | Init sent, waiting for all participants to commit |
+| Open | Head is open for L2 transactions |
+| Closed | Head is closed, contestation period running |
+| FanoutPossible | Contestation period ended, ready for fanout |
+| Final | Fanout complete, UTxOs settled on L1 |
+
+### How do I commit UTxOs to a head?
+
+During the `Initializing` state, use `head.commit()` with a blueprint transaction and UTxO map. For an empty commit (no funds), pass `{}`. See [Wallet Setup](/docs/wallet-setup) for full commit examples with wallet signing.
+
+### What happens if I close the head?
+
+Closing posts the latest snapshot to L1 and starts a contestation period. During this period, any participant can contest with a newer snapshot. After the period ends, the state moves to `FanoutPossible` and you can call `fanout()` to settle UTxOs back to L1.
+
+### Can I reopen a closed head?
+
+No. Once a head is closed and finalized, it cannot be reopened. You need to create a new head.
+
+### What is the contestation period?
+
+A configurable time window (set when starting the hydra-node) during which participants can submit a newer snapshot to L1. This prevents dishonest closures. Typical values: 60 seconds for testnet, longer for mainnet.
+
+## Transactions
+
+### Are there fees on L2?
+
+No. L2 transactions inside a Hydra head have zero fees. Fees only apply to L1 transactions (Init, Commit, Close, Fanout).
+
+### How fast are L2 transactions?
+
+Near-instant. L2 transactions are confirmed as soon as all head participants agree on the new state (typically milliseconds to low seconds).
+
+### What's the difference between Decommit and Fanout?
+
+- **Decommit** withdraws specific UTxOs from L2 to L1 while the head remains open
+- **Fanout** closes the head entirely and settles all remaining UTxOs to L1
+
+### What is incremental commit?
+
+A v1.2.0 feature that allows adding more funds to an already-open head without closing and reopening it. If the deposit expires before being observed, use `head.recover(txId)` to reclaim your funds.
+
+## Connection & Reliability
+
+### Does the SDK auto-reconnect?
+
+Yes. The SDK uses exponential backoff with jitter for reconnection. Configure it via the `reconnect` option:
+
+```ts
+const head = await Head.create({
+  url: "ws://localhost:4001",
+  reconnect: {
+    maxRetries: 10,        // default: 10
+    initialDelayMs: 500,   // default: 500
+    maxDelayMs: 30_000,    // default: 30000
+  },
+});
+```
+
+### What is the heartbeat feature?
+
+Heartbeat monitors connection health by tracking when the last message was received. If no messages arrive within `intervalMs + timeoutMs`, the SDK treats the connection as stale and triggers a reconnect.
+
+```ts
+const head = await Head.create({
+  url: "ws://localhost:4001",
+  heartbeat: {
+    intervalMs: 30_000,    // check every 30s
+    timeoutMs: 10_000,     // stale after 10s of silence
+  },
+});
+```
+
+> For idle heads with no regular traffic, consider using longer intervals or disabling heartbeat.
+
+### How do I detect reconnection?
+
+Subscribe to events and check for `ConnectionRestored`:
+
+```ts
+head.subscribe((event) => {
+  if (event.tag === "ConnectionRestored") {
+    console.log("Reconnected:", event.payload);
+    // payload: { previousStatus, restoredStatus }
+  }
+});
+```
+
+## Troubleshooting
+
+### "Command X is not allowed while head is Y"
+
+You're calling a command from the wrong state. Check `head.getState()` before issuing commands. See the [state requirements table](/docs/head-basics).
+
+### "Command timed out after Xms"
+
+The hydra-node didn't respond in time. Common causes:
+- Network issues between your app and the node
+- Node is overloaded or syncing
+- L1 congestion (for Init, Close, Fanout)
+
+### "PostTxOnChainFailed"
+
+An L1 transaction (Init, Close, or Fanout) failed. Common causes:
+- Insufficient funds for transaction fees
+- Cardano node not fully synced
+- Script validation failure (e.g., oversized UTxOs)
+
+### "DepositExpired"
+
+An incremental commit deposit wasn't observed by the head before it expired. Use `head.recover(txId)` to reclaim the funds.
+
+### WebSocket disconnects frequently
+
+- Check network stability between your app and the hydra-node
+- Enable heartbeat to detect stale connections early
+- Increase `maxRetries` and `maxDelayMs` in reconnect config
+- In production, place a load balancer with WebSocket support in front
+
+### Bundle size is large in the browser
+
+The full SDK bundle (with Effect and evolution-sdk) is ~2.3MB. Use tree-shaking with your bundler to reduce this. If you only need the head lifecycle (no transaction building), you can skip installing `@evolution-sdk/evolution`.
+
+## Next Steps
+
+- [Getting Started](/docs/getting-started) — Quick start guide
+- [Error Handling](/docs/error-handling) — Detailed error types and patterns
+- [Production Checklist](/docs/providers/production-checklist) — Deployment best practices

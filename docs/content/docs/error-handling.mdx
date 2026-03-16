@@ -1,0 +1,275 @@
+---
+title: Error Handling
+description: Error types, handling patterns, and common failure scenarios in the Hydra SDK.
+---
+
+# Error Handling
+
+The Hydra SDK provides structured errors with typed details for both Promise and Effect APIs.
+
+## Error Types
+
+### HeadError
+
+The primary error type for all head operations:
+
+```ts
+import { Head } from "@no-witness-labs/hydra-sdk";
+
+// HeadError has:
+// - message: string          — human-readable description
+// - cause?: unknown          — underlying error
+// - details?: {
+//     tag?: string           — "CommandFailed", "TxInvalid", "PostTxOnChainFailed", etc.
+//     command?: string       — the command that failed (Init, Close, NewTx, etc.)
+//     txId?: string          — transaction ID when applicable
+//     validationError?: unknown — detailed validation info from the node
+//   }
+```
+
+### HydraHttpError
+
+Wraps HTTP request failures to the hydra-node REST API:
+
+```ts
+import { Provider } from "@no-witness-labs/hydra-sdk";
+
+// HydraHttpError has:
+// - message: string          — what operation failed
+// - cause?: unknown          — the underlying network error
+```
+
+### ProviderError
+
+When using `HydraProvider` with evolution-sdk, errors are wrapped in evolution-sdk's `ProviderError`:
+
+```ts
+import { ProviderError } from "@evolution-sdk/evolution/sdk/provider/Provider";
+
+// ProviderError has:
+// - message: string          — what operation failed
+// - cause?: unknown          — the underlying HydraHttpError or HeadError
+```
+
+## Handling Errors
+
+### Promise API
+
+```ts
+try {
+  await head.init();
+} catch (error) {
+  if (error instanceof Head.HeadError) {
+    console.error(error.message);
+
+    // Inspect structured details
+    if (error.details?.tag === "CommandFailed") {
+      console.error(`Command ${error.details.command} was rejected`);
+    }
+    if (error.details?.tag === "PostTxOnChainFailed") {
+      console.error("L1 transaction failed — check funds and node sync");
+    }
+  }
+}
+```
+
+### Effect API
+
+Errors flow through the typed error channel:
+
+```ts
+import { Effect } from "effect";
+
+const program = Effect.gen(function* () {
+  const head = yield* Head.effect.createScoped({ url: "ws://localhost:4001" });
+
+  // Catch specific error tags
+  yield* head.effect.init().pipe(
+    Effect.catchTag("HeadError", (error) =>
+      Effect.logError(`Init failed: ${error.message}`),
+    ),
+  );
+
+  // Or handle all errors
+  yield* head.effect.close().pipe(
+    Effect.catchAll((error) =>
+      Effect.logError(`Operation failed: ${error}`),
+    ),
+  );
+});
+```
+
+## Failure Categories
+
+### FSM Validation (Before Network)
+
+The SDK validates commands against the head's current state before sending to the network. These fail immediately:
+
+```ts
+const head = await Head.create({ url: "ws://localhost:4001" });
+// head is in "Idle" state
+
+try {
+  await head.close(); // Close requires "Open" state
+} catch (error) {
+  // HeadError: "Command Close is not allowed while head is Idle"
+}
+```
+
+| Command | Valid From |
+|---------|-----------|
+| Init | Idle |
+| Abort | Idle, Initializing |
+| Commit | Initializing |
+| Close, SafeClose | Open |
+| NewTx, Decommit, Recover | Open |
+| Contest | Closed |
+| Fanout | FanoutPossible |
+
+### Network Failures (From Hydra Node)
+
+Three categories of failure responses:
+
+**CommandFailed** — the node rejected the command:
+
+```ts
+// details.tag === "CommandFailed"
+// Example: contest when no newer snapshot exists
+```
+
+**InvalidInput** — malformed request:
+
+```ts
+// details.tag === "InvalidInput"
+// Example: invalid CBOR in NewTx or Decommit
+```
+
+**PostTxOnChainFailed** — L1 transaction failed:
+
+```ts
+// details.tag === "PostTxOnChainFailed"
+// Example: Init, Close, or Fanout script validation failure
+```
+
+### Timeout Errors
+
+Commands that don't receive a response within the timeout period:
+
+```ts
+// HeadError: "Command timed out after 10000ms"
+// Common causes: network issues, node overloaded, L1 congestion
+```
+
+### Connection Errors
+
+WebSocket disconnects and reconnection failures:
+
+```ts
+const head = await Head.create({
+  url: "ws://localhost:4001",
+  reconnect: {
+    maxRetries: 10,
+    initialDelayMs: 500,
+    maxDelayMs: 30_000,
+  },
+});
+
+// After maxRetries exhausted, the head fiber terminates
+// Subscribe to connection events:
+head.subscribe((event) => {
+  if (event.tag === "ConnectionRestored") {
+    console.log("Reconnected:", event.payload);
+  }
+});
+```
+
+### Deposit Errors
+
+Incremental commit deposits (submitted to L1 while the head is Open) can expire before the head observes them:
+
+```ts
+// Listen for deposit expiration events
+head.subscribe((event) => {
+  if (event.tag === "CommitFinalized") {
+    console.log("Deposit committed successfully");
+  }
+});
+
+// If a deposit expires, recover the funds
+try {
+  await head.recover(depositTxId);
+} catch (error) {
+  if (error.details?.tag === "CommandFailed") {
+    console.error("Recovery failed:", error.message);
+  }
+}
+```
+
+## Provider Error Handling
+
+```ts
+import { Provider } from "@no-witness-labs/hydra-sdk";
+
+const provider = new Provider.HydraProvider({ head, httpUrl });
+
+try {
+  const utxos = await provider.getSnapshotUtxos();
+} catch (error) {
+  // ProviderError (from evolution-sdk) wraps the underlying failure
+  console.error(error.message); // "Failed to fetch UTxOs"
+  console.error(error.cause);   // Original HydraHttpError
+}
+
+// evaluateTx() is not supported on L2 — always throws
+try {
+  await provider.evaluateTx(tx);
+} catch {
+  // Expected: L2 heads don't support script evaluation
+}
+```
+
+## Transient vs. Permanent Failures
+
+**Transient** — safe to retry:
+- Network timeouts
+- WebSocket disconnects (SDK auto-retries)
+- L1 congestion (PostTxOnChainFailed — may succeed on retry)
+
+**Permanent** — fix the root cause:
+- FSM state violations (wrong command for current state)
+- Invalid CBOR / malformed transactions
+- Insufficient funds for commit
+- Oversized UTxOs preventing fanout
+
+## Resource Cleanup
+
+Always dispose the head to release WebSocket connections and fibers:
+
+```ts
+// Manual cleanup
+const head = await Head.create({ url: "ws://localhost:4001" });
+try {
+  // ... operations
+} finally {
+  await head.dispose();
+}
+
+// Automatic cleanup with bracket pattern
+await Head.withHead({ url: "ws://localhost:4001" }, async (head) => {
+  // head is automatically disposed on exit (success or error)
+});
+
+// Automatic cleanup with Effect
+const program = Effect.scoped(
+  Effect.gen(function* () {
+    const head = yield* Head.effect.createScoped({ url: "ws://localhost:4001" });
+    // head is automatically disposed when scope closes
+  }),
+);
+```
+
+## Next Steps
+
+- [Head Basics](/docs/head-basics) — Head lifecycle and event handling
+- [Providers](/docs/providers/providers) — Provider configuration and error wrapping
+- [Production Checklist](/docs/providers/production-checklist) — Monitoring and deployment best practices
