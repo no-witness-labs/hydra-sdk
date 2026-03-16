@@ -201,7 +201,9 @@ const head = await Head.create({
 });
 ```
 
-When no messages arrive within `intervalMs + timeoutMs`, the SDK closes the connection and triggers the reconnection loop.
+The SDK checks every `intervalMs` whether the last received message is older than `intervalMs + timeoutMs`. If so, it closes the connection and triggers the reconnection loop.
+
+> **Note:** Hydra-node does not send periodic keepalive messages. Heartbeat is most useful when your head has regular activity (e.g. frequent L2 transactions). For idle heads, consider disabling heartbeat or using longer intervals to avoid false reconnections.
 
 ### Connection State Events
 
@@ -216,7 +218,7 @@ head.subscribe((event) => {
 });
 ```
 
-This event is only emitted when the restored state differs from what the SDK last observed before the disconnect.
+This event is only emitted when the restored state differs from the SDK's FSM state at the moment of reconnection.
 
 ## Resource Management
 

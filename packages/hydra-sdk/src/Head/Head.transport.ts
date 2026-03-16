@@ -63,8 +63,8 @@ const normalizeHeartbeat = (
 ): NormalizedHeartbeat | null => {
   if (!config.heartbeat) return null;
   return {
-    intervalMs: config.heartbeat.intervalMs ?? 30_000,
-    timeoutMs: config.heartbeat.timeoutMs ?? 10_000,
+    intervalMs: Math.max(1_000, config.heartbeat.intervalMs ?? 30_000),
+    timeoutMs: Math.max(1_000, config.heartbeat.timeoutMs ?? 10_000),
   };
 };
 
@@ -554,9 +554,6 @@ export const makeHeadTransport = (
     const isDisposed = yield* Ref.make(false);
     const webSocketConstructorLayer = yield* makeWebSocketConstructorLayer;
     const lastMessageAt = yield* Ref.make(Date.now());
-    /** Tracks the last known head status before a disconnect, for ConnectionRestored events. */
-    const previousStatus = yield* Ref.make<HeadStatus | null>(null);
-    const isFirstConnection = yield* Ref.make(true);
 
     const socketSession = (socketUrl: string): Effect.Effect<void, HeadError> =>
       Effect.scoped(
@@ -590,28 +587,7 @@ export const makeHeadTransport = (
                 const raw = new TextDecoder().decode(data);
                 return Ref.set(lastMessageAt, Date.now()).pipe(
                   Effect.flatMap(() => parseApiEvent(raw)),
-                  Effect.flatMap((event) =>
-                    Effect.gen(function* () {
-                      yield* events.publish(event);
-                      // Emit ConnectionRestored when Greetings arrives on a reconnection
-                      if (event._tag === "Greetings") {
-                        const first = yield* Ref.get(isFirstConnection);
-                        const prev = yield* Ref.get(previousStatus);
-                        const restored = event.greetings.headStatus;
-                        if (!first && prev !== null && prev !== restored) {
-                          yield* events.publish({
-                            _tag: "ConnectionRestored",
-                            connectionRestored: {
-                              previousStatus: prev,
-                              restoredStatus: restored,
-                            },
-                          });
-                        }
-                        yield* Ref.set(previousStatus, restored);
-                        yield* Ref.set(isFirstConnection, false);
-                      }
-                    }),
-                  ),
+                  Effect.flatMap(events.publish),
                 );
               })
               .pipe(
