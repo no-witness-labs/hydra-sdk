@@ -1,0 +1,233 @@
+---
+title: Wallet Setup
+description: Connect Cardano wallets for signing Hydra transactions — browser CIP-30 wallets and server-side seed phrase wallets.
+---
+
+# Wallet Setup
+
+The Hydra SDK uses [`@evolution-sdk/evolution`](https://github.com/IntersectMBO/evolution-sdk) for transaction building and signing. This guide covers two wallet integration patterns:
+
+- **Browser wallets** — CIP-30 extensions (Nami, Eternl, Lace, etc.)
+- **Server-side wallets** — Seed phrase via `createClient()`
+
+## Browser Wallets (CIP-30)
+
+### Type Declarations
+
+Cardano browser wallets inject themselves into `window.cardano`. Add these type declarations to your project (e.g., in a `.d.ts` file):
+
+```ts
+interface CardanoWalletApi {
+  getNetworkId(): Promise<number>;
+  getUtxos(
+    amount?: string,
+    paginate?: { page: number; limit: number },
+  ): Promise<string[] | null>;
+  getBalance(): Promise<string>;
+  getUsedAddresses(): Promise<string[]>;
+  getUnusedAddresses(): Promise<string[]>;
+  getChangeAddress(): Promise<string>;
+  getRewardAddresses(): Promise<string[]>;
+  signTx(tx: string, partialSign?: boolean): Promise<string>;
+  signData(
+    addr: string,
+    payload: string,
+  ): Promise<{ signature: string; key: string }>;
+  submitTx(tx: string): Promise<string>;
+  getCollateral(): Promise<string[] | null>;
+}
+
+interface CardanoWalletExtension {
+  enable(): Promise<CardanoWalletApi>;
+  isEnabled(): Promise<boolean>;
+  name: string;
+  icon: string;
+  apiVersion: string;
+}
+
+interface Window {
+  cardano?: Record<string, CardanoWalletExtension>;
+}
+```
+
+### Wallet Discovery & Connection
+
+Use [`@cardano-foundation/cardano-connect-with-wallet`](https://github.com/cardano-foundation/cardano-connect-with-wallet) for React apps:
+
+```bash
+pnpm add @cardano-foundation/cardano-connect-with-wallet @cardano-foundation/cardano-connect-with-wallet-core
+```
+
+```tsx
+import { useCardano } from "@cardano-foundation/cardano-connect-with-wallet";
+import { NetworkType } from "@cardano-foundation/cardano-connect-with-wallet-core";
+
+function WalletConnect() {
+  const {
+    isConnected,
+    isConnecting,
+    enabledWallet,
+    stakeAddress,
+    installedExtensions,
+    connect,
+    disconnect,
+  } = useCardano({ limitNetwork: NetworkType.TESTNET });
+
+  if (isConnected) {
+    return (
+      <div>
+        <p>Connected: {enabledWallet}</p>
+        <p>Stake: {stakeAddress}</p>
+        <button onClick={disconnect}>Disconnect</button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {installedExtensions.map((name) => (
+        <button key={name} onClick={() => connect(name)} disabled={isConnecting}>
+          {name}
+        </button>
+      ))}
+    </div>
+  );
+}
+```
+
+### Getting the CIP-30 API
+
+After connecting, enable the wallet to get the full API:
+
+```ts
+// `enabledWallet` is the wallet name from useCardano (e.g., "nami", "eternl")
+const api: CardanoWalletApi = await window.cardano[enabledWallet].enable();
+```
+
+### Passing the API to evolution-sdk
+
+Create an evolution-sdk client with the CIP-30 API for transaction building:
+
+```ts
+import { createClient } from "@evolution-sdk/evolution";
+
+const client = createClient({
+  network: "preprod",
+  provider: {
+    type: "blockfrost",
+    baseUrl: "https://cardano-preprod.blockfrost.io/api/v0",
+    projectId: "your-blockfrost-project-id",
+  },
+  wallet: { type: "api", api: walletApi },
+});
+
+// Fetch wallet UTxOs from L1
+const utxos = await client.getWalletUtxos();
+```
+
+### Signing Hydra Transactions
+
+L2 transactions require **partial signing** (`partialSign: true`), since the Hydra node also needs to sign:
+
+```ts
+import { Transaction } from "@evolution-sdk/evolution";
+
+// 1. Build the unsigned transaction
+const built = await client.newTx().collectFrom({ inputs: selectedUtxos }).build();
+const unsignedTx = await built.toTransaction();
+const unsignedCbor = Transaction.toCBORHex(unsignedTx);
+
+// 2. Sign with wallet (partial — leaves room for Hydra node's signature)
+const witnessHex = await walletApi.signTx(unsignedCbor, true);
+
+// 3. Merge wallet witnesses into the transaction
+const signedCbor = Transaction.addVKeyWitnessesHex(unsignedCbor, witnessHex);
+```
+
+## Server-Side Wallets
+
+For Node.js scripts, server backends, or CI pipelines, use a seed phrase wallet:
+
+```ts
+import { createClient } from "@evolution-sdk/evolution";
+
+const client = createClient({
+  network: "preprod",
+  provider: {
+    type: "blockfrost",
+    baseUrl: "https://cardano-preprod.blockfrost.io/api/v0",
+    projectId: process.env.BLOCKFROST_KEY,
+  },
+  wallet: { type: "seed", mnemonic: process.env.SEED_PHRASE },
+});
+
+// Fetch UTxOs
+const utxos = await client.getWalletUtxos();
+
+// Sign a transaction
+const witnessSet = await client.signTx(unsignedCbor, {});
+```
+
+> **Security**: Never commit seed phrases to source control. Use environment variables or a secrets manager.
+
+## Using Wallets with HydraProvider
+
+Once you have a wallet (browser or server-side), combine it with the SDK's `HydraProvider` for L2 operations:
+
+```ts
+import { Head, Provider } from "@no-witness-labs/hydra-sdk";
+import {
+  createClient,
+  Transaction,
+  Address,
+  Assets,
+} from "@evolution-sdk/evolution";
+import { makeTxBuilder } from "@evolution-sdk/evolution/sdk/builders/TransactionBuilder";
+
+// Connect to the Hydra head
+const head = await Head.create({ url: "ws://localhost:4001" });
+const provider = new Provider.HydraProvider({
+  head,
+  httpUrl: "http://localhost:4001",
+});
+
+// Build an L2 transaction
+const l2Utxos = await provider.getSnapshotUtxos();
+const built = await makeTxBuilder({ provider, network: "Preprod" })
+  .payToAddress({
+    address: Address.fromBech32("addr_test1..."),
+    assets: Assets.fromLovelace(5_000_000n),
+  })
+  .build({ changeAddress, availableUtxos: l2Utxos, drainTo: 0 });
+
+const unsignedTx = await built.toTransaction();
+const unsignedCbor = Transaction.toCBORHex(unsignedTx);
+
+// Sign with wallet
+const witnessHex = await walletApi.signTx(unsignedCbor, true);
+const signedCbor = Transaction.addVKeyWitnessesHex(unsignedCbor, witnessHex);
+const signedTx = Transaction.fromCBORHex(signedCbor);
+
+// Submit to the Hydra head
+const txHash = await provider.submitTx(signedTx);
+```
+
+## Supported Wallets
+
+The SDK works with any CIP-30 compliant browser wallet:
+
+| Wallet | Extension ID | Notes |
+|--------|-------------|-------|
+| Nami | `nami` | Lightweight, single-address |
+| Eternl | `eternl` | Multi-account, DApp connector |
+| Lace | `lace` | IOG official wallet |
+| Flint | `flint` | Multi-chain support |
+| Typhon | `typhonwallet` | Advanced features |
+| VESPR | `vespr` | Mobile + browser |
+| Hardware wallets | Via extension | Ledger/Trezor through any compatible extension |
+
+## Next Steps
+
+- [Providers](/docs/providers) — Set up L1 and L2 providers
+- [Head Basics](/docs/head-basics) — Head lifecycle and state management
+- [Examples](/docs/examples) — Full working examples (Vite React, Next.js, Node.js scripts)
