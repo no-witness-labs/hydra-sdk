@@ -5,6 +5,7 @@
     "head-basics",
     "providers",
     "examples",
-    "modules"
+    "modules",
+    "compatibility"
   ]
 }

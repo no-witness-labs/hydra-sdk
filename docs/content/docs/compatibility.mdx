@@ -1,0 +1,64 @@
+---
+title: Browser & Platform Compatibility
+description: Supported browsers, platforms, and known issues for the Hydra SDK.
+---
+
+# Browser & Platform Compatibility
+
+The Hydra SDK is tested across major browsers and operating systems using [Playwright](https://playwright.dev/).
+
+## Supported Browsers
+
+| Browser | Engine | Status |
+|---------|--------|--------|
+| Chrome / Edge | Chromium | Supported |
+| Firefox | Gecko | Supported |
+| Safari | WebKit | Supported |
+
+## Supported Platforms
+
+| Platform | CI Tested | Notes |
+|----------|-----------|-------|
+| Linux (Ubuntu) | Yes | Primary CI platform |
+| macOS | Yes | Full browser matrix |
+| Windows | Yes | Full browser matrix |
+
+## Runtime Environments
+
+| Environment | WebSocket | Notes |
+|-------------|-----------|-------|
+| Node.js (>=18) | `ws` package | Auto-detected, uses `ws` for compatibility |
+| Browser | Native `WebSocket` | Auto-detected, uses `globalThis.WebSocket` |
+
+The SDK automatically detects the runtime environment and selects the appropriate WebSocket implementation. In Node.js, the `ws` package is preferred over Node's built-in `WebSocket` (undici-based) for compatibility with `@effect/platform`.
+
+## What's Tested in Browsers
+
+The browser test suite validates:
+
+- SDK loads and exports all modules (Head, Provider, Query)
+- Full head lifecycle via mock transport (init → commit → close → fanout)
+- FSM state transitions and guard rejections
+- All head commands (Recover, Decommit, Contest)
+- Event subscription delivery
+- Head state synchronization
+
+## Known Issues
+
+- **WebSocket ping/pong**: Browser `WebSocket` does not expose ping/pong frames. The SDK's heartbeat feature monitors message activity instead. For idle heads with no regular traffic, consider disabling heartbeat or using longer intervals.
+- **Bundle size**: The full SDK bundle (including Effect and evolution-sdk) is ~2.3MB. Use tree-shaking with your bundler to reduce this.
+
+## Running Browser Tests Locally
+
+```bash
+# Install Playwright browsers
+npx playwright install --with-deps
+
+# Run all browsers
+npx playwright test
+
+# Run a specific browser
+npx playwright test --project=chromium
+npx playwright test --project=firefox
+npx playwright test --project=webkit
+```

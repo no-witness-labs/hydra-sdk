@@ -1,0 +1,14 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Hydra SDK Browser Tests</title>
+  </head>
+  <body>
+    <h1>Hydra SDK Browser Test Harness</h1>
+    <script src="/hydra-sdk.js"></script>
+    <script>
+      // HydraSDK is exposed as a global by the IIFE bundle
+      window.__SDK_READY__ = typeof HydraSDK !== "undefined";
+    </script>
+  </body>
+</html>
