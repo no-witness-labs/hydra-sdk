@@ -24,6 +24,9 @@ node_modules
 coverage
 temp
 *.excalidraw
+test-results/
+playwright-report/
+blob-report/
 
 # Turbo
 .turbo
