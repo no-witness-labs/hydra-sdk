@@ -1,8 +1,30 @@
 {
   "name": "@no-witness-labs/hydra-sdk",
   "version": "0.0.3",
-  "homepage": "https://github.com/no-witness-labs/hydra-sdk",
+  "description": "TypeScript SDK for the Cardano Hydra Head protocol — head lifecycle, WebSocket transport, and L2 provider",
   "type": "module",
+  "license": "MIT",
+  "author": "No Witness Labs",
+  "homepage": "https://github.com/no-witness-labs/hydra-sdk/tree/main/packages/hydra-sdk",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/no-witness-labs/hydra-sdk.git",
+    "directory": "packages/hydra-sdk"
+  },
+  "bugs": {
+    "url": "https://github.com/no-witness-labs/hydra-sdk/issues"
+  },
+  "keywords": [
+    "cardano",
+    "hydra",
+    "hydra-head",
+    "layer2",
+    "l2",
+    "websocket",
+    "typescript",
+    "effect",
+    "sdk"
+  ],
   "publishConfig": {
     "access": "public"
   },

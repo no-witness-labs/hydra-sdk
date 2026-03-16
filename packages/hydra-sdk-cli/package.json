@@ -2,7 +2,18 @@
   "name": "@no-witness-labs/hydra-sdk-cli",
   "version": "0.0.5",
   "type": "module",
-  "description": "",
+  "description": "CLI for managing Cardano Hydra heads — lifecycle commands, UTxO queries, and interactive TUI",
+  "license": "MIT",
+  "author": "No Witness Labs",
+  "homepage": "https://github.com/no-witness-labs/hydra-sdk/tree/main/packages/hydra-sdk-cli",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/no-witness-labs/hydra-sdk.git",
+    "directory": "packages/hydra-sdk-cli"
+  },
+  "bugs": {
+    "url": "https://github.com/no-witness-labs/hydra-sdk/issues"
+  },
   "main": "./dist/cli.js",
   "types": "./dist/cli.d.ts",
   "bin": {
@@ -30,9 +41,17 @@
     "test": "vitest run",
     "clean": "rm -rf dist .turbo .tsbuildinfo"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "cardano",
+    "hydra",
+    "hydra-head",
+    "cli",
+    "layer2",
+    "l2"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "@effect/cli": "^0.73.2",
     "@effect/platform": "^0.94.4",
