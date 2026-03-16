@@ -40,10 +40,11 @@
   },
   "devDependencies": {
     "@babel/cli": "^7.28.0",
+    "@no-witness-labs/hydra-devnet": "workspace:*",
     "@types/node": "^22.19.7",
     "@types/ws": "^8.18.1",
     "babel-plugin-annotate-pure-calls": "^0.4.0",
-    "@no-witness-labs/hydra-devnet": "workspace:*",
+    "dockerode": "^4.0.8",
     "vitest-websocket-mock": "^0.5.0"
   },
   "peerDependencies": {

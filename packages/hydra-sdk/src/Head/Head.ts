@@ -89,6 +89,17 @@ export interface HeadConfig {
     /** Optional random jitter factor in the range `[0, 1]` (inclusive) added to each delay to avoid thundering herd. The SDK does not perform runtime validation of this range and forwards the value to the underlying reconnection implementation; callers are responsible for only providing values within the documented range. */
     readonly jitter?: number;
   };
+  /**
+   * Optional heartbeat configuration for detecting stale connections.
+   * When enabled, the SDK monitors incoming message activity and forces
+   * a reconnection if no messages are received within the timeout window.
+   */
+  readonly heartbeat?: {
+    /** Interval in milliseconds between heartbeat checks. Default: 30000 (30s). */
+    readonly intervalMs?: number;
+    /** Timeout in milliseconds after the last received message before the connection is considered stale. Default: 10000 (10s). */
+    readonly timeoutMs?: number;
+  };
 }
 
 /**
@@ -202,7 +213,14 @@ export type ApiEvent =
   | { readonly _tag: "ServerOutput"; readonly output: ServerOutput }
   | { readonly _tag: "ClientMessage"; readonly message: ClientMessage }
   | { readonly _tag: "Greetings"; readonly greetings: Greetings }
-  | { readonly _tag: "InvalidInput"; readonly invalidInput: InvalidInput };
+  | { readonly _tag: "InvalidInput"; readonly invalidInput: InvalidInput }
+  | {
+      readonly _tag: "ConnectionRestored";
+      readonly connectionRestored: {
+        readonly previousStatus: HeadStatus;
+        readonly restoredStatus: HeadStatus;
+      };
+    };
 
 /**
  * Function type returned by `HydraHead.subscribe` to cancel the subscription.
@@ -846,6 +864,9 @@ const createEffect = (
     // Deferred that resolves once the first Greetings has been processed,
     // so callers know the FSM reflects the node's actual state.
     const greetingsReceived = yield* Deferred.make<void>();
+    // Track whether we've received the initial Greetings to distinguish
+    // first connection from reconnections for ConnectionRestored events.
+    const greetingsCount = yield* Ref.make(0);
 
     const projectorFiber = yield* Effect.forkDaemon(
       Effect.forever(
@@ -861,22 +882,35 @@ const createEffect = (
             }
 
             if (event._tag === "Greetings") {
-              // On reconnect/greeting, force-sync FSM to the server's state.
-              // Use the output tag so applyOutputTag can validate/log if needed.
-              const tag = outputTagFromStatus(event.greetings.headStatus);
-              const updateFsm =
-                tag !== undefined
-                  ? fsm.applyOutputTag(tag)
-                  : Ref.set(fsm.status, event.greetings.headStatus);
-              return updateFsm.pipe(
-                Effect.tap(() => {
-                  if (event.greetings.headId) {
-                    return Ref.set(headIdRef, event.greetings.headId);
-                  }
-                  return Effect.void;
-                }),
-                Effect.tap(() => Deferred.succeed(greetingsReceived, void 0)),
-              );
+              return Effect.gen(function* () {
+                // Capture current FSM status BEFORE syncing to detect changes
+                const previousStatus = yield* Ref.get(fsm.status);
+                const count = yield* Ref.get(greetingsCount);
+                const restoredStatus = event.greetings.headStatus;
+
+                // On reconnect/greeting, force-sync FSM to the server's state.
+                const tag = outputTagFromStatus(restoredStatus);
+                if (tag !== undefined) {
+                  yield* fsm.applyOutputTag(tag);
+                } else {
+                  yield* Ref.set(fsm.status, restoredStatus);
+                }
+
+                if (event.greetings.headId) {
+                  yield* Ref.set(headIdRef, event.greetings.headId);
+                }
+
+                // Emit ConnectionRestored on reconnection when state differs
+                if (count > 0 && previousStatus !== restoredStatus) {
+                  yield* PubSub.publish(hub, {
+                    tag: "ConnectionRestored",
+                    payload: { previousStatus, restoredStatus },
+                  });
+                }
+
+                yield* Ref.update(greetingsCount, (n) => n + 1);
+                yield* Deferred.succeed(greetingsReceived, void 0);
+              });
             }
 
             return Effect.void;

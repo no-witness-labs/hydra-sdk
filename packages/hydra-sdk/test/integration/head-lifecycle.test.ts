@@ -500,4 +500,109 @@ describe("Hydra SDK — Reconnection", () => {
       await head.dispose();
     }
   }, 600_000);
+
+  // -------------------------------------------------------------------------
+  // 5. Network drop: Docker network disconnect/reconnect
+  // -------------------------------------------------------------------------
+  it("recovers from network partition (docker network disconnect)", async () => {
+    const Docker = (await import("dockerode")).default;
+    const docker = new Docker();
+    const networkName = `${cluster.config.clusterName}-network`;
+
+    const head = await Head.create({
+      url: cluster.hydraApiUrl,
+      reconnect: {
+        maxRetries: 15,
+        initialDelayMs: 200,
+        maxDelayMs: 5_000,
+      },
+    });
+
+    try {
+      expect(head.getState()).toBe("Idle");
+
+      // Simulate network partition by disconnecting the hydra-node container
+      const network = docker.getNetwork(networkName);
+      await network.disconnect({ Container: cluster.hydraNode!.id });
+
+      // Wait for the SDK to detect the disconnection
+      await new Promise((r) => setTimeout(r, 5_000));
+
+      // Restore network connectivity
+      await network.connect({ Container: cluster.hydraNode!.id });
+
+      // Wait for reconnection
+      await new Promise((r) => setTimeout(r, 15_000));
+
+      // Verify state is restored to Idle (head was idle before disconnect)
+      expect(head.getState()).toBe("Idle");
+
+      // Prove the connection is live by sending a command
+      await head.init();
+      expect(head.getState()).toBe("Initializing");
+
+      await head.abort();
+      expect(head.getState()).toBe("Aborted");
+    } finally {
+      await head.dispose();
+    }
+  }, 600_000);
+
+  // -------------------------------------------------------------------------
+  // 6. ConnectionRestored event is emitted on state change after reconnect
+  // -------------------------------------------------------------------------
+  it("emits ConnectionRestored when state differs after reconnect", async () => {
+    const head = await Head.create({
+      url: cluster.hydraApiUrl,
+      reconnect: {
+        maxRetries: 10,
+        initialDelayMs: 200,
+        maxDelayMs: 5_000,
+      },
+    });
+
+    const connectionRestoredEvents: Array<{
+      tag: string;
+      payload: unknown;
+    }> = [];
+
+    try {
+      expect(head.getState()).toBe("Idle");
+
+      // Subscribe to events to capture ConnectionRestored
+      const unsub = head.subscribe((event) => {
+        if (event.tag === "ConnectionRestored") {
+          connectionRestoredEvents.push(event);
+        }
+      });
+
+      await head.init();
+      expect(head.getState()).toBe("Initializing");
+
+      // Restart hydra-node — persistence may cause state to differ
+      await Container.stop(cluster.hydraNode!);
+      await Container.start(cluster.hydraNode!);
+
+      // Wait for reconnection
+      await new Promise((r) => setTimeout(r, 15_000));
+
+      // State should be consistent (same as before disconnect)
+      const currentState = head.getState();
+      expect(["Idle", "Initializing"]).toContain(currentState);
+
+      unsub();
+
+      // If state changed during reconnect, ConnectionRestored should have been emitted
+      if (currentState !== "Initializing") {
+        expect(connectionRestoredEvents.length).toBeGreaterThan(0);
+      }
+
+      // Clean up: abort to return to a terminal state
+      if (currentState === "Initializing") {
+        await head.abort();
+      }
+    } finally {
+      await head.dispose();
+    }
+  }, 600_000);
 });

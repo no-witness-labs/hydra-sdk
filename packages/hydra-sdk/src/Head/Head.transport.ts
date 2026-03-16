@@ -53,6 +53,21 @@ interface NormalizedReconnect {
   readonly jitter: number;
 }
 
+interface NormalizedHeartbeat {
+  readonly intervalMs: number;
+  readonly timeoutMs: number;
+}
+
+const normalizeHeartbeat = (
+  config: HeadConfig,
+): NormalizedHeartbeat | null => {
+  if (!config.heartbeat) return null;
+  return {
+    intervalMs: Math.max(1_000, config.heartbeat.intervalMs ?? 30_000),
+    timeoutMs: Math.max(1_000, config.heartbeat.timeoutMs ?? 10_000),
+  };
+};
+
 const clampAtLeastZero = (value: number): number => Math.max(0, value);
 
 const isNodeJs =
@@ -533,10 +548,12 @@ export const makeHeadTransport = (
     }
 
     const reconnect = normalizeReconnect(config);
+    const heartbeat = normalizeHeartbeat(config);
     const reconnectPolicy = makeReconnectPolicy(reconnect);
     const outbound = yield* Queue.unbounded<string>();
     const isDisposed = yield* Ref.make(false);
     const webSocketConstructorLayer = yield* makeWebSocketConstructorLayer;
+    const lastMessageAt = yield* Ref.make(Date.now());
 
     const socketSession = (socketUrl: string): Effect.Effect<void, HeadError> =>
       Effect.scoped(
@@ -552,6 +569,7 @@ export const makeHeadTransport = (
           );
 
           yield* Ref.update(generation, (n) => n + 1);
+          yield* Ref.set(lastMessageAt, Date.now());
 
           const write = yield* socket.writer.pipe(
             Effect.mapError(
@@ -567,7 +585,10 @@ export const makeHeadTransport = (
             socket
               .run((data: Uint8Array) => {
                 const raw = new TextDecoder().decode(data);
-                return parseApiEvent(raw).pipe(Effect.flatMap(events.publish));
+                return Ref.set(lastMessageAt, Date.now()).pipe(
+                  Effect.flatMap(() => parseApiEvent(raw)),
+                  Effect.flatMap(events.publish),
+                );
               })
               .pipe(
                 Effect.mapError(
@@ -595,12 +616,37 @@ export const makeHeadTransport = (
             ),
           );
 
-          const result = yield* Fiber.join(readerFiber).pipe(
+          // Heartbeat: detect stale connections where WebSocket stays open
+          // but no messages arrive within the timeout window.
+          // Races with the reader — if heartbeat detects staleness first,
+          // it terminates the session so the reconnect loop can retry.
+          const heartbeatEffect = heartbeat
+            ? Effect.forever(
+                Effect.sleep(`${heartbeat.intervalMs} millis`).pipe(
+                  Effect.flatMap(() => Ref.get(lastMessageAt)),
+                  Effect.flatMap((last) => {
+                    const elapsed = Date.now() - last;
+                    if (elapsed > heartbeat.intervalMs + heartbeat.timeoutMs) {
+                      return Effect.fail(
+                        new HeadError({
+                          message: `Connection stale: no messages received for ${elapsed}ms`,
+                        }),
+                      );
+                    }
+                    return Effect.void;
+                  }),
+                ),
+              )
+            : null;
+
+          const mainEffect = heartbeatEffect
+            ? Effect.raceFirst(Fiber.join(readerFiber), heartbeatEffect)
+            : Fiber.join(readerFiber);
+
+          yield* mainEffect.pipe(
             Effect.ensuring(Fiber.interrupt(writerFiber)),
             Effect.asVoid,
           );
-
-          return result;
         }),
       ).pipe(Effect.provide(webSocketConstructorLayer));
 
