@@ -184,7 +184,39 @@ const head = await Head.create({
 });
 ```
 
-On reconnect, the SDK re-syncs the FSM state from the server's `Greetings` message.
+On reconnect, the SDK re-syncs the FSM state from the server's `Greetings` message. Each successful connection resets the retry budget, so transient failures don't accumulate across sessions.
+
+### Heartbeat (Stale Connection Detection)
+
+Enable heartbeat monitoring to detect connections that stay open but stop receiving messages (e.g. network partition without TCP reset):
+
+```ts
+const head = await Head.create({
+  url: "ws://localhost:4001",
+  reconnect: { maxRetries: 10 },
+  heartbeat: {
+    intervalMs: 30_000,   // check every 30s (default)
+    timeoutMs: 10_000,    // stale after 10s of silence (default)
+  },
+});
+```
+
+When no messages arrive within `intervalMs + timeoutMs`, the SDK closes the connection and triggers the reconnection loop.
+
+### Connection State Events
+
+When the head state changes during a disconnect (e.g. another participant closed the head while you were offline), the SDK emits a `ConnectionRestored` event:
+
+```ts
+head.subscribe((event) => {
+  if (event.tag === "ConnectionRestored") {
+    const { previousStatus, restoredStatus } = event.payload;
+    console.log(`State changed during disconnect: ${previousStatus} → ${restoredStatus}`);
+  }
+});
+```
+
+This event is only emitted when the restored state differs from what the SDK last observed before the disconnect.
 
 ## Resource Management
 

@@ -89,6 +89,17 @@ export interface HeadConfig {
     /** Optional random jitter factor in the range `[0, 1]` (inclusive) added to each delay to avoid thundering herd. The SDK does not perform runtime validation of this range and forwards the value to the underlying reconnection implementation; callers are responsible for only providing values within the documented range. */
     readonly jitter?: number;
   };
+  /**
+   * Optional heartbeat configuration for detecting stale connections.
+   * When enabled, the SDK monitors incoming message activity and forces
+   * a reconnection if no messages are received within the timeout window.
+   */
+  readonly heartbeat?: {
+    /** Interval in milliseconds between heartbeat checks. Default: 30000 (30s). */
+    readonly intervalMs?: number;
+    /** Timeout in milliseconds after the last received message before the connection is considered stale. Default: 10000 (10s). */
+    readonly timeoutMs?: number;
+  };
 }
 
 /**
@@ -202,7 +213,14 @@ export type ApiEvent =
   | { readonly _tag: "ServerOutput"; readonly output: ServerOutput }
   | { readonly _tag: "ClientMessage"; readonly message: ClientMessage }
   | { readonly _tag: "Greetings"; readonly greetings: Greetings }
-  | { readonly _tag: "InvalidInput"; readonly invalidInput: InvalidInput };
+  | { readonly _tag: "InvalidInput"; readonly invalidInput: InvalidInput }
+  | {
+      readonly _tag: "ConnectionRestored";
+      readonly connectionRestored: {
+        readonly previousStatus: HeadStatus;
+        readonly restoredStatus: HeadStatus;
+      };
+    };
 
 /**
  * Function type returned by `HydraHead.subscribe` to cancel the subscription.
@@ -877,6 +895,13 @@ const createEffect = (
                 }),
                 Effect.tap(() => Deferred.succeed(greetingsReceived, void 0)),
               );
+            }
+
+            if (event._tag === "ConnectionRestored") {
+              return PubSub.publish(hub, {
+                tag: "ConnectionRestored",
+                payload: event.connectionRestored,
+              }).pipe(Effect.asVoid);
             }
 
             return Effect.void;
