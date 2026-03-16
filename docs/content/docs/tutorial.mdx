@@ -64,7 +64,7 @@ import { Head, Provider } from "@no-witness-labs/hydra-sdk";
 
 async function main() {
   // Start a local Cardano + Hydra cluster
-  await Cluster.withCluster({}, async (cluster) => {
+  await Cluster.withCluster(async (cluster) => {
     console.log(`Hydra node running at ${cluster.hydraApiUrl}`);
 
     // Your app code goes here (Steps 3-7)
@@ -191,7 +191,7 @@ import { Cluster } from "@no-witness-labs/hydra-devnet";
 import { Head, Provider } from "@no-witness-labs/hydra-sdk";
 
 async function main() {
-  await Cluster.withCluster({}, async (cluster) => {
+  await Cluster.withCluster(async (cluster) => {
     console.log(`Hydra node: ${cluster.hydraApiUrl}`);
 
     // Connect

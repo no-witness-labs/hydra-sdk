@@ -97,7 +97,7 @@ Spin up a local Cardano + Hydra cluster with Docker:
 import { Cluster } from "@no-witness-labs/hydra-devnet";
 import { Head } from "@no-witness-labs/hydra-sdk";
 
-await Cluster.withCluster({}, async (cluster) => {
+await Cluster.withCluster(async (cluster) => {
   console.log(`Hydra API: ${cluster.hydraApiUrl}`);
 
   const head = await Head.create({ url: cluster.hydraApiUrl });

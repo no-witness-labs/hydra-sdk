@@ -13,10 +13,10 @@ The `@no-witness-labs/hydra-sdk-cli` package provides a command-line interface f
 pnpm add -g @no-witness-labs/hydra-sdk-cli
 ```
 
-Or run directly with `npx`:
+Or run directly with `pnpm dlx`:
 
 ```bash
-npx @no-witness-labs/hydra-sdk-cli status
+pnpm dlx @no-witness-labs/hydra-sdk-cli hydra status
 ```
 
 ## Configuration
@@ -34,7 +34,6 @@ The CLI reads configuration from three sources (in priority order):
 hydra config set --key url --value ws://localhost:4001
 hydra config set --key blockfrostKey --value preprodXXXXXX
 hydra config set --key mnemonic --value "word1 word2 ... word24"
-hydra config set --key network --value preprod
 
 # View values
 hydra config get --key url

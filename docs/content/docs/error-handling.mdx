@@ -27,16 +27,28 @@ import { Head } from "@no-witness-labs/hydra-sdk";
 //   }
 ```
 
-### ProviderError
+### HydraHttpError
 
-Wraps HTTP and provider-level failures:
+Wraps HTTP request failures to the hydra-node REST API:
 
 ```ts
 import { Provider } from "@no-witness-labs/hydra-sdk";
 
+// HydraHttpError has:
+// - message: string          — what operation failed
+// - cause?: unknown          — the underlying network error
+```
+
+### ProviderError
+
+When using `HydraProvider` with evolution-sdk, errors are wrapped in evolution-sdk's `ProviderError`:
+
+```ts
+import { ProviderError } from "@evolution-sdk/evolution/sdk/provider/Provider";
+
 // ProviderError has:
 // - message: string          — what operation failed
-// - cause?: unknown          — the underlying HydraHttpError or network error
+// - cause?: unknown          — the underlying HydraHttpError or HeadError
 ```
 
 ## Handling Errors
@@ -171,17 +183,24 @@ head.subscribe((event) => {
 });
 ```
 
-### Commit-Specific Errors
+### Deposit Errors
 
-Incremental commits can fail with deposit expiration:
+Incremental commit deposits (submitted to L1 while the head is Open) can expire before the head observes them:
 
 ```ts
+// Listen for deposit expiration events
+head.subscribe((event) => {
+  if (event.tag === "CommitFinalized") {
+    console.log("Deposit committed successfully");
+  }
+});
+
+// If a deposit expires, recover the funds
 try {
-  await head.commit(commitBody);
+  await head.recover(depositTxId);
 } catch (error) {
-  if (error.details?.tag === "DepositExpired") {
-    // The deposit transaction expired before being observed
-    // Use head.recover(error.details.txId) to reclaim funds
+  if (error.details?.tag === "CommandFailed") {
+    console.error("Recovery failed:", error.message);
   }
 }
 ```
@@ -194,9 +213,9 @@ import { Provider } from "@no-witness-labs/hydra-sdk";
 const provider = new Provider.HydraProvider({ head, httpUrl });
 
 try {
-  const utxos = await provider.getUtxos(address);
+  const utxos = await provider.getSnapshotUtxos();
 } catch (error) {
-  // ProviderError wraps the underlying failure
+  // ProviderError (from evolution-sdk) wraps the underlying failure
   console.error(error.message); // "Failed to fetch UTxOs"
   console.error(error.cause);   // Original HydraHttpError
 }
