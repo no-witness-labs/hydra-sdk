@@ -17,6 +17,9 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
+    outputs:
+      published: ${{ steps.changesets.outputs.published }}
+      publishedPackages: ${{ steps.changesets.outputs.publishedPackages }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -57,3 +60,60 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
+
+  cli-binaries:
+    name: Build CLI binaries (${{ matrix.target }})
+    needs: release
+    if: >-
+      needs.release.outputs.published == 'true' &&
+      contains(needs.release.outputs.publishedPackages, '@no-witness-labs/hydra-sdk-cli')
+    strategy:
+      matrix:
+        include:
+          - target: bun-linux-x64
+            os: ubuntu-latest
+            artifact: hydra-linux-x64
+          - target: bun-linux-arm64
+            os: ubuntu-latest
+            artifact: hydra-linux-arm64
+          - target: bun-darwin-arm64
+            os: macos-latest
+            artifact: hydra-darwin-arm64
+          - target: bun-darwin-x64
+            os: macos-latest
+            artifact: hydra-darwin-x64
+          - target: bun-windows-x64
+            os: ubuntu-latest
+            artifact: hydra-windows-x64.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Compile CLI binary
+        working-directory: packages/hydra-sdk-cli
+        run: bun run build.ts --target ${{ matrix.target }} --outfile ../../${{ matrix.artifact }}
+
+      - name: Get CLI version
+        id: version
+        run: echo "version=$(node -p "require('./packages/hydra-sdk-cli/package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Upload binary to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "@no-witness-labs/hydra-sdk-cli@${{ steps.version.outputs.version }}" "${{ matrix.artifact }}" --clobber
