@@ -1,5 +1,11 @@
 # @no-witness-labs/hydra-sdk-cli
 
+## 0.1.1
+
+### Patch Changes
+
+- 86ba939: Fix CLI binary compilation in CI by resolving pnpm workspace packages
+
 ## 0.1.0
 
 ### Minor Changes
