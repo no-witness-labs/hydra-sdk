@@ -1,6 +1,6 @@
 {
   "name": "@no-witness-labs/hydra-sdk",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "TypeScript SDK for the Cardano Hydra Head protocol — head lifecycle, WebSocket transport, and L2 provider",
   "type": "module",
   "license": "MIT",

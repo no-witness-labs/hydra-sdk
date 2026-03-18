@@ -1,6 +1,6 @@
 {
   "name": "@no-witness-labs/hydra-devnet",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Local Docker-based Cardano + Hydra development environment for testing and integration",
   "type": "module",
   "license": "MIT",

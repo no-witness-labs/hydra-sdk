@@ -1,7 +1,7 @@
 {
   "name": "@no-witness-labs/example-node-scripts",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.0.1",
   "type": "module",
   "scripts": {
     "transfer": "tsx --env-file=.env src/transfer.ts",

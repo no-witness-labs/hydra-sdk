@@ -1,6 +1,6 @@
 {
   "name": "@no-witness-labs/hydra-sdk-cli",
-  "version": "0.0.5",
+  "version": "0.1.0",
   "type": "module",
   "description": "CLI for managing Cardano Hydra heads — lifecycle commands, UTxO queries, and interactive TUI",
   "license": "MIT",
