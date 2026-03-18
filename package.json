@@ -1,7 +1,23 @@
 {
   "name": "@no-witness-labs/hydra-sdk-monorepo",
   "version": "0.1.0",
+  "private": true,
+  "description": "Monorepo for the Hydra SDK — a TypeScript SDK for the Cardano Hydra Head protocol",
   "type": "module",
+  "license": "MIT",
+  "author": "No Witness Labs",
+  "homepage": "https://github.com/no-witness-labs/hydra-sdk",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/no-witness-labs/hydra-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/no-witness-labs/hydra-sdk/issues"
+  },
+  "funding": {
+    "type": "individual",
+    "url": "https://projectcatalyst.io"
+  },
   "packageManager": "pnpm@9.0.0",
   "engines": {
     "node": ">=18.0.0",
@@ -22,6 +38,7 @@
     "changeset": "changeset",
     "changeset:version": "changeset version",
     "changeset:publish": "pnpm build && changeset publish",
+    "changeset:dry-run": "pnpm build && changeset publish --dry-run",
     "docgen": "turbo docgen"
   },
   "devDependencies": {

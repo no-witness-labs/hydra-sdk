@@ -1,0 +1,82 @@
+name: Release Candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "RC version suffix (e.g., rc.1, rc.2)"
+        required: true
+        default: "rc.1"
+      package:
+        description: "Package to release"
+        required: true
+        type: choice
+        options:
+          - "@no-witness-labs/hydra-sdk"
+          - "@no-witness-labs/hydra-sdk-cli"
+          - "@no-witness-labs/hydra-devnet"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  rc:
+    name: Publish RC
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "pnpm"
+          registry-url: "https://registry.npmjs.org/"
+
+      - name: Update npm to latest (required for trusted publishing)
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: pnpm turbo run build
+
+      - name: Run tests
+        run: pnpm turbo run test
+
+      - name: Determine package directory
+        id: pkg
+        run: |
+          case "${{ inputs.package }}" in
+            "@no-witness-labs/hydra-sdk") echo "dir=packages/hydra-sdk" >> $GITHUB_OUTPUT ;;
+            "@no-witness-labs/hydra-sdk-cli") echo "dir=packages/hydra-sdk-cli" >> $GITHUB_OUTPUT ;;
+            "@no-witness-labs/hydra-devnet") echo "dir=packages/hydra-devnet" >> $GITHUB_OUTPUT ;;
+          esac
+
+      - name: Get current version
+        id: version
+        run: |
+          CURRENT=$(node -p "require('./${{ steps.pkg.outputs.dir }}/package.json').version")
+          RC_VERSION="${CURRENT}-${{ inputs.version }}"
+          echo "rc_version=$RC_VERSION" >> $GITHUB_OUTPUT
+          echo "Publishing ${{ inputs.package }}@$RC_VERSION"
+
+      - name: Set RC version
+        working-directory: ${{ steps.pkg.outputs.dir }}
+        run: npm version ${{ steps.version.outputs.rc_version }} --no-git-tag-version
+
+      - name: Publish RC to npm
+        working-directory: ${{ steps.pkg.outputs.dir }}
+        run: pnpm publish --tag next --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true
+
+      - name: Summary
+        run: echo "Published ${{ inputs.package }}@${{ steps.version.outputs.rc_version }} with tag \`next\`" >> $GITHUB_STEP_SUMMARY

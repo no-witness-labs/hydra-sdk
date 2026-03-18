@@ -39,6 +39,7 @@ blob-report/
 out/
 build
 dist
+bin
 .direnv
 
 
