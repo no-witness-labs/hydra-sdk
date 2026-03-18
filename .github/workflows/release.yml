@@ -68,6 +68,7 @@ jobs:
       needs.release.outputs.published == 'true' &&
       contains(needs.release.outputs.publishedPackages, '@no-witness-labs/hydra-sdk-cli')
     strategy:
+      fail-fast: false
       matrix:
         include:
           - target: bun-linux-x64
