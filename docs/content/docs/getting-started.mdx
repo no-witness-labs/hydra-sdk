@@ -13,6 +13,8 @@ description: Install the SDK and connect to a Hydra node
 
 ## Installation
 
+### SDK
+
 ```bash
 pnpm add @no-witness-labs/hydra-sdk
 ```
@@ -22,6 +24,16 @@ For local development with a devnet cluster:
 ```bash
 pnpm add @no-witness-labs/hydra-devnet
 ```
+
+### CLI
+
+Install the standalone binary (no Node.js required):
+
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf https://raw.githubusercontent.com/no-witness-labs/hydra-sdk/main/packages/hydra-sdk-cli/install.sh | sh
+```
+
+See [CLI Usage](/docs/cli) for full documentation.
 
 ## Quick Example
 

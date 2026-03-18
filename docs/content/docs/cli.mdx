@@ -9,11 +9,31 @@ The `@no-witness-labs/hydra-sdk-cli` package provides a command-line interface f
 
 ## Installation
 
+### Standalone Binary (recommended)
+
+Install the precompiled binary with a single command:
+
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf https://raw.githubusercontent.com/no-witness-labs/hydra-sdk/main/packages/hydra-sdk-cli/install.sh | sh
+```
+
+This auto-detects your platform and installs to `~/.hydra/bin/`. Supported targets:
+
+| Platform | Architecture |
+|----------|-------------|
+| macOS | Apple Silicon (arm64), Intel (x64) |
+| Linux | x64, arm64 |
+| Windows | x64 |
+
+You can also download binaries directly from [GitHub Releases](https://github.com/no-witness-labs/hydra-sdk/releases).
+
+### Via npm
+
 ```bash
 pnpm add -g @no-witness-labs/hydra-sdk-cli
 ```
 
-Or run directly with `pnpm dlx`:
+Or run directly without installing:
 
 ```bash
 pnpm dlx @no-witness-labs/hydra-sdk-cli hydra status
