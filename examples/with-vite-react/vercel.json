@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "buildCommand": "cd ../.. && pnpm install && pnpm --filter @no-witness-labs/hydra-sdk build && cd examples/with-vite-react && pnpm build",
+  "outputDirectory": "dist",
+  "installCommand": "echo 'skip — handled in buildCommand'"
+}

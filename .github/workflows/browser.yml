@@ -44,4 +44,57 @@ jobs:
         run: npx playwright install --with-deps ${{ matrix.browser }}
 
       - name: Run browser tests
-        run: npx playwright test --project=${{ matrix.browser }} --reporter=list
+        run: npx playwright test --project=${{ matrix.browser }} --reporter=list --reporter=html
+
+      - name: Upload test report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-${{ matrix.browser }}-${{ matrix.os }}
+          path: playwright-report/
+          retention-days: 30
+
+  # Publish a combined summary as a GitHub Pages artifact
+  report:
+    name: Test Report Summary
+    needs: browser
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: playwright-report-*
+          path: all-reports/
+
+      - name: Generate compatibility matrix
+        run: |
+          echo "# Cross-Browser Compatibility Report" > summary.md
+          echo "" >> summary.md
+          echo "| Browser | OS | Status |" >> summary.md
+          echo "|---------|-----|--------|" >> summary.md
+          for dir in all-reports/playwright-report-*/; do
+            name=$(basename "$dir" | sed 's/playwright-report-//')
+            browser=$(echo "$name" | cut -d'-' -f1)
+            os=$(echo "$name" | cut -d'-' -f2-)
+            if [ -f "$dir/index.html" ]; then
+              echo "| $browser | $os | :white_check_mark: Pass |" >> summary.md
+            else
+              echo "| $browser | $os | :x: Fail |" >> summary.md
+            fi
+          done
+          echo "" >> summary.md
+          echo "_Generated: $(date -u '+%Y-%m-%d %H:%M UTC')_" >> summary.md
+          cat summary.md
+
+      - name: Add job summary
+        run: cat summary.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload combined report
+        uses: actions/upload-artifact@v4
+        with:
+          name: cross-browser-compatibility-report
+          path: |
+            summary.md
+            all-reports/
+          retention-days: 90
