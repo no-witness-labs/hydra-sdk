@@ -51,15 +51,15 @@
     "clean": "rm -rf dist .turbo .tsbuildinfo"
   },
   "devDependencies": {
-    "@babel/cli": "^7.28.0",
-    "@types/dockerode": "^3.3.38",
-    "@types/node": "^22.19.7",
+    "@babel/cli": "^7.28.6",
+    "@types/dockerode": "^4.0.1",
+    "@types/node": "^25.5.0",
     "@types/ws": "^8.18.1",
-    "babel-plugin-annotate-pure-calls": "^0.4.0"
+    "babel-plugin-annotate-pure-calls": "^0.5.0"
   },
   "dependencies": {
-    "@effect/platform-node": "^0.104.1",
-    "dockerode": "^4.0.8",
-    "ws": "^8.19.0"
+    "@effect/platform-node": "^0.106.0",
+    "dockerode": "^4.0.10",
+    "ws": "^8.20.0"
   }
 }

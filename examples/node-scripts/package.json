@@ -10,13 +10,13 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@evolution-sdk/evolution": "^0.3.22",
+    "@evolution-sdk/evolution": "^0.3.31",
     "@no-witness-labs/hydra-sdk": "workspace:*",
-    "effect": "^3.19.15"
+    "effect": "^3.21.0"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
-    "tsx": "^4.19.0",
-    "typescript": "~5.9.0-beta"
+    "@types/node": "^25.5.0",
+    "tsx": "^4.21.0",
+    "typescript": "~6.0.2"
   }
 }

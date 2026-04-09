@@ -54,18 +54,18 @@
     "access": "public"
   },
   "dependencies": {
-    "@effect/cli": "^0.73.2",
-    "@effect/platform": "^0.94.4",
-    "@effect/platform-node": "^0.104.1",
-    "@evolution-sdk/evolution": ">=0.3.25",
+    "@effect/cli": "^0.75.0",
+    "@effect/platform": "^0.96.0",
+    "@effect/platform-node": "^0.106.0",
+    "@evolution-sdk/evolution": "^0.3.31",
     "@no-witness-labs/hydra-sdk": "workspace:*",
     "ink": "^6.8.0",
     "react": "^19.2.4",
-    "yaml": "^2.8.2"
+    "yaml": "^2.8.3"
   },
   "devDependencies": {
     "@babel/cli": "^7.28.6",
-    "@types/node": "^25.2.2",
+    "@types/node": "^25.5.0",
     "@types/react": "^19.2.14",
     "babel-plugin-annotate-pure-calls": "^0.5.0",
     "vitest-websocket-mock": "^0.5.0"
