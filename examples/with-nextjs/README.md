@@ -4,7 +4,7 @@ A full-stack example with server-side Hydra head management and a client-side UI
 
 ## Prerequisites
 
-- A running **hydra-node** (v1.2.0) reachable via WebSocket and HTTP
+- A running **hydra-node** (v2.0.0) reachable via WebSocket and HTTP
 - A **preprod** wallet funded with at least **3 UTxOs**
 - [Blockfrost](https://blockfrost.io/) preprod API key
 - Node.js >= 18
@@ -75,10 +75,9 @@ Execute a head action. Body: `{ "action": "<action>" }`
 | `connect` | Connect to hydra-node via WebSocket |
 | `disconnect` | Disconnect and dispose head |
 | `init` | Initialize a new head |
-| `commit` | Blueprint commit (server-side wallet) |
+| `commit` | Deposit-draft commit (server-side wallet) |
 | `close` | Close the head |
 | `fanout` | Fanout after contestation |
-| `abort` | Abort initialization |
 
 ### `GET /api/utxos`
 Returns L2 snapshot UTxOs (when head is Open).

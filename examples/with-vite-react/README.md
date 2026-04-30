@@ -4,7 +4,7 @@ A browser-based demo that walks through the full Hydra Head lifecycle using a CI
 
 ## Prerequisites
 
-- A running **hydra-node** (v1.2.0) reachable via WebSocket
+- A running **hydra-node** (v2.0.0) reachable via WebSocket
 - A CIP-30 browser wallet connected to **preprod**
 - Wallet funded with at least **two UTxOs** (one to commit, one for fee coverage)
 - [Blockfrost](https://blockfrost.io/) preprod API key
@@ -57,14 +57,13 @@ src/
 | Action | State Required | Description |
 |--------|---------------|-------------|
 | **Connect** | — | Opens WebSocket to hydra-node, subscribes to events |
-| **Init** | `Idle` | Initializes a new head on L1 |
+| **Init** | `Idle` | Initializes a new head on L1; head opens directly (hydra-node v2) |
 | **Fetch UTxOs** | Any | Queries wallet for available L1 UTxOs |
-| **Commit** | `Initializing` | Locks selected UTxOs into the head via L1 commit tx |
+| **Commit** | `Open` | Drafts an incremental deposit; signs and submits to L1 |
 | **Close** | `Open` | Closes the head, starts contestation period |
 | **SafeClose** | `Open` | Graceful close — waits for pending transactions |
 | **Contest** | `Closed` | Contest with a newer snapshot (if available) |
 | **Fanout** | `FanoutPossible` | Distributes final UTxOs back to L1 |
-| **Abort** | `Idle` / `Initializing` | Cancels initialization, refunds committed UTxOs |
 
 ### L2 Operations (inside an Open head)
 
@@ -89,7 +88,7 @@ Enter the Hydra node WebSocket URL and click **Connect**. The app opens a WebSoc
 
 ### 2. Init
 
-Click **Init** (available when state is `Idle`). This posts an `Init` command to the Hydra node, which submits an L1 transaction to initialize a new head. The state transitions to `Initializing` once the init tx is observed on-chain.
+Click **Init** (available when state is `Idle`). This posts an `Init` command to the Hydra node, which submits an L1 transaction to initialize a new head. As of hydra-node v2, the head transitions directly to `Open` — there is no separate `Initializing` phase.
 
 ### 3. Fetch UTxOs & Commit
 
@@ -97,14 +96,14 @@ Click **Fetch UTxOs** to query the wallet for available UTxOs. Select the ones y
 
 > **Important:** Keep at least one UTxO unselected — it will be automatically used for fee coverage on the commit transaction.
 
-Click **Commit** to lock the selected UTxOs into the head. The commit flow:
+Click **Commit** to deposit the selected UTxOs into the open head. The deposit flow:
 
 1. Builds a blueprint transaction with the selected + fee UTxOs
-2. POSTs to the hydra-node `/commit` endpoint
+2. POSTs to the hydra-node `/commit` endpoint (deposit-draft)
 3. Signs the returned draft L1 transaction via the wallet
-4. Submits the signed commit tx on-chain
+4. Submits the signed deposit tx on-chain
 
-Once all participants commit, the head transitions to `Open`.
+Track the deposit lifecycle via `CommitRecorded` → `DepositActivated` → `CommitApproved` → `CommitFinalized` events.
 
 ### 4. L2 Transactions
 
@@ -121,10 +120,11 @@ Click **Close** (or **SafeClose**) to close the head. After the contestation per
 ## State Machine
 
 ```
-Idle → Init → Initializing → Commit → Open → Close → Closed → FanoutPossible → Fanout → Final
-                    ↓                    ↑
-                  Abort              Decommit
-                                     Recover
+Idle → Init → Open → Close → Closed → FanoutPossible → Fanout → Final
+                ↑↓
+              Commit (deposit)
+              Decommit
+              Recover
 ```
 
 ## Vite Proxy
