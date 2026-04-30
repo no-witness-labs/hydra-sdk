@@ -39,18 +39,16 @@ const wsToHttp = (wsUrl: string): string =>
  *
  * Transitions are driven exclusively by server-side events emitted by
  * hydra-node over the WebSocket connection. The normal happy-path is:
- * `Idle → Initializing → Open → Closed → FanoutPossible → Final`.
+ * `Idle → Open → Closed → FanoutPossible → Final`.
  *
  * @category Models
  */
 export type HeadStatus =
   | "Idle"
-  | "Initializing"
   | "Open"
   | "Closed"
   | "FanoutPossible"
-  | "Final"
-  | "Aborted";
+  | "Final";
 
 /**
  * Connection and reconnection configuration for a Hydra Head.
@@ -116,19 +114,23 @@ export interface InitParams {
 /**
  * Request body for the Hydra Head REST `/commit` endpoint.
  *
+ * In hydra-node v2, this drafts an incremental deposit transaction. The head
+ * is already Open when this is called; the returned draft tx must be signed
+ * and submitted to L1 to deposit funds into the head.
+ *
  * Pass an empty object `{}` for an empty commit, or provide a blueprint
- * transaction together with the UTxO set to commit into the head.
+ * transaction together with the UTxO set to deposit into the head.
  *
  * @category Models
  */
 export interface CommitRequest {
-  /** Blueprint transaction that references the UTxOs to commit. */
+  /** Blueprint transaction that references the UTxOs to deposit. */
   readonly blueprintTx?: {
     readonly type: string;
     readonly description: string;
     readonly cborHex: string;
   };
-  /** UTxO map (keyed by `"txHash#index"`) to commit into the head. */
+  /** UTxO map (keyed by `"txHash#index"`) to deposit into the head. */
   readonly utxo?: UTxO;
 }
 
@@ -157,7 +159,6 @@ export type ClientInputTag =
   | "Close"
   | "SafeClose"
   | "Fanout"
-  | "Abort"
   | "Recover"
   | "Decommit"
   | "Contest";
@@ -267,8 +268,8 @@ export class HeadError extends Data.TaggedError("HeadError")<{
  * async function example() {
  *   const head = await Head.create({ url: "ws://localhost:4001" });
  *
- *   await head.init();
- *   await head.commit({}); // or { blueprintTx: { ... }, utxo: { ... } }
+ *   await head.init(); // head opens directly (hydra-node v2)
+ *   await head.commit({}); // optional: deposit additional UTxOs
  *   await head.close();
  *   await head.fanout();
  *   console.log(head.getState()); // "Final"
@@ -286,8 +287,8 @@ export class HeadError extends Data.TaggedError("HeadError")<{
  * const program = Effect.gen(function* () {
  *   const head = yield* Head.effect.create({ url: "ws://localhost:4001" });
  *
- *   yield* head.effect.init();
- *   yield* head.effect.commit({}); // or { blueprintTx: { ... }, utxo: { ... } }
+ *   yield* head.effect.init(); // head opens directly (hydra-node v2)
+ *   yield* head.effect.commit({}); // optional: deposit additional UTxOs
  *   yield* head.effect.close();
  *   yield* head.effect.fanout();
  *   console.log(head.getState()); // "Final"
@@ -306,9 +307,9 @@ export interface HydraHead {
   /**
    * Unique identifier for the Hydra Head.
    *
-   * Set to a placeholder value after `init()` is acknowledged and reset to
-   * `null` after `dispose()`. Full extraction from the `HeadIsInitializing`
-   * payload is pending protocol-schema integration.
+   * Populated from the `HeadIsOpen` payload once `init()` is acknowledged
+   * (hydra-node v2 opens the head directly with no Initializing phase).
+   * Reset to `null` after `dispose()`.
    */
   readonly headId: string | null;
 
@@ -344,13 +345,14 @@ export interface HydraHead {
    * Initialize a new Hydra Head on the L1 chain.
    *
    * Sends the `Init` command over the WebSocket and resolves once the
-   * hydra-node confirms `HeadIsInitializing`.
+   * hydra-node confirms `HeadIsOpen`. As of hydra-node v2 the head transitions
+   * `Idle → Open` directly; there is no separate Initializing phase.
    *
    * @example Promise API
    * ```ts
    * const head = await Head.create({ url: "ws://localhost:4001" });
    * await head.init();
-   * console.log(head.getState()); // "Initializing"
+   * console.log(head.getState()); // "Open"
    * ```
    *
    * @example Effect API
@@ -364,22 +366,26 @@ export interface HydraHead {
   init(params?: InitParams): Promise<void>;
 
   /**
-   * Commits UTxOs into the Hydra Head via the REST `/commit` endpoint.
+   * Drafts an incremental-deposit transaction via the REST `/commit` endpoint.
    *
-   * POSTs the commit body (blueprint transaction + UTxO map) to the
-   * hydra-node HTTP API. The returned draft transaction must be signed
-   * and submitted to L1 by the caller. Resolves once `HeadIsOpen` is
-   * received over WebSocket, indicating all participants have committed.
+   * POSTs the commit body (blueprint transaction + UTxO map) to the hydra-node
+   * HTTP API and resolves with the returned draft transaction. The caller
+   * signs and submits the draft to L1 to deposit funds into the open head.
+   *
+   * Since hydra-node v2, heads open immediately on `init()` — funds are added
+   * via this deposit flow, not during initialization. Track the deposit
+   * lifecycle by subscribing to `CommitRecorded`, `DepositActivated`,
+   * `CommitApproved`, and `CommitFinalized` events.
    *
    * @param body - Commit request body containing `blueprintTx` and `utxo`,
-   *   or an empty object `{}` for an empty commit.
+   *   or an empty object `{}` for an empty deposit.
    *
    * @example Promise API
    * ```ts
    * import { Head } from "@no-witness-labs/hydra-sdk";
    *
    * const head = await Head.create({ url: "ws://localhost:9944" });
-   * await head.init();
+   * await head.init(); // head is Open
    * const draftTx = await head.commit({ blueprintTx: { ... }, utxo: { ... } });
    * // sign and submit draftTx to L1
    * ```
@@ -492,35 +498,6 @@ export interface HydraHead {
    * ```
    */
   fanout(): Promise<void>;
-
-  /**
-   * Aborts the head initialization before it is finalized on-chain. Sends the
-   * `Abort` command and resolves once `HeadIsAborted` is received, returning the
-   * head to the `Aborted` state.
-   *
-   * @example Promise API
-   * ```ts
-   * import { Head } from "@no-witness-labs/hydra-sdk";
-   *
-   * const head = await Head.create({ url: "ws://localhost:9944" });
-   * await head.init();
-   * await head.abort(); // cancel before any funds are committed
-   * console.log(head.getState()); // "Aborted"
-   * ```
-   *
-   * @example Effect API
-   * ```ts
-   * import { Effect } from "effect";
-   * import { Head } from "@no-witness-labs/hydra-sdk";
-   *
-   * const program = Effect.gen(function* () {
-   *   const head = yield* Head.effect.create({ url: "ws://localhost:9944" });
-   *   yield* head.effect.init();
-   *   yield* head.effect.abort();
-   * });
-   * ```
-   */
-  abort(): Promise<void>;
 
   /**
    * Submits a new transaction to the open Hydra Head. Sends `NewTx` via
@@ -707,7 +684,6 @@ export interface HydraHead {
      * ```
      */
     awaitReadyToFanout(): Effect.Effect<void, HeadError>;
-    abort(): Effect.Effect<void, HeadError>;
     newTx(transaction: {
       type: string;
       description: string;
@@ -789,29 +765,6 @@ export const matchServerTag = (
   }
 
   return isCommandFailure(event, command);
-};
-
-/** @internal Exported for testing only. */
-export const matchCommit = (event: ApiEvent): MatchResult<void> => {
-  if (event._tag === "ServerOutput" && event.output.tag === "HeadIsOpen") {
-    return matchSuccess(undefined);
-  }
-  if (event._tag === "ServerOutput" && event.output.tag === "DepositExpired") {
-    const payload = event.output.payload as
-      | { depositTxId?: string }
-      | undefined;
-    return matchFailure(
-      new HeadError({
-        message: `Deposit expired for commit transaction ${payload?.depositTxId ?? "unknown"}`,
-        details: {
-          tag: "DepositExpired",
-          command: "Commit",
-          txId: payload?.depositTxId,
-        },
-      }),
-    );
-  }
-  return isCommandFailure(event, "Commit");
 };
 
 // ---------------------------------------------------------------------------
@@ -976,7 +929,7 @@ const createEffect = (
           (event) => {
             if (
               event._tag === "ServerOutput" &&
-              event.output.tag === "HeadIsInitializing"
+              event.output.tag === "HeadIsOpen"
             ) {
               return matchSuccess(event.output);
             }
@@ -985,7 +938,7 @@ const createEffect = (
           30_000,
         );
 
-        // Extract headId from the HeadIsInitializing payload
+        // Extract headId from the HeadIsOpen payload (v2 opens directly).
         const payload = event.payload as { headId?: string } | undefined;
         yield* Ref.set(headIdRef, payload?.headId ?? null);
       });
@@ -999,44 +952,21 @@ const createEffect = (
         yield* assertNotDisposed;
         yield* fsm.assertCommandAllowed("Commit");
 
-        if (isMock) {
-          // In mock mode, subscribe first then simulate the REST commit
-          // by publishing HeadIsOpen directly.
-          yield* router.sendAndAwait(
-            transport.events.publish({
-              _tag: "ServerOutput",
-              output: { tag: "HeadIsOpen", payload: body },
-            }),
-            matchCommit,
-            30_000,
-          );
-          return undefined;
-        }
+        // In v2, /commit drafts a deposit transaction synchronously. The
+        // caller signs and submits it to L1; the deposit lifecycle is
+        // observed via CommitRecorded → DepositActivated → CommitApproved
+        // → CommitFinalized events on the WebSocket.
+        if (isMock) return undefined;
 
-        // Use sendAndAwait to subscribe *before* POSTing, preventing the
-        // race where a fast HeadIsOpen arrives before the listener is ready.
-        let draftTx: unknown;
-        yield* router.sendAndAwait(
-          postCommit(httpUrl, body).pipe(
-            Effect.tap((result) =>
-              Effect.sync(() => {
-                draftTx = result;
+        return yield* postCommit(httpUrl, body).pipe(
+          Effect.mapError(
+            (err) =>
+              new HeadError({
+                message: `Commit REST request failed: ${err.message}`,
+                cause: err.cause,
               }),
-            ),
-            Effect.mapError(
-              (err) =>
-                new HeadError({
-                  message: `Commit REST request failed: ${err.message}`,
-                  cause: err.cause,
-                }),
-            ),
-            Effect.asVoid,
           ),
-          matchCommit,
-          30_000,
         );
-
-        return draftTx;
       });
 
     const closeEffect = (): Effect.Effect<void, HeadError> =>
@@ -1091,14 +1021,6 @@ const createEffect = (
           (event) => matchServerTag(event, "HeadIsFinalized", "Fanout"),
           90_000,
         ),
-      );
-
-    const abortEffect = (): Effect.Effect<void, HeadError> =>
-      execute(
-        "Abort",
-        undefined,
-        (event) => matchServerTag(event, "HeadIsAborted", "Abort"),
-        30_000,
       );
 
     const newTxEffect = (transaction: {
@@ -1392,7 +1314,6 @@ const createEffect = (
       safeClose: safeCloseEffect,
       fanout: fanoutEffect,
       awaitReadyToFanout: awaitReadyToFanoutEffect,
-      abort: abortEffect,
       newTx: newTxEffect,
       recover: recoverEffect,
       decommit: decommitEffect,
@@ -1417,7 +1338,6 @@ const createEffect = (
       close: () => runEffect(effectApi.close()),
       safeClose: () => runEffect(effectApi.safeClose()),
       fanout: () => runEffect(effectApi.fanout()),
-      abort: () => runEffect(effectApi.abort()),
       newTx: (transaction) => runEffect(effectApi.newTx(transaction)),
       recover: (recoverTxId) => runEffect(effectApi.recover(recoverTxId)),
       decommit: (decommitTx) => runEffect(effectApi.decommit(decommitTx)),

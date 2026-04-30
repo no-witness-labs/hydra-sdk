@@ -2,7 +2,6 @@ import { Socket } from "@effect/platform";
 import { Effect, Fiber, Layer, Queue, Ref, Schedule, Schema } from "effect";
 
 import {
-  AbortMessageSchema,
   CloseMessageSchema,
   ContestMessageSchema,
   DecommitMessageSchema,
@@ -121,9 +120,9 @@ const commandToEvents = (
   switch (tag) {
     case "Init":
       return [
-        toServerOutput("HeadIsInitializing", {
+        toServerOutput("HeadIsOpen", {
           headId: "mock-head-id",
-          parties: [],
+          utxo: {},
         }),
       ];
     case "NewTx": {
@@ -140,8 +139,6 @@ const commandToEvents = (
       return [toServerOutput("HeadIsClosed"), toServerOutput("ReadyToFanout")];
     case "Fanout":
       return [toServerOutput("HeadIsFinalized")];
-    case "Abort":
-      return [toServerOutput("HeadIsAborted")];
     case "Recover": {
       const recoverPayload = payload as { recoverTxId?: string } | undefined;
       return [
@@ -207,16 +204,11 @@ const withHistoryQuery = (url: string, history: boolean): string => {
 const parseHeadStatus = (value: unknown): HeadStatus | null => {
   switch (value) {
     case "Idle":
-    case "Initializing":
     case "Open":
     case "Closed":
     case "FanoutPossible":
     case "Final":
-    case "Aborted":
       return value;
-    // Hydra node sends "Initial" in Greetings headStatus
-    case "Initial":
-      return "Initializing";
     default:
       return null;
   }
@@ -230,7 +222,6 @@ const parseClientInputTag = (value: unknown): ClientInputTag | undefined => {
     case "Close":
     case "SafeClose":
     case "Fanout":
-    case "Abort":
     case "Recover":
     case "Decommit":
     case "Contest":
@@ -244,20 +235,14 @@ const parseChainTxTag = (value: unknown): ClientInputTag | undefined => {
   switch (value) {
     case "InitTx":
       return "Init";
-    case "CommitTx":
-      return "Commit";
     case "CloseTx":
       return "Close";
     case "FanoutTx":
       return "Fanout";
-    case "AbortTx":
-      return "Abort";
     case "RecoverTx":
       return "Recover";
     case "ContestTx":
       return "Contest";
-    case "CollectComTx":
-      return "Commit";
     case "IncrementTx":
       return "Commit";
     case "DecrementTx":
@@ -391,8 +376,6 @@ const buildRequestMessage = (
   switch (tag) {
     case "Init":
       return Schema.encode(InitMessageSchema)({ tag: "Init" });
-    case "Abort":
-      return Schema.encode(AbortMessageSchema)({ tag: "Abort" });
     case "Close":
       return Schema.encode(CloseMessageSchema)({ tag: "Close" });
     case "SafeClose":
