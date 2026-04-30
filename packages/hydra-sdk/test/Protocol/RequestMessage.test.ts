@@ -14,18 +14,6 @@ describe("InitMessageSchema", () => {
   );
 });
 
-describe("AbortMessageSchema", () => {
-  it.effect("validates a correct Abort message", () =>
-    Effect.gen(function* () {
-      const input = {
-        tag: "Abort",
-      };
-
-      yield* Schema.decodeUnknown(Protocol.RequestMessageSchema)(input);
-    }),
-  );
-});
-
 describe("NewTxMessageSchema", () => {
   it.effect("validates a correct NewTx message", () =>
     Effect.gen(function* () {

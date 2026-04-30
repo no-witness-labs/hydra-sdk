@@ -43,7 +43,7 @@ describe("Head module", () => {
     const collected = await collectedPromise;
     const tags = Array.from(collected).map((event) => event.tag);
 
-    expect(tags).toContain("HeadIsInitializing");
+    expect(tags).toContain("HeadIsOpen");
 
     await head.dispose();
   });

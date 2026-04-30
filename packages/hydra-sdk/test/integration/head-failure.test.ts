@@ -1,6 +1,5 @@
-import { Cluster, Container } from "@no-witness-labs/hydra-devnet";
-import { Head, Provider } from "@no-witness-labs/hydra-sdk";
-import { Effect } from "effect";
+import { Cluster } from "@no-witness-labs/hydra-devnet";
+import { Head } from "@no-witness-labs/hydra-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 /**
@@ -66,13 +65,8 @@ describe("Hydra SDK — Failure Matching (TxInvalid)", () => {
     const head = await Head.create({ url: cluster.hydraApiUrl });
 
     try {
-      // Init and commit empty to get to Open state
+      // Init opens the head directly in hydra-node v2
       await head.init();
-      const events = head.subscribeEvents();
-      await commitEmpty(cluster);
-      for await (const event of events) {
-        if (event.tag === "HeadIsOpen") break;
-      }
       expect(head.getState()).toBe("Open");
 
       // Submit garbage CBOR — hydra-node rejects with InvalidInput (deserialization failure)
@@ -113,17 +107,16 @@ describe("Hydra SDK — Failure Matching (InvalidInput)", () => {
     }
   }, 120_000);
 
-  it("init fails fast with structured details when head is already initializing", async () => {
+  it("init fails fast with structured details when head is already open", async () => {
     const head = await Head.create({ url: cluster.hydraApiUrl });
 
     try {
       await head.init();
-      expect(head.getState()).toBe("Initializing");
+      expect(head.getState()).toBe("Open");
 
-      // Bypass FSM and send raw Init again — hydra-node should reject
-      // FSM rejects this before it reaches the node
+      // FSM rejects re-Init before it reaches the node.
       await expect(head.send("Init")).rejects.toThrow(
-        "Command Init is not allowed while head is Initializing",
+        "Command Init is not allowed while head is Open",
       );
     } finally {
       await head.dispose();
@@ -131,40 +124,3 @@ describe("Hydra SDK — Failure Matching (InvalidInput)", () => {
   }, 600_000);
 });
 
-// ---------------------------------------------------------------------------
-// Helpers (shared with head-lifecycle.test.ts)
-// ---------------------------------------------------------------------------
-
-async function signAndSubmitCommit(cluster: Cluster.Cluster): Promise<void> {
-  await Container.exec(cluster.cardanoNode!, [
-    "sh",
-    "-c",
-    "cardano-cli conway transaction sign" +
-      " --tx-file /opt/cardano/config/commit-draft.json" +
-      " --signing-key-file /opt/cardano/config/payment.skey" +
-      " --out-file /tmp/commit-signed.json",
-  ]);
-
-  await Container.exec(cluster.cardanoNode!, [
-    "sh",
-    "-c",
-    "cardano-cli conway transaction submit" +
-      " --tx-file /tmp/commit-signed.json" +
-      " --socket-path /opt/cardano/ipc/node.socket" +
-      ` --testnet-magic ${cluster.config.cardanoNode.networkMagic}`,
-  ]);
-}
-
-async function commitEmpty(cluster: Cluster.Cluster): Promise<void> {
-  const draftTx = (await Effect.runPromise(
-    Provider.postCommit(cluster.hydraHttpUrl, {}),
-  )) as { cborHex: string };
-
-  const { writeFile } = await import("node:fs/promises");
-  const { join } = await import("node:path");
-  await writeFile(
-    join(cluster.tempDir!, "commit-draft.json"),
-    JSON.stringify(draftTx),
-  );
-  await signAndSubmitCommit(cluster);
-}
