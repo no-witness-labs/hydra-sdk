@@ -18,17 +18,6 @@ export const InitMessageSchema = Schema.Struct({
 export type InitMessage = typeof InitMessageSchema.Type;
 
 /**
- * Abort the Hydra Head initialization process.
- *
- * @since 0.1.0
- * @category schemas
- */
-export const AbortMessageSchema = Schema.Struct({
-  tag: Schema.Literal("Abort"),
-});
-export type AbortMessage = typeof AbortMessageSchema.Type;
-
-/**
  * Submit a new transaction to the Hydra Head.
  *
  * @since 0.1.0
@@ -127,7 +116,6 @@ export type SafeCloseMessage = typeof SafeCloseMessageSchema.Type;
  */
 export const RequestMessageSchema = Schema.Union(
   InitMessageSchema,
-  AbortMessageSchema,
   NewTxMessageSchema,
   RecoverMessageSchema,
   DecommitMessageSchema,
