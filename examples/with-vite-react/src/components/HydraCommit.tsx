@@ -221,11 +221,6 @@ export default function HydraCommit({ walletApi }: Props) {
     [head, fireAction],
   );
 
-  const handleAbort = useCallback(
-    () => fireAction(() => head!.abort()),
-    [head, fireAction],
-  );
-
   const handleContest = useCallback(
     () =>
       fireAction(async () => {
@@ -519,11 +514,9 @@ export default function HydraCommit({ walletApi }: Props) {
   // The SDK guards commands internally and throws on invalid state transitions.
   // These checks are purely for UI button enable/disable.
   const canInit = !submitting && head && status === "Idle";
-  const canCommit = !submitting && head && status === "Initializing";
+  const canCommit = !submitting && head && status === "Open";
   const canClose = !submitting && head && status === "Open";
   const canFanout = !submitting && head && status === "FanoutPossible";
-  const canAbort =
-    !submitting && head && (status === "Idle" || status === "Initializing");
   const canContest = !submitting && head && status === "Closed";
   const isOpen = status === "Open";
 
@@ -653,13 +646,6 @@ export default function HydraCommit({ walletApi }: Props) {
             className="rounded bg-purple-600 px-3 py-1.5 text-sm font-medium hover:bg-purple-700 disabled:opacity-30"
           >
             Fanout
-          </button>
-          <button
-            onClick={handleAbort}
-            disabled={!canAbort}
-            className="rounded bg-gray-600 px-3 py-1.5 text-sm font-medium hover:bg-gray-700 disabled:opacity-30"
-          >
-            Abort
           </button>
           {isOpen && (
             <button

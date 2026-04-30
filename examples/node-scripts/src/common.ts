@@ -96,7 +96,7 @@ export function waitForState(
   });
 }
 
-/** Init the head and wait for Initializing state. */
+/** Init the head and wait for the Open state (hydra-node v2 opens directly). */
 export async function initHead(head: Head.HydraHead) {
   log("Init", "Sending Init command...");
   try {
@@ -105,11 +105,11 @@ export async function initHead(head: Head.HydraHead) {
     // SDK's default init timeout (30s) can be tight on preprod.
     // If the command was sent but confirmation was slow, check if
     // the state transitioned anyway.
-    if (head.getState() === "Initializing") {
+    if (head.getState() === "Open") {
       log("Init", "Init succeeded (state confirmed after timeout)");
       return;
     }
-    throw new Error("Init failed — head is not in Initializing state");
+    throw new Error("Init failed — head is not in Open state");
   }
   log("Init", `State: ${head.getState()}`);
 }

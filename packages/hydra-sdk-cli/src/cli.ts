@@ -189,20 +189,6 @@ export const initCommand = Command.make("init", headOptions).pipe(
   ),
 );
 
-export const abortCommand = Command.make("abort", headOptions).pipe(
-  Command.withDescription("Abort head initialization"),
-  Command.withHandler(({ json, url }) =>
-    withHead(url, (head) =>
-      Effect.gen(function* () {
-        yield* sendCommand(head, "Abort");
-        yield* Effect.logInfo(
-          output(json, { result: "sent", command: "Abort" }),
-        );
-      }),
-    ),
-  ),
-);
-
 const commitUtxoOption = Options.text("utxo").pipe(
   Options.optional,
   Options.withDescription(
@@ -737,7 +723,6 @@ export const rootCommand = Command.make("hydra").pipe(
   Command.withSubcommands([
     statusCommand,
     initCommand,
-    abortCommand,
     commitCommand,
     closeCommand,
     contestCommand,

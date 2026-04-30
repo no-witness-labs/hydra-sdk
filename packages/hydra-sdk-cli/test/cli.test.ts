@@ -2,7 +2,6 @@ import { Head } from "@no-witness-labs/hydra-sdk";
 import { describe, expect, it } from "vitest";
 
 import {
-  abortCommand,
   closeCommand,
   commitCommand,
   configCommand,
@@ -29,7 +28,6 @@ describe("CLI — Command Structure", () => {
   it("all lifecycle commands are exported", () => {
     expect(statusCommand).toBeDefined();
     expect(initCommand).toBeDefined();
-    expect(abortCommand).toBeDefined();
     expect(commitCommand).toBeDefined();
     expect(closeCommand).toBeDefined();
     expect(contestCommand).toBeDefined();
@@ -64,19 +62,8 @@ describe("CLI — output helper", () => {
     const head = await Head.create({ url: "mock://localhost:4001" });
     try {
       await head.init();
-      expect(head.getState()).toBe("Initializing");
+      expect(head.getState()).toBe("Open");
       expect(head.headId).toBe("mock-head-id");
-    } finally {
-      await head.dispose();
-    }
-  });
-
-  it("init → abort transitions correctly", async () => {
-    const head = await Head.create({ url: "mock://localhost:4001" });
-    try {
-      await head.init();
-      await head.abort();
-      expect(head.getState()).toBe("Aborted");
     } finally {
       await head.dispose();
     }
