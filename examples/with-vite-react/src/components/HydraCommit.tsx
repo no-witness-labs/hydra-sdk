@@ -28,7 +28,24 @@ interface LogEntry {
   payload?: unknown;
 }
 
-const HYDRA_URL = import.meta.env.VITE_HYDRA_NODE_URL as string | undefined;
+const RAW_HYDRA_URL = import.meta.env.VITE_HYDRA_NODE_URL as string | undefined;
+
+/**
+ * Resolve the configured hydra-node URL. A relative value (e.g. "/hydra") is
+ * resolved against the current page origin — using wss:// on HTTPS pages and
+ * ws:// on HTTP — so the app works behind any reverse proxy / tunnel without a
+ * rebuild. Absolute ws(s):// URLs are used verbatim.
+ */
+function resolveNodeUrl(raw: string | undefined): string {
+  if (!raw) return "";
+  if (raw.startsWith("/")) {
+    const proto = window.location.protocol === "https:" ? "wss" : "ws";
+    return `${proto}://${window.location.host}${raw}`;
+  }
+  return raw;
+}
+
+const HYDRA_URL = resolveNodeUrl(RAW_HYDRA_URL);
 
 function wsToHttp(wsUrl: string): string {
   return wsUrl.replace(/^ws(s?):\/\//, "http$1://");
