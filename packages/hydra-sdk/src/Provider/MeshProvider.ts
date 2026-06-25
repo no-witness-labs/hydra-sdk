@@ -15,7 +15,6 @@ import type {
   GovernanceProposalInfo,
   IEvaluator,
   IFetcher,
-  IFetcherOptions,
   IListener,
   ISubmitter,
   Protocol,
@@ -38,7 +37,7 @@ import { fromHydraMeshUtxoMap } from "./mesh-utxo.js";
 // ---------------------------------------------------------------------------
 
 /** Fetches the full UTxO snapshot from hydra-node and converts to MeshJS shape. */
-const getAllMeshUtxos = (httpUrl: string): Promise<MeshUTxO[]> =>
+const getAllMeshUtxos = (httpUrl: string): Promise<Array<MeshUTxO>> =>
   Effect.runPromise(
     getSnapshotUtxo(httpUrl).pipe(
       Effect.map((utxoMap) =>
@@ -120,7 +119,7 @@ export class HydraMeshProvider
    * Fetches UTxOs at the given address from the L2 snapshot.
    * Optionally filters by asset unit.
    */
-  async fetchAddressUTxOs(address: string, asset?: string): Promise<MeshUTxO[]> {
+  async fetchAddressUTxOs(address: string, asset?: string): Promise<Array<MeshUTxO>> {
     const all = await getAllMeshUtxos(this.httpUrl);
     let filtered = all.filter((u) => u.output.address === address);
     if (asset) {
@@ -134,7 +133,7 @@ export class HydraMeshProvider
   /**
    * Fetches UTxOs by transaction hash (and optional output index) from the L2 snapshot.
    */
-  async fetchUTxOs(hash: string, index?: number): Promise<MeshUTxO[]> {
+  async fetchUTxOs(hash: string, index?: number): Promise<Array<MeshUTxO>> {
     const all = await getAllMeshUtxos(this.httpUrl);
     return all.filter(
       (u) =>
@@ -190,15 +189,15 @@ export class HydraMeshProvider
   /** Not supported on Hydra L2. */
   fetchAddressTxs(
     _address: string,
-    _options?: IFetcherOptions,
-  ): Promise<TransactionInfo[]> {
+    _options?: unknown,
+  ): Promise<Array<TransactionInfo>> {
     return notSupported("fetchAddressTxs");
   }
 
   /** Not supported on Hydra L2. */
   fetchAssetAddresses(
     _asset: string,
-  ): Promise<{ address: string; quantity: string }[]> {
+  ): Promise<Array<{ address: string; quantity: string }>> {
     return notSupported("fetchAssetAddresses");
   }
 
@@ -216,7 +215,7 @@ export class HydraMeshProvider
   fetchCollectionAssets(
     _policyId: string,
     _cursor?: number | string,
-  ): Promise<{ assets: Asset[]; next?: string | number | null }> {
+  ): Promise<{ assets: Array<Asset>; next?: string | number | null }> {
     return notSupported("fetchCollectionAssets");
   }
 
@@ -274,9 +273,9 @@ export class HydraMeshProvider
    */
   evaluateTx(
     _tx: string,
-    _additionalUtxos?: MeshUTxO[],
-    _additionalTxs?: string[],
-  ): Promise<Omit<Action, "data">[]> {
+    _additionalUtxos?: Array<MeshUTxO>,
+    _additionalTxs?: Array<string>,
+  ): Promise<Array<Omit<Action, "data">>> {
     return notSupported("evaluateTx");
   }
 

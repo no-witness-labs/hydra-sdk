@@ -7,6 +7,8 @@ import type {
 import { Head, Provider } from "@no-witness-labs/hydra-sdk";
 import { describe, expect, it } from "vitest";
 
+import type { TxOut } from "../../src/Protocol/Types.js";
+
 const { HydraMeshProvider } = Provider;
 
 // ---------------------------------------------------------------------------
@@ -280,7 +282,7 @@ describe("Provider / mesh-utxo conversion", () => {
       value: {
         lovelace: 2_000_000,
         [policyId]: { [assetName]: 100 },
-      } as import("../../src/Protocol/Types.js").TxOut["value"],
+      } as TxOut["value"],
     });
 
     expect(utxo.output.amount).toContainEqual({

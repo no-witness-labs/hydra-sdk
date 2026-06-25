@@ -6,6 +6,12 @@ export {
 } from "./http.js";
 export { HydraProvider, type HydraProviderConfig } from "./HydraProvider.js";
 export {
+  fromHydraMeshUtxo,
+  fromHydraMeshUtxoMap,
+  toHydraMeshUtxo,
+  toHydraMeshUtxoMap,
+} from "./mesh-utxo.js";
+export {
   HydraMeshProvider,
   type HydraMeshProviderConfig,
 } from "./MeshProvider.js";
@@ -15,9 +21,3 @@ export {
   toHydraUtxo,
   toHydraUtxoMap,
 } from "./utxo.js";
-export {
-  fromHydraMeshUtxo,
-  fromHydraMeshUtxoMap,
-  toHydraMeshUtxo,
-  toHydraMeshUtxoMap,
-} from "./mesh-utxo.js";
