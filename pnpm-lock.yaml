@@ -323,6 +323,9 @@ importers:
       '@evolution-sdk/evolution':
         specifier: '>=0.3.22'
         version: 0.3.25(@effect/cluster@0.56.3(@effect/platform@0.90.10(effect@3.19.16))(@effect/rpc@0.73.0(@effect/platform@0.90.10(effect@3.19.16))(effect@3.19.16))(@effect/sql@0.49.0(@effect/experimental@0.58.0(@effect/platform@0.90.10(effect@3.19.16))(effect@3.19.16))(@effect/platform@0.90.10(effect@3.19.16))(effect@3.19.16))(@effect/workflow@0.16.0(@effect/experimental@0.58.0(@effect/platform@0.90.10(effect@3.19.16))(effect@3.19.16))(@effect/platform@0.90.10(effect@3.19.16))(@effect/rpc@0.73.0(@effect/platform@0.90.10(effect@3.19.16))(effect@3.19.16))(effect@3.19.16))(effect@3.19.16))(@effect/rpc@0.73.0(@effect/platform@0.90.10(effect@3.19.16))(effect@3.19.16))(@effect/sql@0.49.0(@effect/experimental@0.58.0(@effect/platform@0.90.10(effect@3.19.16))(effect@3.19.16))(@effect/platform@0.90.10(effect@3.19.16))(effect@3.19.16))(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      '@meshsdk/common':
+        specifier: '>=1.8.0'
+        version: 1.8.14
       '@noble/hashes':
         specifier: ^1.7.0
         version: 1.8.0
@@ -1516,6 +1519,9 @@ packages:
 
   '@mdx-js/mdx@3.1.1':
     resolution: {integrity: sha512-f6ZO2ifpwAQIpzGWaBQT2TXxPv6z3RBzQKpVftEWN78Vl/YweF1uwussDx8ECAXVtr3Rs89fKyG9YlzUs9DyGQ==}
+
+  '@meshsdk/common@1.8.14':
+    resolution: {integrity: sha512-rKkgaxX5c0XOZ0Wxwp1WkQ8B79QuwGAy9t7KSofDz3NoIsW4SVY2nKWJ0N0tQdwv+hSw4xvM5AXIsyzkLHO3Ow==}
 
   '@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.3':
     resolution: {integrity: sha512-QZHtlVgbAdy2zAqNA9Gu1UpIuI8Xvsd1v8ic6B2pZmeFnFcMWiPLfWXh7TVw4eGEZ/C9TH281KwhVoeQUKbyjw==}
@@ -3157,6 +3163,12 @@ packages:
 
   bl@4.1.0:
     resolution: {integrity: sha512-1W07cM9gS6DcLperZfFSj+bWLtaPGSOHWhPiGzXmvVJbRLdG82sH/Kn8EtW1VqWVA54AKf2h5k5BbnIbwF3h6w==}
+
+  blake2b-wasm@2.4.0:
+    resolution: {integrity: sha512-S1kwmW2ZhZFFFOghcx73+ZajEfKBqhP82JMssxtLVMxlaPea1p9uoLiUZ5WYyHn0KddwbLc+0vh4wR0KBNoT5w==}
+
+  blake2b@2.1.4:
+    resolution: {integrity: sha512-AyBuuJNI64gIvwx13qiICz6H6hpmjvYS5DGkG6jbXMOT8Z3WUJ3V1X0FlhIoT1b/5JtHE3ki+xjtMvu1nn+t9A==}
 
   block-iterator@1.1.2:
     resolution: {integrity: sha512-yAHUP44v2K25xLPdrgVTgwtuQctlullzjczu9CoUZom5AP3g4p1R1+aWHjS1GHG9JtcSUVUnbEPiuXiW5YZ24w==}
@@ -5227,6 +5239,9 @@ packages:
 
   nan@2.25.0:
     resolution: {integrity: sha512-0M90Ag7Xn5KMLLZ7zliPWP3rT90P6PN+IzVFS0VqmnPktBk3700xUVv8Ikm9EUaUE5SDWdp/BIxdENzVznpm1g==}
+
+  nanoassert@2.0.0:
+    resolution: {integrity: sha512-7vO7n28+aYO4J+8w96AzhmU8G+Y/xpPDJz/se19ICsqj/momRbb9mh9ZUtkoJ5X3nTnPdhEJyc0qnM6yAsHBaA==}
 
   nanoid@3.3.11:
     resolution: {integrity: sha512-N8SpfPUnUp1bK+PMYW8qSWdl9U+wwNWI4QKxOYDy9JAro3WMX7p2OeVRF9v+347pnakNevPmiHhNmZ2HbFA76w==}
@@ -8049,6 +8064,14 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  '@meshsdk/common@1.8.14':
+    dependencies:
+      bech32: 2.0.0
+      bip39: 3.1.0
+      blake2b: 2.1.4
+    transitivePeerDependencies:
+      - react-native-b4a
+
   '@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.3':
     optional: true
 
@@ -9897,6 +9920,20 @@ snapshots:
       buffer: 5.7.1
       inherits: 2.0.4
       readable-stream: 3.6.2
+
+  blake2b-wasm@2.4.0:
+    dependencies:
+      b4a: 1.8.0
+      nanoassert: 2.0.0
+    transitivePeerDependencies:
+      - react-native-b4a
+
+  blake2b@2.1.4:
+    dependencies:
+      blake2b-wasm: 2.4.0
+      nanoassert: 2.0.0
+    transitivePeerDependencies:
+      - react-native-b4a
 
   block-iterator@1.1.2: {}
 
@@ -12452,6 +12489,8 @@ snapshots:
 
   nan@2.25.0:
     optional: true
+
+  nanoassert@2.0.0: {}
 
   nanoid@3.3.11: {}
 

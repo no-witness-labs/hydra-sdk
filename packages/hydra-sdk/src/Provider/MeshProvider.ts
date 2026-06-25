@@ -15,7 +15,6 @@ import type {
   GovernanceProposalInfo,
   IEvaluator,
   IFetcher,
-  IFetcherOptions,
   IListener,
   ISubmitter,
   Protocol,
@@ -190,7 +189,7 @@ export class HydraMeshProvider
   /** Not supported on Hydra L2. */
   fetchAddressTxs(
     _address: string,
-    _options?: IFetcherOptions,
+    _options?: unknown,
   ): Promise<TransactionInfo[]> {
     return notSupported("fetchAddressTxs");
   }
