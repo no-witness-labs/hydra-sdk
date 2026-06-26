@@ -1,5 +1,12 @@
 # @no-witness-labs/hydra-sdk-cli
 
+## 0.1.2
+
+### Patch Changes
+
+- Updated dependencies [78afe9c]
+  - @no-witness-labs/hydra-sdk@0.1.0
+
 ## 0.1.1
 
 ### Patch Changes
