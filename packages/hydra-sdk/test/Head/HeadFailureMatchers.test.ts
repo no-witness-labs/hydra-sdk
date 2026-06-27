@@ -106,47 +106,6 @@ describe("matchServerTag", () => {
   });
 });
 
-describe("matchCommit", () => {
-  it("succeeds on HeadIsOpen", () => {
-    const event = serverOutput("HeadIsOpen", { utxo: {} });
-    const result = Head.matchCommit(event);
-    expect(result._tag).toBe("success");
-  });
-
-  it("fails on DepositExpired with details", () => {
-    const event = serverOutput("DepositExpired", {
-      depositTxId: "abc123",
-      headId: "head-1",
-    });
-    const result = Head.matchCommit(event);
-
-    expect(result._tag).toBe("failure");
-    if (result._tag === "failure") {
-      expect(result.error.message).toContain("Deposit expired");
-      expect(result.error.message).toContain("abc123");
-      expect(result.error.details?.tag).toBe("DepositExpired");
-      expect(result.error.details?.command).toBe("Commit");
-      expect(result.error.details?.txId).toBe("abc123");
-    }
-  });
-
-  it("fails on CommandFailed for Commit", () => {
-    const event = clientMessage("CommandFailed", "Commit");
-    const result = Head.matchCommit(event);
-
-    expect(result._tag).toBe("failure");
-    if (result._tag === "failure") {
-      expect(result.error.details?.tag).toBe("CommandFailed");
-    }
-  });
-
-  it("continues on unrelated event", () => {
-    const event = serverOutput("TxValid", {});
-    const result = Head.matchCommit(event);
-    expect(result._tag).toBe("continue");
-  });
-});
-
 describe("HeadError details field", () => {
   it("preserves structured details through TxInvalid failure", async () => {
     // TxInvalid is matched inside newTxEffect, which we can't call directly

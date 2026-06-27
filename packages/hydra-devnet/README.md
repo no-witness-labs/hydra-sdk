@@ -36,12 +36,12 @@ await Cluster.withCluster(async (cluster) => {
 const cluster = Cluster.make({
   clusterName: "my-devnet",
   cardanoNode: {
-    image: "ghcr.io/intersectmbo/cardano-node:10.5.3",
+    image: "ghcr.io/intersectmbo/cardano-node:10.6.2",
     port: 3001,
     networkMagic: 42,
   },
   hydraNode: {
-    image: "ghcr.io/cardano-scaling/hydra-node:1.2.0",
+    image: "ghcr.io/cardano-scaling/hydra-node:2.0.0",
     apiPort: 4001,
     contestationPeriod: 60,
   },

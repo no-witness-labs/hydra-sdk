@@ -1,7 +1,4 @@
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
-
-import { Cluster, Container } from "@no-witness-labs/hydra-devnet";
+import { Cluster } from "@no-witness-labs/hydra-devnet";
 import { Head, Query } from "@no-witness-labs/hydra-sdk";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -18,43 +15,6 @@ const FAST_SHELLEY_GENESIS = {
 const SUBSCRIPTION_WAIT_MS = 20_000;
 const OPEN_HEAD_WAIT_MS = 60_000;
 
-/**
- * Draft empty commit via POST /commit, sign with cardano-cli, submit to L1.
- * After this, the head will move to Open once the commit is confirmed.
- */
-async function commitEmpty(cluster: Cluster.Cluster): Promise<void> {
-  const response = await fetch(`${cluster.hydraHttpUrl}/commit`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({}),
-  });
-  if (!response.ok) {
-    throw new Error(
-      `Commit draft failed: ${response.status} ${await response.text()}`,
-    );
-  }
-  const draftTx = await response.text();
-  await writeFile(join(cluster.tempDir!, "commit-draft.json"), draftTx);
-
-  await Container.exec(cluster.cardanoNode!, [
-    "sh",
-    "-c",
-    "cardano-cli conway transaction sign" +
-      " --tx-file /opt/cardano/config/commit-draft.json" +
-      " --signing-key-file /opt/cardano/config/payment.skey" +
-      " --out-file /tmp/commit-signed.json",
-  ]);
-
-  await Container.exec(cluster.cardanoNode!, [
-    "sh",
-    "-c",
-    "cardano-cli conway transaction submit" +
-      " --tx-file /tmp/commit-signed.json" +
-      " --socket-path /opt/cardano/ipc/node.socket" +
-      ` --testnet-magic ${cluster.config.cardanoNode.networkMagic}`,
-  ]);
-}
-
 async function firstWithTimeout<T>(
   iter: AsyncIterableIterator<T>,
   timeoutMs: number,
@@ -70,7 +30,7 @@ async function firstWithTimeout<T>(
 
 /**
  * Wait for head state to match (e.g. after init(), state may still be Idle
- * until the projector processes HeadIsInitializing). Same idea as lifecycle test
+ * until the projector processes HeadIsOpen). Same idea as lifecycle test
  * but resilient to event processing order.
  */
 async function waitForState(
@@ -158,13 +118,6 @@ describe("Query — Devnet", () => {
       try {
         expect(head.getState()).toBe("Idle");
         await head.init();
-        await waitForState(head, "Initializing");
-
-        const events = head.subscribeEvents();
-        await commitEmpty(cluster);
-        for await (const event of events) {
-          if (event.tag === "HeadIsOpen") break;
-        }
         await waitForState(head, "Open");
         // Give the node a moment to expose Open state on REST before we query
         await new Promise((r) => setTimeout(r, 1500));

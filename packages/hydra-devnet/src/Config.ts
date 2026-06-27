@@ -365,7 +365,7 @@ export type CardanoKey = {
  * @category constants
  */
 export const DEFAULT_CARDANO_NODE_IMAGE =
-  "ghcr.io/intersectmbo/cardano-node:10.5.3" as const;
+  "ghcr.io/intersectmbo/cardano-node:10.6.2" as const;
 
 /**
  * Default Hydra node Docker image.
@@ -373,7 +373,7 @@ export const DEFAULT_CARDANO_NODE_IMAGE =
  * @category constants
  */
 export const DEFAULT_HYDRA_NODE_IMAGE =
-  "ghcr.io/cardano-scaling/hydra-node:1.2.0" as const;
+  "ghcr.io/cardano-scaling/hydra-node:2.0.0" as const;
 
 // ---------------------------------------------------------------------------
 // Default Container Configuration

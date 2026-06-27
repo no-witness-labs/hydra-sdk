@@ -14,12 +14,10 @@ import { PartySchema, UTxOSchema } from "./Types.js";
  * @category schemas
  */
 export const GreetingsMessageSchema = Schema.Struct({
-  tag: Schema.optional(Schema.Literal("Greetings")),
+  tag: Schema.Literal("Greetings"),
   me: PartySchema,
   headStatus: Schema.Literal(
     "Idle",
-    "Initial",
-    "Initializing",
     "Open",
     "Closed",
     "FanoutPossible",
@@ -29,14 +27,12 @@ export const GreetingsMessageSchema = Schema.Struct({
   hydraHeadId: Schema.optional(Schema.String),
   snapshotUtxo: Schema.optional(
     Schema.Record({ key: Schema.String, value: Schema.Any }),
-  ), // TODO: make a better match
+  ),
   timestamp: Schema.optional(Schema.String),
-  env: Schema.optional(
-    Schema.Record({ key: Schema.String, value: Schema.Any }),
-  ), // Undocumented field of the Hydra Head response
-  networkInfo: Schema.optional(
-    Schema.Record({ key: Schema.String, value: Schema.Any }),
-  ), // Undocumented field of the Hydra Head response
+  env: Schema.Record({ key: Schema.String, value: Schema.Any }),
+  networkInfo: Schema.Record({ key: Schema.String, value: Schema.Any }),
+  chainSyncedStatus: Schema.Literal("InSync", "CatchingUp"),
+  currentSlot: Schema.Int,
 });
 export type GreetingsMessage = typeof GreetingsMessageSchema.Type;
 
@@ -51,7 +47,6 @@ export const CommandFailedMessageSchema = Schema.Struct({
   clientInput: Schema.Struct({
     tag: Schema.Literal(
       "Init",
-      "Abort",
       "NewTx",
       "Decommit",
       "Recover",
@@ -77,15 +72,13 @@ export const PostTxOnChainFailedMessageSchema = Schema.Struct({
   postChainTx: Schema.Struct({
     tag: Schema.Literal(
       "InitTx",
-      "AbortTx",
-      "CollectComTx",
       "RecoverTx",
       "IncrementTx",
       "DecrementTx",
       "CloseTx",
       "ContestTx",
       "FanoutTx",
-    ), // TODO: Error in the docs
+    ),
     participants: Schema.Array(Schema.String),
     headParameters: Schema.Struct({
       contestationPeriod: Schema.Int,
@@ -191,38 +184,6 @@ export type NetworkClusterIDMismatchMessage =
   typeof NetworkClusterIDMismatchMessageSchema.Type;
 
 /**
- * Head is initializing event.
- *
- * @since 0.1.0
- * @category schemas
- */
-export const HeadIsInitializingMessageSchema = Schema.Struct({
-  tag: Schema.Literal("HeadIsInitializing"),
-  headId: Schema.String,
-  parties: Schema.Array(PartySchema),
-  seq: Schema.Int,
-  timestamp: Schema.DateTimeUtc,
-});
-export type HeadIsInitializingMessage =
-  typeof HeadIsInitializingMessageSchema.Type;
-
-/**
- * Committed event indicating a party has committed funds to the Head.
- *
- * @since 0.1.0
- * @category schemas
- */
-export const CommittedMessageSchema = Schema.Struct({
-  tag: Schema.Literal("Committed"),
-  headId: Schema.String,
-  parties: Schema.Array(PartySchema),
-  utxo: UTxOSchema,
-  seq: Schema.Int,
-  timestamp: Schema.DateTimeUtc,
-});
-export type CommittedMessage = typeof CommittedMessageSchema.Type;
-
-/**
  * Head is open event.
  *
  * @since 0.1.0
@@ -284,21 +245,6 @@ export const ReadyToFanoutMessageSchema = Schema.Struct({
   timestamp: Schema.DateTimeUtc,
 });
 export type ReadyToFanoutMessage = typeof ReadyToFanoutMessageSchema.Type;
-
-/**
- * Head is aborted event.
- *
- * @since 0.1.0
- * @category schemas
- */
-export const HeadIsAbortedMessageSchema = Schema.Struct({
-  tag: Schema.Literal("HeadIsAborted"),
-  headId: Schema.String,
-  utxo: UTxOSchema,
-  seq: Schema.Int,
-  timestamp: Schema.DateTimeUtc,
-});
-export type HeadIsAbortedMessage = typeof HeadIsAbortedMessageSchema.Type;
 
 /**
  * Head is finalized event.
@@ -661,6 +607,24 @@ export type SideLoadSnapshotRejectedMessage =
   typeof SideLoadSnapshotRejectedMessageSchema.Type;
 
 /**
+ * Synced status report — periodic L2 chain sync state from hydra-node v2.
+ *
+ * @since 0.4.0
+ * @category schemas
+ */
+export const SyncedStatusReportMessageSchema = Schema.Struct({
+  tag: Schema.Literal("SyncedStatusReport"),
+  chainSlot: Schema.Int,
+  chainTime: Schema.DateTimeUtc,
+  drift: Schema.Number,
+  synced: Schema.Literal("InSync", "CatchingUp"),
+  seq: Schema.Int,
+  timestamp: Schema.DateTimeUtc,
+});
+export type SyncedStatusReportMessage =
+  typeof SyncedStatusReportMessageSchema.Type;
+
+/**
  * Union of all possible WebSocket response message types from a Hydra node.
  *
  * @since 0.1.0
@@ -676,13 +640,10 @@ export const WebSocketResponseMessageSchema = Schema.Union(
   NetworkDisconnectedMessageSchema,
   NetworkVersionMismatchMessageSchema,
   NetworkClusterIDMismatchMessageSchema,
-  HeadIsInitializingMessageSchema,
-  CommittedMessageSchema,
   HeadIsOpenMessageSchema,
   HeadIsClosedMessageSchema,
   HeadIsContestedMessageSchema,
   ReadyToFanoutMessageSchema,
-  HeadIsAbortedMessageSchema,
   HeadIsFinalizedMessageSchema,
   TxValidMessageSchema,
   TxInvalidMessageSchema,
@@ -705,6 +666,7 @@ export const WebSocketResponseMessageSchema = Schema.Union(
   NodeSyncedMessageSchema,
   RejectedInputBecauseUnsyncedMessageSchema,
   SideLoadSnapshotRejectedMessageSchema,
+  SyncedStatusReportMessageSchema,
 );
 export type WebSocketResponseMessage =
   typeof WebSocketResponseMessageSchema.Type;
@@ -758,20 +720,6 @@ export const HeadResponseSchema = Schema.Union(
     tag: Schema.Literal("Idle"),
     contents: Schema.Struct({
       chainState: ChainStateSchema,
-    }),
-  }),
-  Schema.Struct({
-    tag: Schema.Literal("Initial"),
-    contents: Schema.Struct({
-      parameters: Schema.Struct({
-        contestationPeriod: Schema.Int,
-        parties: Schema.Array(PartySchema),
-      }),
-      pendingCommits: Schema.Array(PartySchema),
-      commited: PartySchema,
-      chainState: ChainStateSchema,
-      headId: Schema.String,
-      headSeed: Schema.String,
     }),
   }),
   Schema.Struct({
@@ -944,12 +892,12 @@ export const CardanoTransactionResponseSchema = Schema.Union(
     headUTxO: Schema.String,
   }),
   Schema.Struct({
-    tag: Schema.Literal("NoFuelUTXOFound"),
+    tag: Schema.Literal("NotEnoughFuel"),
     failingTx: Common.TransactionMessageSchema,
   }),
   Schema.Struct({
-    tag: Schema.Literal("CannotFindOwnInitial"),
-    knownUTxO: Schema.String,
+    tag: Schema.Literal("NoFuelUTXOFound"),
+    failingTx: Common.TransactionMessageSchema,
   }),
   Schema.Struct({
     tag: Schema.Literal("UnsupportedLegacyOutput"),
@@ -974,9 +922,6 @@ export const CardanoTransactionResponseSchema = Schema.Union(
     mainnetLimitLovelace: Schema.Int,
   }),
   Schema.Struct({
-    tag: Schema.Literal("FailedToDraftTxNotInitializing"),
-  }),
-  Schema.Struct({
     tag: Schema.Literal("InvalidSeed"),
     headSeed: Schema.String,
   }),
@@ -985,16 +930,10 @@ export const CardanoTransactionResponseSchema = Schema.Union(
     headId: Schema.String,
   }),
   Schema.Struct({
-    tag: Schema.Literal("FailedToConstructAbortTx"),
-  }),
-  Schema.Struct({
     tag: Schema.Literal("FailedToConstructCloseTx"),
   }),
   Schema.Struct({
     tag: Schema.Literal("FailedToConstructContestTx"),
-  }),
-  Schema.Struct({
-    tag: Schema.Literal("FailedToConstructCollectTx"),
   }),
   Schema.Struct({
     tag: Schema.Literal("FailedToConstructDepositTx"),
@@ -1010,6 +949,24 @@ export const CardanoTransactionResponseSchema = Schema.Union(
   }),
   Schema.Struct({
     tag: Schema.Literal("FailedToConstructFanoutTx"),
+  }),
+  Schema.Struct({
+    tag: Schema.Literal("DepositTooLow"),
+    minimumValue: Schema.Int,
+    providedValue: Schema.Int,
+  }),
+  Schema.Struct({
+    tag: Schema.Literal("MissingTokenPolicies"),
+    contents: Schema.Array(Schema.String),
+  }),
+  Schema.Struct({
+    tag: Schema.Literal("InvalidTokenRequest"),
+    contents: Schema.Array(
+      Schema.Struct({
+        policyId: Schema.String,
+        assetName: Schema.String,
+      }),
+    ),
   }),
 );
 export type CardanoTransactionResponse =

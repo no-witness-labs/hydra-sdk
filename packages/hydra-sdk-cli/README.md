@@ -71,8 +71,7 @@ hydra status --watch
 ### Head lifecycle
 
 ```bash
-hydra init                          # Initialize a new head
-hydra abort                         # Abort initialization
+hydra init                          # Initialize a new head (opens directly)
 hydra close                         # Close the head
 hydra contest                       # Contest closure with newer snapshot
 hydra fanout                        # Fan out from closed head to L1

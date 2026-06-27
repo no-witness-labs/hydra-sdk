@@ -84,12 +84,6 @@ export async function fanout() {
   return { state: head.getState() };
 }
 
-export async function abort() {
-  if (!head) throw new Error("Not connected");
-  await head.abort();
-  return { state: head.getState() };
-}
-
 export function getState() {
   if (!head) return { state: "Disconnected" as const, headId: null };
   return { state: head.getState(), headId: head.headId };
