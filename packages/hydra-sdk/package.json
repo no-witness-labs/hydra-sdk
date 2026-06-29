@@ -67,12 +67,12 @@
     "clean": "rm -rf dist .turbo .tsbuildinfo"
   },
   "devDependencies": {
-    "@babel/cli": "^7.28.0",
+    "@babel/cli": "^8.0.1",
     "@no-witness-labs/hydra-devnet": "workspace:*",
-    "@types/node": "^22.19.7",
+    "@types/node": "^26.0.1",
     "@types/ws": "^8.18.1",
-    "babel-plugin-annotate-pure-calls": "^0.4.0",
-    "dockerode": "^4.0.8",
+    "babel-plugin-annotate-pure-calls": "^0.5.0",
+    "dockerode": "^5.0.1",
     "vitest-websocket-mock": "^0.5.0"
   },
   "peerDependencies": {
@@ -88,7 +88,7 @@
     }
   },
   "dependencies": {
-    "@noble/hashes": "^1.7.0",
-    "ws": "^8.19.0"
+    "@noble/hashes": "^2.2.0",
+    "ws": "^8.21.0"
   }
 }
