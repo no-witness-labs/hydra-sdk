@@ -1,0 +1,47 @@
+---
+title: Release Notes
+description: Version history, release highlights, and versioning policy for the Hydra SDK.
+---
+
+# Release Notes
+
+All packages are published to npm under the `@no-witness-labs` scope and follow [semantic versioning](https://semver.org). Every release is driven by [changesets](https://github.com/changesets/changesets), published with [npm provenance](https://docs.npmjs.com/generating-provenance-statements) (signed, verifiable build attestations), and tagged on GitHub.
+
+- npm: [@no-witness-labs/hydra-sdk](https://www.npmjs.com/package/@no-witness-labs/hydra-sdk) · [@no-witness-labs/hydra-sdk-cli](https://www.npmjs.com/package/@no-witness-labs/hydra-sdk-cli) · [@no-witness-labs/hydra-devnet](https://www.npmjs.com/package/@no-witness-labs/hydra-devnet)
+- GitHub releases: [no-witness-labs/hydra-sdk/releases](https://github.com/no-witness-labs/hydra-sdk/releases)
+- Full per-package changelogs: [hydra-sdk](https://github.com/no-witness-labs/hydra-sdk/blob/main/packages/hydra-sdk/CHANGELOG.md) · [hydra-sdk-cli](https://github.com/no-witness-labs/hydra-sdk/blob/main/packages/hydra-sdk-cli/CHANGELOG.md)
+
+## v1.0.0 — Stable release
+
+First stable release. The documented public API is now stable: breaking changes will only ship in a new major version.
+
+- Complete Hydra Head lifecycle: init, commit, incremental commit/decommit, close, contest, fanout, abort (hydra-node v1.2.0)
+- `HydraStateMachine` with typed head-state transitions and event subscriptions
+- Provider layer with two adapters behind one interface: `HydraProvider` (evolution-sdk) and `HydraMeshProvider` (MeshJS)
+- Automatic WebSocket connection recovery
+- CLI with standalone binaries (linux-x64/arm64, darwin-x64/arm64, windows-x64)
+
+> **Note on the package name:** the original Project Catalyst proposal referred to this package as `hydra-manager`. That name was already taken on the npm registry by an unrelated package, so the SDK is published as [`@no-witness-labs/hydra-sdk`](https://www.npmjs.com/package/@no-witness-labs/hydra-sdk) instead.
+
+## v0.3.0 — Provider Layer & Testnet Hardening
+
+[GitHub release](https://github.com/no-witness-labs/hydra-sdk/releases/tag/v0.3.0)
+
+- `HydraMeshProvider`: MeshJS provider adapter implementing `IFetcher`, `ISubmitter`, `IEvaluator`, and `IListener`, with a tree-shakeable `./mesh-provider` subpath export
+- Bidirectional UTxO converters between hydra-node and MeshJS formats
+- Cross-browser (Chromium/Firefox/WebKit) and cross-platform (Linux/macOS/Windows) test matrix in CI
+- Node-resilience tests (hydra-node drop/restart with automatic reconnect)
+- Provider documentation: [Providers](/docs/providers), [Testing](/docs/providers/testing), [Limits](/docs/providers/limits), [Production Checklist](/docs/providers/production-checklist)
+
+## v0.2.0 — Hydra Transactions & UTXO Query
+
+[GitHub release](https://github.com/no-witness-labs/hydra-sdk/releases/tag/v0.2.0)
+
+- L2 transaction submission and UTxO querying inside an open head
+- `HydraStateMachine` for typed head-state tracking
+- CLI standalone binary compilation (Bun) with release automation
+- npm publishing with provenance
+
+## Earlier releases
+
+Initial development releases (0.0.x) established the WebSocket wrapper around the hydra-node API, package structure, and CI. See the [per-package changelogs](https://github.com/no-witness-labs/hydra-sdk/blob/main/packages/hydra-sdk/CHANGELOG.md) for details.
