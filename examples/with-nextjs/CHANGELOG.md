@@ -1,5 +1,13 @@
 # @no-witness-labs/example-with-nextjs
 
+## 0.0.2
+
+### Patch Changes
+
+- Updated dependencies [78afe9c]
+- Updated dependencies [d4f2804]
+  - @no-witness-labs/hydra-sdk@1.0.0
+
 ## 0.0.1
 
 ### Patch Changes
