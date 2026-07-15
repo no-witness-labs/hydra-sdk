@@ -48,7 +48,16 @@ The Cardano Open: Developers challenge funds open-source developer tooling that 
 - **npm downloads (Dec 2025 – Jul 2026):** 316 (`hydra-sdk`) + 399 (`hydra-sdk-cli`) = 715+ installs during the funded period, before the v1.0.0 stability declaration.
 - **Contributors:** 5 people contributed to the repository.
 - **Demo interactions:** the hosted demo has been used to open, commit to, transact in, and fan out real Hydra heads on Cardano preprod (transaction evidence visible on preprod explorers via the demo's head address).
-- **Social reach:** development updates posted on X throughout the project via [@nowitnesslabs](https://x.com/nowitnesslabs) and [@solidsnakedev](https://x.com/solidsnakedev) — see the [social plan spreadsheet](_TBD — Google Sheet link_); **total interactions: _TBD from X Analytics_** (impressions, likes, reposts, replies across all project posts).
+- **Social reach:** every release was announced on X automatically (GitHub Actions posts on publish) via [@nowitnesslabs](https://x.com/nowitnesslabs) and [@solidsnakedev](https://x.com/solidsnakedev) — see the [social plan spreadsheet](_TBD — Google Sheet link_). Across the tracked release posts (as of 2026-07-15): **959 impressions and 51 total interactions** (37 likes, 11 reposts, 1 reply, 2 bookmarks).
+
+| Date       | Post                                                                                     | Impressions | Interactions |
+| ---------- | ---------------------------------------------------------------------------------------- | ----------- | ------------ |
+| 2026-03-18 | [hydra-sdk 0.0.4](https://x.com/solidsnakedev/status/2034196264259059883)                | 153         | 8            |
+| 2026-03-18 | [hydra-sdk-cli 0.1.1](https://x.com/solidsnakedev/status/2034203293166252061)            | 256         | 16           |
+| 2026-03-18 | [hydra-sdk-cli 0.1.1 (binaries)](https://x.com/solidsnakedev/status/2034203903605002596) | 180         | 10           |
+| 2026-07-14 | [hydra-sdk-cli 1.0.0](https://x.com/solidsnakedev/status/2077095154830193004)            | 201         | 12           |
+| 2026-07-14 | [hydra-sdk 1.0.0](https://x.com/solidsnakedev/status/2077096548148891708)                | 169         | 5            |
+| **Total**  |                                                                                          | **959**     | **51**       |
 
 ## Impact
 
