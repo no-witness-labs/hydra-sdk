@@ -514,10 +514,13 @@ const getProtocolParametersEffect = (
           collateralPercentage: pp.collateralPercentage,
           maxCollateralInputs: pp.maxCollateralInputs,
           minFeeRefScriptCostPerByte: 0,
+          // The node returns whichever cost models the ledger has — any
+          // subset of PlutusV1/V2/V3 (hydra-node v2 may omit some); absent
+          // models become empty records (only needed to run that language)
           costModels: {
-            PlutusV1: arrayToIndexedRecord(pp.costModels.PlutusV1),
-            PlutusV2: arrayToIndexedRecord(pp.costModels.PlutusV2),
-            PlutusV3: arrayToIndexedRecord(pp.costModels.PlutusV3),
+            PlutusV1: arrayToIndexedRecord(pp.costModels?.PlutusV1),
+            PlutusV2: arrayToIndexedRecord(pp.costModels?.PlutusV2),
+            PlutusV3: arrayToIndexedRecord(pp.costModels?.PlutusV3),
           },
         };
       }),
@@ -734,6 +737,6 @@ const extractPriceStep = (executionUnitPrices: unknown): number => {
 
 // Convert an array of numbers (e.g. [10, 20, 30]) to a record with string keys ("0", "1", "2") for compatibility with the expected cost model format.
 const arrayToIndexedRecord = (
-  arr: ReadonlyArray<number>,
+  arr: ReadonlyArray<number> | undefined,
 ): Record<string, number> =>
-  Object.fromEntries(arr.map((v, i) => [String(i), v]));
+  Object.fromEntries((arr ?? []).map((v, i) => [String(i), v]));
