@@ -40,7 +40,7 @@ export const fromHydraMeshUtxo = (key: string, txOut: TxOut): MeshUTxO => {
  */
 export const fromHydraMeshUtxoMap = (
   utxoMap: Record<string, TxOut>,
-): MeshUTxO[] =>
+): Array<MeshUTxO> =>
   Object.entries(utxoMap).map(([key, txOut]) => fromHydraMeshUtxo(key, txOut));
 
 // ---------------------------------------------------------------------------
@@ -104,8 +104,8 @@ export const toHydraMeshUtxoMap = (
 // ---------------------------------------------------------------------------
 
 /** Convert hydra-node Value to MeshJS Asset array. */
-const hydraValueToMeshAssets = (value: Value): Asset[] => {
-  const assets: Asset[] = [];
+const hydraValueToMeshAssets = (value: Value): Array<Asset> => {
+  const assets: Array<Asset> = [];
 
   if (value.lovelace !== undefined) {
     assets.push({ unit: "lovelace", quantity: String(value.lovelace) });

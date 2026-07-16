@@ -12,9 +12,11 @@ import {
 } from "@evolution-sdk/evolution";
 import { blake2b } from "@noble/hashes/blake2b";
 import { makeTxBuilder } from "@evolution-sdk/evolution/sdk/builders/TransactionBuilder";
+import { preprod as blockfrostPreprod } from "@evolution-sdk/evolution/sdk/provider/Blockfrost";
+import { MaestroProvider } from "@evolution-sdk/evolution/sdk/provider/Maestro";
 import { Head, Provider } from "@no-witness-labs/hydra-sdk";
 import { Effect } from "effect";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type HeadStatus = Head.HeadStatus;
 
@@ -28,7 +30,24 @@ interface LogEntry {
   payload?: unknown;
 }
 
-const HYDRA_URL = import.meta.env.VITE_HYDRA_NODE_URL as string | undefined;
+const RAW_HYDRA_URL = import.meta.env.VITE_HYDRA_NODE_URL as string | undefined;
+
+/**
+ * Resolve the configured hydra-node URL. A relative value (e.g. "/hydra") is
+ * resolved against the current page origin — using wss:// on HTTPS pages and
+ * ws:// on HTTP — so the app works behind any reverse proxy / tunnel without a
+ * rebuild. Absolute ws(s):// URLs are used verbatim.
+ */
+function resolveNodeUrl(raw: string | undefined): string {
+  if (!raw) return "";
+  if (raw.startsWith("/")) {
+    const proto = window.location.protocol === "https:" ? "wss" : "ws";
+    return `${proto}://${window.location.host}${raw}`;
+  }
+  return raw;
+}
+
+const HYDRA_URL = resolveNodeUrl(RAW_HYDRA_URL);
 
 function wsToHttp(wsUrl: string): string {
   return wsUrl.replace(/^ws(s?):\/\//, "http$1://");
@@ -40,6 +59,31 @@ function formatAda(lovelace: bigint): string {
     maximumFractionDigits: 2,
   });
 }
+
+/** Compact, provider-agnostic summary of protocol parameters for the swap demo. */
+function summarizeParams(
+  p: unknown,
+): ReadonlyArray<{ label: string; value: string }> {
+  const r = (p ?? {}) as Record<string, unknown>;
+  const show = (v: unknown): string =>
+    v === undefined || v === null ? "-" : String(v);
+  return [
+    { label: "minFeeA (per byte)", value: show(r.minFeeA) },
+    { label: "minFeeB (fixed)", value: show(r.minFeeB) },
+    { label: "maxTxSize", value: show(r.maxTxSize) },
+    {
+      label: "coinsPerUtxoByte",
+      value: show(r.coinsPerUtxoByte ?? r.coinsPerUtxoSize),
+    },
+  ];
+}
+
+const SWAP_PROVIDERS = [
+  { id: "blockfrost", label: "Blockfrost", layer: "L1" },
+  { id: "maestro", label: "Maestro", layer: "L1" },
+  { id: "hydra", label: "Hydra", layer: "L2" },
+] as const;
+type SwapProviderId = (typeof SWAP_PROVIDERS)[number]["id"];
 
 const { toHydraUtxoMap } = Provider;
 
@@ -89,6 +133,27 @@ export default function HydraCommit({ walletApi }: Props) {
   const [selectedUtxos, setSelectedUtxos] = useState<Set<number>>(new Set());
   const [submitting, setSubmitting] = useState(false);
   const [walletBalance, setWalletBalance] = useState<bigint | null>(null);
+
+  // Provider-swap + recovery demo state
+  const [reconnects, setReconnects] = useState(0);
+  const greetingsSeen = useRef(0);
+  const [swap, setSwap] = useState<{
+    results: Partial<Record<SwapProviderId, unknown>>;
+    busy?: SwapProviderId;
+    error?: string;
+  }>({ results: {} });
+  const blockfrostProvider = useMemo(() => {
+    const key = import.meta.env.VITE_BLOCKFROST_KEY_PREPROD as string | undefined;
+    return key ? blockfrostPreprod(key) : null;
+  }, []);
+  const maestroProvider = useMemo(() => {
+    const key = import.meta.env.VITE_MAESTRO_KEY_PREPROD as string | undefined;
+    // evolution-sdk's preprod() targets the dead preprod.api.maestro.org host;
+    // construct against the working gomaestro endpoint instead.
+    return key
+      ? new MaestroProvider("https://preprod.gomaestro-api.org/v1", key)
+      : null;
+  }, []);
 
   // L2 state
   const [l2Utxos, setL2Utxos] = useState<ReadonlyArray<UTxO.UTxO>>([]);
@@ -155,6 +220,8 @@ export default function HydraCommit({ walletApi }: Props) {
       const provider = new Provider.HydraProvider({ head: h, httpUrl });
 
       headRef.current = h;
+      greetingsSeen.current = 0;
+      setReconnects(0);
       setHead(h);
       setHydraProvider(provider);
       setStatus(h.getState());
@@ -163,6 +230,17 @@ export default function HydraCommit({ walletApi }: Props) {
       h.subscribe((event) => {
         appendLog(event.tag, event.payload);
         setStatus(h.getState());
+        // A repeat "Greetings" means the SDK transparently re-established the
+        // WebSocket after a drop — i.e. recovery behavior.
+        if (event.tag === "Greetings") {
+          greetingsSeen.current += 1;
+          if (greetingsSeen.current > 1) {
+            setReconnects((n) => n + 1);
+            appendLog("ConnectionRecovered", {
+              reconnect: greetingsSeen.current - 1,
+            });
+          }
+        }
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -179,8 +257,49 @@ export default function HydraCommit({ walletApi }: Props) {
     setUtxos(null);
     setL2Utxos([]);
     setL2Balance(null);
+    greetingsSeen.current = 0;
+    setReconnects(0);
+    setSwap({ results: {} });
     appendLog("Disconnected");
   }, [appendLog]);
+
+  // -- Provider swap (same interface, L1 <-> L2) ------------------------------
+
+  const runProviderQuery = useCallback(
+    async (id: SwapProviderId) => {
+      setSwap((s) => ({ ...s, busy: id, error: undefined }));
+      try {
+        const provider =
+          id === "hydra"
+            ? hydraProvider
+            : id === "blockfrost"
+              ? blockfrostProvider
+              : maestroProvider;
+        if (!provider) {
+          throw new Error(
+            id === "hydra"
+              ? "Connect to a Hydra head first"
+              : `${id} key not configured`,
+          );
+        }
+        // Identical call against any backend — only the instance differs.
+        const params = await provider.getProtocolParameters();
+        setSwap((s) => ({
+          ...s,
+          results: { ...s.results, [id]: params },
+          busy: undefined,
+        }));
+        appendLog(`Provider:${id}.getProtocolParameters`);
+      } catch (err) {
+        setSwap((s) => ({
+          ...s,
+          busy: undefined,
+          error: `${id}: ${err instanceof Error ? err.message : String(err)}`,
+        }));
+      }
+    },
+    [hydraProvider, blockfrostProvider, maestroProvider, appendLog],
+  );
 
   useEffect(
     () => () => {
@@ -519,6 +638,12 @@ export default function HydraCommit({ walletApi }: Props) {
   const canFanout = !submitting && head && status === "FanoutPossible";
   const canContest = !submitting && head && status === "Closed";
   const isOpen = status === "Open";
+  const swapProviderReady = (id: SwapProviderId): boolean =>
+    id === "hydra"
+      ? !!hydraProvider
+      : id === "blockfrost"
+        ? !!blockfrostProvider
+        : !!maestroProvider;
 
   return (
     <section className="space-y-4 rounded-lg border border-gray-800 bg-gray-900 p-5">
@@ -554,6 +679,14 @@ export default function HydraCommit({ walletApi }: Props) {
             <span className="text-gray-400">
               Connected to <code className="text-gray-300">{url}</code>
             </span>
+            {reconnects > 0 && (
+              <span
+                title="The SDK transparently re-established the WebSocket after a drop"
+                className="rounded bg-emerald-900/60 px-2 py-0.5 text-xs font-medium text-emerald-300"
+              >
+                ↻ auto-recovered ×{reconnects}
+              </span>
+            )}
           </div>
           <button
             onClick={handleDisconnect}
@@ -592,6 +725,75 @@ export default function HydraCommit({ walletApi }: Props) {
               </span>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Provider swap (same evolution-sdk Provider interface, L1 <-> L2) */}
+      {head && (
+        <div className="space-y-3 rounded border border-indigo-900/40 bg-gray-950/50 p-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium text-indigo-300">
+              Provider swap (same interface)
+            </h3>
+            <span className="text-xs text-gray-500">
+              evolution-sdk <code className="text-gray-400">Provider</code>
+            </span>
+          </div>
+          <p className="text-xs text-gray-500">
+            The identical call{" "}
+            <code className="text-gray-300">provider.getProtocolParameters()</code>{" "}
+            runs against Blockfrost (L1), Maestro (L1), or the Hydra L2 provider —
+            only the provider instance changes.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {SWAP_PROVIDERS.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => runProviderQuery(p.id)}
+                disabled={swap.busy === p.id || !swapProviderReady(p.id)}
+                className="rounded bg-indigo-600 px-3 py-1.5 text-sm font-medium hover:bg-indigo-700 disabled:opacity-40"
+              >
+                {swap.busy === p.id
+                  ? "Querying…"
+                  : `Query ${p.label} (${p.layer})`}
+              </button>
+            ))}
+          </div>
+          {swap.error && <p className="text-xs text-red-400">{swap.error}</p>}
+          {Object.keys(swap.results).length > 0 && (
+            <div className="grid grid-cols-3 gap-3 text-xs">
+              {SWAP_PROVIDERS.map((p) => (
+                <div
+                  key={p.id}
+                  className="rounded border border-gray-800 bg-gray-900 p-2"
+                >
+                  <div className="mb-1 font-medium text-gray-300">
+                    {p.label} · {p.layer}
+                  </div>
+                  {swap.results[p.id] ? (
+                    <table className="w-full">
+                      <tbody>
+                        {summarizeParams(swap.results[p.id]).map((row) => (
+                          <tr key={row.label}>
+                            <td className="pr-2 text-gray-500">{row.label}</td>
+                            <td className="text-right font-mono text-gray-300">
+                              {row.value}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <span className="text-gray-600">— not queried —</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="text-[11px] text-gray-600">
+            Note L2 fees are 0 (Hydra) while L1 has real fees — same typed result,
+            swapped backend.
+          </p>
         </div>
       )}
 
