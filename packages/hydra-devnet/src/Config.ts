@@ -52,6 +52,12 @@ export interface HydraNodeConfig {
   readonly monitoringPort?: number;
   /** Contestation period in seconds (default: 60) */
   readonly contestationPeriod?: number;
+  /**
+   * Deposit period in seconds (default: 30).
+   * hydra-node's own default is 3600s, which makes incremental commits take
+   * up to an hour to activate — far too slow for a devnet.
+   */
+  readonly depositPeriod?: number;
   /** Unique node identifier (default: "devnet-1") */
   readonly nodeId?: string;
 }
@@ -403,6 +409,7 @@ export const DEFAULT_HYDRA_NODE_CONFIG: Required<HydraNodeConfig> = {
   peerPort: 5001,
   monitoringPort: 6001,
   contestationPeriod: 60,
+  depositPeriod: 30,
   nodeId: "devnet-1",
 } as const;
 

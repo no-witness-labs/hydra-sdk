@@ -730,7 +730,7 @@ export const HeadResponseSchema = Schema.Union(
         confirmedSnapshot: Common.ConfirmedSnapshotSchema,
         seenSnapshot: Common.SeenSnapshotSchema,
         pendingDeposits: Schema.optional(StringRecordSchema),
-        currentDepositTxId: Schema.NullOr(StringRecordSchema),
+        currentDepositTxId: Schema.NullOr(Schema.String),
         decommitTx: Schema.NullOr(Common.TransactionMessageSchema),
         version: Schema.Int,
       }),
@@ -754,6 +754,8 @@ export const HeadResponseSchema = Schema.Union(
       headId: Schema.String,
       headSeed: Schema.String,
       version: Schema.Int,
+      remainingFanoutOutputs: Schema.optional(Schema.NullOr(UTxOSchema)),
+      distributedFanoutOutputs: Schema.optional(UTxOSchema),
     }),
   }),
 );

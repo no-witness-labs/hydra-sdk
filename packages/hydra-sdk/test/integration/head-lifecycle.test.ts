@@ -435,6 +435,10 @@ describe("Hydra SDK — Reconnection", () => {
       // a working WebSocket — close() sends Close and awaits HeadIsClosed.
       await head.close();
       expect(head.getState()).toBe("Closed");
+
+      // v2 has no abort: fan out so the node returns to Idle for the next test
+      await head.fanout();
+      expect(head.getState()).toBe("Final");
     } finally {
       await head.dispose();
     }
@@ -482,6 +486,10 @@ describe("Hydra SDK — Reconnection", () => {
 
       await head.close();
       expect(head.getState()).toBe("Closed");
+
+      // v2 has no abort: fan out so the node returns to Idle for the next test
+      await head.fanout();
+      expect(head.getState()).toBe("Final");
     } finally {
       await head.dispose();
     }

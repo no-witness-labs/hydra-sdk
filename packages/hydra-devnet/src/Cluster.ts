@@ -253,6 +253,9 @@ function resolveConfig(config: DevNetConfig = {}): ResolvedDevNetConfig {
       contestationPeriod:
         config.hydraNode?.contestationPeriod ??
         DEFAULT_DEVNET_CONFIG.hydraNode.contestationPeriod,
+      depositPeriod:
+        config.hydraNode?.depositPeriod ??
+        DEFAULT_DEVNET_CONFIG.hydraNode.depositPeriod,
       nodeId:
         config.hydraNode?.nodeId ?? DEFAULT_DEVNET_CONFIG.hydraNode.nodeId,
     },
