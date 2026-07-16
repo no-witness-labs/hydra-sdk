@@ -4,7 +4,7 @@ Three standalone scripts demonstrating hydra-sdk usage from Node.js. Each runs t
 
 ## Prerequisites
 
-- A running **hydra-node** (v2.0.0) reachable via WebSocket and HTTP
+- A running **hydra-node** (v2.3.0) reachable via WebSocket and HTTP
 - A **preprod** wallet funded with at least **3 UTxOs** (one to commit, one for fees, one spare)
 - [Blockfrost](https://blockfrost.io/) preprod API key
 - Node.js >= 18

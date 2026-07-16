@@ -16,13 +16,7 @@ import { PartySchema, UTxOSchema } from "./Types.js";
 export const GreetingsMessageSchema = Schema.Struct({
   tag: Schema.Literal("Greetings"),
   me: PartySchema,
-  headStatus: Schema.Literal(
-    "Idle",
-    "Open",
-    "Closed",
-    "FanoutPossible",
-    "Final",
-  ),
+  headStatus: Schema.Literal("Idle", "Open", "Closed", "FanoutPossible"),
   hydraNodeVersion: Schema.String,
   hydraHeadId: Schema.optional(Schema.String),
   snapshotUtxo: Schema.optional(
@@ -255,7 +249,7 @@ export type ReadyToFanoutMessage = typeof ReadyToFanoutMessageSchema.Type;
 export const HeadIsFinalizedMessageSchema = Schema.Struct({
   tag: Schema.Literal("HeadIsFinalized"),
   headId: Schema.String,
-  utxo: UTxOSchema,
+  finalizedUTxO: UTxOSchema,
   seq: Schema.Int,
   timestamp: Schema.DateTimeUtc,
 });
@@ -675,9 +669,9 @@ export type WebSocketResponseMessage =
 // HTTP API Response Schemas
 // =============================================================================
 
-/** 
+/**
  * Chain point from node (blockHash, slot, tag).
- * 
+ *
  * @category schemas
  */
 const ChainPointSchema = Schema.Struct({

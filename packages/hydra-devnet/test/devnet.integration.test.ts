@@ -51,10 +51,10 @@ describe("Devnet Integration Tests", () => {
         expect(cluster.config).toBeDefined();
         expect(cluster.config.clusterName).toBe("hydra-devnet");
         expect(cluster.config.cardanoNode.image).toBe(
-          "ghcr.io/intersectmbo/cardano-node:10.6.2",
+          "ghcr.io/intersectmbo/cardano-node:11.0.1",
         );
         expect(cluster.config.hydraNode.image).toBe(
-          "ghcr.io/cardano-scaling/hydra-node:2.0.0",
+          "ghcr.io/cardano-scaling/hydra-node:2.3.0",
         );
 
         // Containers not created until start()

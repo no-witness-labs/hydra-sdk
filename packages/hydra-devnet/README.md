@@ -41,7 +41,7 @@ const cluster = Cluster.make({
     networkMagic: 42,
   },
   hydraNode: {
-    image: "ghcr.io/cardano-scaling/hydra-node:2.0.0",
+    image: "ghcr.io/cardano-scaling/hydra-node:2.3.0",
     apiPort: 4001,
     contestationPeriod: 60,
   },

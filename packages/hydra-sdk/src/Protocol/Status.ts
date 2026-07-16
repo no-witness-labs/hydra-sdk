@@ -22,8 +22,6 @@ export function socketMessageToStatus(
         return Option.some("CLOSED");
       case "FanoutPossible":
         return Option.some("FANOUT_POSSIBLE");
-      case "Final":
-        return Option.some("FINAL");
     }
   }
 

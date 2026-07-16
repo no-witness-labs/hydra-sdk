@@ -201,7 +201,7 @@ flowchart TD
 
 **Purpose:** Type definitions and Effect Schema validators for all Hydra API messages.
 
-**Coverage (from Hydra API v1.2.0):**
+**Coverage (from Hydra API v2.3.0):**
 
 | Category                        | Messages                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -314,7 +314,7 @@ Config precedence: CLI flags > `HYDRA_*` env vars > `~/.config/hydra-sdk/config.
 
 ### Hydra Node API Mapping
 
-The SDK wraps both WebSocket and HTTP interfaces of the `hydra-node` (API v2.0.0):
+The SDK wraps both WebSocket and HTTP interfaces of the `hydra-node` (API v2.3.0):
 
 **WebSocket (`ws://{host}:{port}/`):**
 
@@ -526,7 +526,7 @@ Multi-head orchestration across multiple `hydra-node` instances. Out of scope fo
 
 | Dependency                                    | Version                         | Purpose                                              |
 | --------------------------------------------- | ------------------------------- | ---------------------------------------------------- |
-| `hydra-node`                                  | >= 1.0.0 (tested against 1.2.0) | Target node API version                              |
+| `hydra-node`                                  | >= 2.0.0 (tested against 2.3.0) | Target node API version                              |
 | `effect`                                      | >= 3.10                         | Core runtime incl. `effect/Schema` (peer dependency) |
 | `@effect/cli`                                 | >= 0.x                          | CLI framework                                        |
 | evolution-sdk (`@intersectmbo/evolution-sdk`) | TBD                             | L1 providers + wallet + tx building                  |

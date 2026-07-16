@@ -422,7 +422,7 @@ describe("HeadIsFinalizedMessageSchema", () => {
       const expected = {
         tag: "HeadIsFinalized",
         headId: "820082582089ff4f3ff4a6052ec9d073",
-        utxo: sampleUtxo,
+        finalizedUTxO: sampleUtxo,
         seq: 1,
         timestamp: "2019-08-24T14:15:22.000Z",
       };
