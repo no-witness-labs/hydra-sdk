@@ -10,7 +10,7 @@
 | **Date Project Started**   | December 2025                                                                        |
 | **Date Project Completed** | July 2026                                                                            |
 | **Budget**                 | 81,000 ADA (4 milestones: 20,000 / 24,000 / 20,000 / 17,000)                         |
-| **Close-out Video**        | _[TBD — public YouTube link]_                                                        |
+| **Close-out Video**        | https://youtu.be/Th3_NDU4itQ                                                         |
 
 > **Note on the package name:** the proposal referred to the deliverable as `hydra-manager`. That name was already occupied on the npm registry by an unrelated package (a monorepo tool, published years earlier by a different author), so the SDK ships under the organization scope as [`@no-witness-labs/hydra-sdk`](https://www.npmjs.com/package/@no-witness-labs/hydra-sdk). All other acceptance criteria are unchanged.
 
@@ -113,4 +113,4 @@ Hydra is production-ready protocol machinery; what it lacked was an approachable
 - **npm:** https://www.npmjs.com/package/@no-witness-labs/hydra-sdk
 - **X:** https://x.com/nowitnesslabs · https://x.com/solidsnakedev
 - **Social plan spreadsheet:** _[TBD — Google Sheet link]_
-- **Close-out video:** _[TBD — YouTube link]_
+- **Close-out video:** https://youtu.be/Th3_NDU4itQ
