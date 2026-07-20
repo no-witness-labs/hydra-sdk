@@ -13,7 +13,7 @@ A TypeScript SDK for interacting with [Hydra Head](https://hydra.family/) protoc
 
 ### Which Hydra node version is supported?
 
-The SDK targets **hydra-node v1.2.0**, which supports incremental commits, SafeClose, and the deposit lifecycle.
+SDK 2.0.0 targets **hydra-node >= 2.0.0** and is tested against **v2.3.0**. In the v2 protocol (ADR-33), `init()` opens the head directly and empty — funds enter through incremental commits (deposits) while the head is open.
 
 ### Does the SDK work in the browser?
 
@@ -27,18 +27,19 @@ Yes. The SDK auto-detects the runtime and uses the native `WebSocket` in browser
 
 ### What are the head states?
 
-| State | Description |
-|-------|-------------|
-| Idle | Connected, waiting for Init |
-| Initializing | Init sent, waiting for all participants to commit |
-| Open | Head is open for L2 transactions |
-| Closed | Head is closed, contestation period running |
+| State          | Description                                 |
+| -------------- | ------------------------------------------- |
+| Idle           | Connected, waiting for Init                 |
+| Open           | Head is open for L2 transactions            |
+| Closed         | Head is closed, contestation period running |
 | FanoutPossible | Contestation period ended, ready for fanout |
-| Final | Fanout complete, UTxOs settled on L1 |
+| Final          | Fanout complete, UTxOs settled on L1        |
+
+In v2, `init()` moves the head from `Idle` directly to `Open` (empty) — there is no `Initializing` phase. `Final` is tracked SDK-side only: after fanout the node itself reports `Idle` again.
 
 ### How do I commit UTxOs to a head?
 
-During the `Initializing` state, use `head.commit()` with a blueprint transaction and UTxO map. For an empty commit (no funds), pass `{}`. See [Wallet Setup](/docs/wallet-setup) for full commit examples with wallet signing.
+While the head is `Open`, use `head.commit()` with a blueprint transaction and UTxO map (or `{}` for an empty deposit). This drafts a deposit transaction that you sign and submit to L1; the node then absorbs the funds asynchronously (`CommitRecorded` → `DepositActivated` → `CommitApproved` → `CommitFinalized`). The deposit deadline is 2 × the node's `--deposit-period`. See [Wallet Setup](/docs/wallet-setup) for full commit examples with wallet signing.
 
 ### What happens if I close the head?
 
@@ -69,7 +70,7 @@ Near-instant. L2 transactions are confirmed as soon as all head participants agr
 
 ### What is incremental commit?
 
-A v1.2.0 feature that allows adding more funds to an already-open head without closing and reopening it. If the deposit expires before being observed, use `head.recover(txId)` to reclaim your funds.
+In hydra-node v2, incremental commits (deposits) are the way funds enter a head: `init()` opens the head empty, and each `commit()` deposits UTxOs into the open head — no closing and reopening required. If a deposit expires before being observed, use `head.recover(txId)` to reclaim your funds.
 
 ## Connection & Reliability
 
@@ -81,9 +82,9 @@ Yes. The SDK uses exponential backoff with jitter for reconnection. Configure it
 const head = await Head.create({
   url: "ws://localhost:4001",
   reconnect: {
-    maxRetries: 10,        // default: 10
-    initialDelayMs: 500,   // default: 500
-    maxDelayMs: 30_000,    // default: 30000
+    maxRetries: 10, // default: 10
+    initialDelayMs: 500, // default: 500
+    maxDelayMs: 30_000, // default: 30000
   },
 });
 ```
@@ -96,8 +97,8 @@ Heartbeat monitors connection health by tracking when the last message was recei
 const head = await Head.create({
   url: "ws://localhost:4001",
   heartbeat: {
-    intervalMs: 30_000,    // check every 30s
-    timeoutMs: 10_000,     // stale after 10s of silence
+    intervalMs: 30_000, // check every 30s
+    timeoutMs: 10_000, // stale after 10s of silence
   },
 });
 ```
@@ -126,6 +127,7 @@ You're calling a command from the wrong state. Check `head.getState()` before is
 ### "Command timed out after Xms"
 
 The hydra-node didn't respond in time. Common causes:
+
 - Network issues between your app and the node
 - Node is overloaded or syncing
 - L1 congestion (for Init, Close, Fanout)
@@ -133,9 +135,10 @@ The hydra-node didn't respond in time. Common causes:
 ### "PostTxOnChainFailed"
 
 An L1 transaction (Init, Close, or Fanout) failed. Common causes:
+
 - Insufficient funds for transaction fees
 - Cardano node not fully synced
-- Script validation failure (e.g., oversized UTxOs)
+- Script validation failure
 
 ### "DepositExpired"
 

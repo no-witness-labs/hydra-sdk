@@ -19,11 +19,11 @@ curl --proto '=https' --tlsv1.2 -LsSf https://raw.githubusercontent.com/no-witne
 
 This auto-detects your platform and installs to `~/.hydra/bin/`. Supported targets:
 
-| Platform | Architecture |
-|----------|-------------|
-| macOS | Apple Silicon (arm64), Intel (x64) |
-| Linux | x64, arm64 |
-| Windows | x64 |
+| Platform | Architecture                       |
+| -------- | ---------------------------------- |
+| macOS    | Apple Silicon (arm64), Intel (x64) |
+| Linux    | x64, arm64                         |
+| Windows  | x64                                |
 
 You can also download binaries directly from [GitHub Releases](https://github.com/no-witness-labs/hydra-sdk/releases).
 
@@ -81,11 +81,8 @@ hydra status --json         # JSON output
 All lifecycle commands accept `--url` and `--json` flags.
 
 ```bash
-# Initialize a new head
+# Initialize a new head (opens directly and empty)
 hydra init
-
-# Abort during initialization
-hydra abort
 
 # Close the head
 hydra close
@@ -99,15 +96,16 @@ hydra fanout
 
 ### State Requirements
 
-| Command | Valid From State |
-|---------|-----------------|
-| `init` | Idle |
-| `abort` | Idle, Initializing |
-| `close` | Open |
-| `contest` | Closed |
-| `fanout` | FanoutPossible |
+| Command   | Valid From State |
+| --------- | ---------------- |
+| `init`    | Idle             |
+| `close`   | Open             |
+| `contest` | Closed           |
+| `fanout`  | FanoutPossible   |
 
 ## Commit
+
+Commits are incremental deposits into an **open** head — run `hydra init` first.
 
 Empty commit (no UTxOs):
 
@@ -125,6 +123,7 @@ hydra commit \
 ```
 
 The commit workflow:
+
 1. Fetches wallet UTxOs from Blockfrost
 2. Matches requested UTxO refs with wallet UTxOs
 3. Finds a fee UTxO (>= 2 ADA, not in selected set)
@@ -173,27 +172,26 @@ hydra tui \
 
 ### Keyboard Controls
 
-| Key | Action |
-|-----|--------|
-| `i` | Init |
+| Key | Action                                             |
+| --- | -------------------------------------------------- |
+| `i` | Init                                               |
 | `c` | Commit (opens UTxO selection if wallet configured) |
-| `x` | Close |
-| `s` | SafeClose |
-| `f` | Fanout |
-| `a` | Abort |
-| `t` | Contest |
-| `1` | View L1 UTxOs |
-| `2` | View L2 UTxOs |
-| `q` | Quit |
+| `x` | Close                                              |
+| `s` | SafeClose                                          |
+| `f` | Fanout                                             |
+| `t` | Contest                                            |
+| `1` | View L1 UTxOs                                      |
+| `2` | View L2 UTxOs                                      |
+| `q` | Quit                                               |
 
 In UTxO selection view:
 
-| Key | Action |
-|-----|--------|
-| Up/Down | Navigate UTxOs |
-| Space | Toggle selection |
-| Enter | Commit selected |
-| Esc | Back to dashboard |
+| Key     | Action            |
+| ------- | ----------------- |
+| Up/Down | Navigate UTxOs    |
+| Space   | Toggle selection  |
+| Enter   | Commit selected   |
+| Esc     | Back to dashboard |
 
 ## Full Lifecycle Example
 
@@ -205,9 +203,9 @@ hydra config set --key mnemonic --value "word1 word2 ... word24"
 
 # Run lifecycle
 hydra connect              # verify connection
-hydra init                 # initialize head
-hydra commit               # empty commit (or with --utxo)
+hydra init                 # open a new (empty) head
 hydra status --watch       # wait for Open state
+hydra commit               # deposit funds (empty commit or with --utxo)
 hydra close                # close the head
 hydra status --watch       # wait for contestation period
 hydra fanout               # finalize to L1

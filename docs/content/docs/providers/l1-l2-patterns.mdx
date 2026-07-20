@@ -9,24 +9,24 @@ This page describes common patterns: moving value **into** a head (commit), movi
 
 ## Commit flow (L1 → L2)
 
-**Commit** is the process of locking UTxOs on L1 so they appear in the Hydra Head and can be spent on L2.
+**Commit** is the process of locking UTxOs on L1 so they appear in the Hydra Head and can be spent on L2. Since hydra-node v2, commits are **deposits** into an already-open head.
 
 ### 1. Head is open
 
-Ensure the head has been initialized and all participants have committed. The head state must be **Open** before you submit L2 transactions.
+Ensure the head has been initialized. `init()` opens the head directly and empty (Idle → Open); the head state must be **Open** before you deposit funds or submit L2 transactions.
 
 ```ts
 import { Head } from "@no-witness-labs/hydra-sdk";
 
 const head = await Head.create({ url: "ws://localhost:4001" });
+await head.init();
 
-// Wait until head is open (e.g. via subscribe or after init + commits)
 console.log(head.getState()); // "Open"
 ```
 
-### 2. Commit UTxOs into the head
+### 2. Commit UTxOs into the head (deposit)
 
-Use the Hydra node's commit endpoint to post a commit transaction on L1. The SDK exposes `postCommit` for the HTTP call; the commit payload format is defined by the hydra-node API.
+Use the Hydra node's commit endpoint to draft a deposit transaction; you sign and submit it on L1, and the head absorbs it asynchronously (`CommitRecorded` → `DepositActivated` → `CommitApproved` → `CommitFinalized`). The SDK exposes `postCommit` for the HTTP call; the commit payload format is defined by the hydra-node API.
 
 ```ts
 import { Provider } from "@no-witness-labs/hydra-sdk";
@@ -35,15 +35,19 @@ import { Effect } from "effect";
 const httpUrl = "http://localhost:4001";
 
 // Build the commit payload per hydra-node API (UTxOs in the format the node expects)
-const commitPayload = { /* ... */ };
+const commitPayload = {
+  /* ... */
+};
 
-// Post commit request; the node will post the commit tx on L1
+// Request a drafted deposit tx; sign and submit it on L1
 await Effect.runPromise(Provider.postCommit(httpUrl, commitPayload));
 
-// After the commit is confirmed on L1, the UTxOs appear in the head snapshot.
+// Once the deposit is absorbed (CommitFinalized), the UTxOs appear in the head snapshot.
 const provider = new Provider.HydraProvider({ head, httpUrl });
 const l2Utxos = await provider.getSnapshotUtxos();
 ```
+
+Each deposit has a deadline (2 × the node's `--deposit-period`). If it expires before being absorbed, reclaim it with `head.recover(recoverTxId)`.
 
 ### 3. Use L2 (HydraProvider) for transactions
 
@@ -83,12 +87,12 @@ head.subscribe((event) => {
 });
 
 // Or with Effect
-yield* head.effect.awaitReadyToFanout();
+yield * head.effect.awaitReadyToFanout();
 ```
 
 ### 3. Run fanout
 
-Run fanout to post the fanout transaction on L1 and distribute UTxOs back to L1 addresses.
+Run fanout to post the fanout transaction(s) on L1 and distribute UTxOs back to L1 addresses. For large UTxO sets, fanout happens in multiple steps (several L1 transactions).
 
 ```ts
 await head.fanout();

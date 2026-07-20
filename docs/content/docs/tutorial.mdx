@@ -101,16 +101,22 @@ const unsubscribe = head.subscribe((event) => {
 ## Step 4: Initialize and Commit
 
 ```ts
-// Initialize the head
+// Initialize the head — it opens directly and empty (hydra-node v2)
 await head.init();
-console.log(`State after init: ${head.getState()}`); // "Initializing"
-
-// Commit (empty commit for this tutorial)
-await head.commit({});
-console.log(`State after commit: ${head.getState()}`); // "Open"
+console.log(`State after init: ${head.getState()}`); // "Open"
 ```
 
-With an empty commit, the head opens without any L1 UTxOs. In a real app, you'd commit UTxOs from a wallet — see the [Wallet Setup](/docs/wallet-setup) guide.
+The head opens without any L1 UTxOs. To add funds, draft a deposit transaction into the _open_ head with `commit()`, then sign and submit it to L1:
+
+```ts
+// Draft an incremental-commit deposit transaction
+const draftTx = await head.commit({ blueprintTx, utxo });
+// Sign and submit draftTx to L1 with your wallet.
+// The node observes the deposit and absorbs it asynchronously:
+// CommitRecorded → DepositActivated → CommitApproved → CommitFinalized
+```
+
+Unlike v1, funds arrive asynchronously — the head is already open, and the deposit is absorbed once the node observes it on L1 (watch for the `CommitFinalized` event in your subscription). For this tutorial we'll continue with an empty head; to commit real UTxOs from a wallet, see the [Wallet Setup](/docs/wallet-setup) guide.
 
 ## Step 5: Query the Head State
 
@@ -134,11 +140,7 @@ console.log(`L2 min fee: ${params.minFeeA}`); // 0 on L2
 If you committed funds, you can build and submit transactions on L2. Here's a simplified example using evolution-sdk:
 
 ```ts
-import {
-  Address,
-  Assets,
-  Transaction,
-} from "@evolution-sdk/evolution";
+import { Address, Assets, Transaction } from "@evolution-sdk/evolution";
 import { makeTxBuilder } from "@evolution-sdk/evolution/sdk/builders/TransactionBuilder";
 
 // Build an L2 transaction
@@ -201,9 +203,8 @@ async function main() {
     });
 
     try {
-      // Open the head
+      // Open the head — opens directly and empty (hydra-node v2)
       await head.init();
-      await head.commit({});
       console.log(`Head is ${head.getState()}`); // "Open"
 
       // Query L2 state

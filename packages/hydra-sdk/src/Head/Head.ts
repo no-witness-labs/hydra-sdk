@@ -1480,7 +1480,7 @@ export const effect = {
  *   console.log(head.getState()); // "Idle"
  *
  *   await head.init();
- *   console.log(head.getState()); // "Initializing"
+ *   console.log(head.getState()); // "Open"
  *
  *   await head.dispose();
  * }
@@ -1553,7 +1553,7 @@ export const withHead = async <A>(
  * const program = Effect.gen(function* () {
  *   const head = yield* Head.HydraHeadService;
  *   yield* head.effect.init();
- *   console.log(head.getState()); // "Initializing"
+ *   console.log(head.getState()); // "Open"
  * });
  *
  * const runnable = program.pipe(

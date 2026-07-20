@@ -84,18 +84,20 @@ const program = Effect.gen(function* () {
   const head = yield* Head.effect.createScoped({ url: "ws://localhost:4001" });
 
   // Catch specific error tags
-  yield* head.effect.init().pipe(
-    Effect.catchTag("HeadError", (error) =>
-      Effect.logError(`Init failed: ${error.message}`),
-    ),
-  );
+  yield* head.effect
+    .init()
+    .pipe(
+      Effect.catchTag("HeadError", (error) =>
+        Effect.logError(`Init failed: ${error.message}`),
+      ),
+    );
 
   // Or handle all errors
-  yield* head.effect.close().pipe(
-    Effect.catchAll((error) =>
-      Effect.logError(`Operation failed: ${error}`),
-    ),
-  );
+  yield* head.effect
+    .close()
+    .pipe(
+      Effect.catchAll((error) => Effect.logError(`Operation failed: ${error}`)),
+    );
 });
 ```
 
@@ -116,15 +118,14 @@ try {
 }
 ```
 
-| Command | Valid From |
-|---------|-----------|
-| Init | Idle |
-| Abort | Idle, Initializing |
-| Commit | Initializing |
-| Close, SafeClose | Open |
-| NewTx, Decommit, Recover | Open |
-| Contest | Closed |
-| Fanout | FanoutPossible |
+| Command                  | Valid From     |
+| ------------------------ | -------------- |
+| Init                     | Idle           |
+| Commit                   | Open           |
+| Close, SafeClose         | Open           |
+| NewTx, Decommit, Recover | Open           |
+| Contest                  | Closed         |
+| Fanout                   | FanoutPossible |
 
 ### Network Failures (From Hydra Node)
 
@@ -217,7 +218,7 @@ try {
 } catch (error) {
   // ProviderError (from evolution-sdk) wraps the underlying failure
   console.error(error.message); // "Failed to fetch UTxOs"
-  console.error(error.cause);   // Original HydraHttpError
+  console.error(error.cause); // Original HydraHttpError
 }
 
 // evaluateTx() is not supported on L2 — always throws
@@ -231,15 +232,16 @@ try {
 ## Transient vs. Permanent Failures
 
 **Transient** — safe to retry:
+
 - Network timeouts
 - WebSocket disconnects (SDK auto-retries)
 - L1 congestion (PostTxOnChainFailed — may succeed on retry)
 
 **Permanent** — fix the root cause:
+
 - FSM state violations (wrong command for current state)
 - Invalid CBOR / malformed transactions
 - Insufficient funds for commit
-- Oversized UTxOs preventing fanout
 
 ## Resource Cleanup
 
@@ -262,7 +264,9 @@ await Head.withHead({ url: "ws://localhost:4001" }, async (head) => {
 // Automatic cleanup with Effect
 const program = Effect.scoped(
   Effect.gen(function* () {
-    const head = yield* Head.effect.createScoped({ url: "ws://localhost:4001" });
+    const head = yield* Head.effect.createScoped({
+      url: "ws://localhost:4001",
+    });
     // head is automatically disposed when scope closes
   }),
 );

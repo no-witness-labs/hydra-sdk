@@ -9,7 +9,7 @@ description: Install the SDK and connect to a Hydra node
 
 - Node.js 18+
 - pnpm 8+
-- A running [Hydra node](https://hydra.family/) (or use `@no-witness-labs/hydra-devnet` for local development)
+- A running [Hydra node](https://hydra.family/) v2.0.0 or later (or use `@no-witness-labs/hydra-devnet` for local development)
 
 ## Installation
 
@@ -49,9 +49,9 @@ const unsubscribe = head.subscribe((event) => {
   console.log(`Event: ${event.tag}`, event.payload);
 });
 
-// Initialize a new head
+// Initialize a new head — opens directly and empty (hydra-node v2)
 await head.init();
-console.log(head.getState()); // "Initializing"
+console.log(head.getState()); // "Open"
 
 // Close and finalize
 await head.close();
@@ -129,14 +129,14 @@ import { Head } from "@no-witness-labs/hydra-sdk";
 
 const head = await Head.create({
   url: "ws://localhost:4001",
-  historyOnConnect: true,    // request message history on initial connect
+  historyOnConnect: true, // request message history on initial connect
   historyOnReconnect: false, // request history on reconnect
   reconnect: {
-    maxRetries: 10,          // default: 10
-    initialDelayMs: 500,     // default: 500
-    maxDelayMs: 30_000,      // default: 30000
-    factor: 1.7,             // exponential backoff factor
-    jitter: 0.2,             // jitter factor
+    maxRetries: 10, // default: 10
+    initialDelayMs: 500, // default: 500
+    maxDelayMs: 30_000, // default: 30000
+    factor: 1.7, // exponential backoff factor
+    jitter: 0.2, // jitter factor
   },
 });
 ```
@@ -149,14 +149,15 @@ import { Cluster } from "@no-witness-labs/hydra-devnet";
 const cluster = Cluster.make({
   clusterName: "my-devnet",
   cardanoNode: {
-    image: "ghcr.io/intersectmbo/cardano-node:10.5.3",
+    image: "ghcr.io/intersectmbo/cardano-node:11.0.1",
     port: 3001,
     networkMagic: 42,
   },
   hydraNode: {
-    image: "ghcr.io/cardano-scaling/hydra-node:1.2.0",
+    image: "ghcr.io/cardano-scaling/hydra-node:2.3.0",
     apiPort: 4001,
     contestationPeriod: 60,
+    depositPeriod: 30, // seconds; hydra-node's own default is 3600
   },
 });
 ```
