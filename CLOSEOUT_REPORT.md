@@ -114,3 +114,4 @@ Hydra is production-ready protocol machinery; what it lacked was an approachable
 - **X:** https://x.com/nowitnesslabs · https://x.com/solidsnakedev
 - **Social plan spreadsheet:** https://docs.google.com/spreadsheets/d/1c-uXL-_7sOoYJ-dj-Df6EOyUwtpxI7UN-lg1I9J2Vks/edit?usp=sharing
 - **Close-out video:** https://youtu.be/Th3_NDU4itQ
+- **This report (PDF):** https://github.com/no-witness-labs/hydra-sdk/releases/download/v1.0.0/Hydra-Manager-1400085-Closeout-Report.pdf
