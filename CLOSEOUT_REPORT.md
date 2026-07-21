@@ -48,7 +48,7 @@ The Cardano Open: Developers challenge funds open-source developer tooling that 
 - **npm downloads (Dec 2025 – Jul 2026):** 316 (`hydra-sdk`) + 399 (`hydra-sdk-cli`) = 715+ installs during the funded period, before the v1.0.0 stability declaration.
 - **Contributors:** 5 people contributed to the repository.
 - **Demo interactions:** the hosted demo has been used to open, commit to, transact in, and fan out real Hydra heads on Cardano preprod (transaction evidence visible on preprod explorers via the demo's head address).
-- **Social reach:** every release was announced on X automatically (GitHub Actions posts on publish) via [@nowitnesslabs](https://x.com/nowitnesslabs) and [@solidsnakedev](https://x.com/solidsnakedev) — see the [social plan spreadsheet](_TBD — Google Sheet link_). Across the tracked release posts (as of 2026-07-15): **959 impressions and 51 total interactions** (37 likes, 11 reposts, 1 reply, 2 bookmarks).
+- **Social reach:** every release was announced on X automatically (GitHub Actions posts on publish) via [@nowitnesslabs](https://x.com/nowitnesslabs) and [@solidsnakedev](https://x.com/solidsnakedev) — see the [social plan spreadsheet](https://docs.google.com/spreadsheets/d/1c-uXL-_7sOoYJ-dj-Df6EOyUwtpxI7UN-lg1I9J2Vks/edit?usp=sharing). Across the tracked release posts (as of 2026-07-15): **959 impressions and 51 total interactions** (37 likes, 11 reposts, 1 reply, 2 bookmarks).
 
 | Date       | Post                                                                                     | Impressions | Interactions |
 | ---------- | ---------------------------------------------------------------------------------------- | ----------- | ------------ |
@@ -112,5 +112,5 @@ Hydra is production-ready protocol machinery; what it lacked was an approachable
 - **Demo:** http://178.63.100.104/
 - **npm:** https://www.npmjs.com/package/@no-witness-labs/hydra-sdk
 - **X:** https://x.com/nowitnesslabs · https://x.com/solidsnakedev
-- **Social plan spreadsheet:** _[TBD — Google Sheet link]_
+- **Social plan spreadsheet:** https://docs.google.com/spreadsheets/d/1c-uXL-_7sOoYJ-dj-Df6EOyUwtpxI7UN-lg1I9J2Vks/edit?usp=sharing
 - **Close-out video:** https://youtu.be/Th3_NDU4itQ
