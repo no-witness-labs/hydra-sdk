@@ -69,7 +69,8 @@ export const ConfirmedSnapshotSchema = Schema.Union(
   Schema.Struct({
     tag: Schema.Literal("InitialSnapshot"),
     headId: Schema.String,
-    initialUTxO: UTxOSchema,
+    // v2 heads open empty (no commit phase), so InitialSnapshot carries no UTxO
+    initialUTxO: Schema.optional(UTxOSchema),
   }),
   Schema.Struct({
     tag: Schema.Literal("ConfirmedSnapshot"),
@@ -83,10 +84,7 @@ export const ConfirmedSnapshotSchema = Schema.Union(
       utxoToDecommit: Schema.optional(Schema.NullOr(UTxOSchema)),
     }),
     signatures: Schema.Struct({
-      multiSignature: Schema.Union(
-        Schema.String,
-        Schema.Array(Schema.String),
-      ),
+      multiSignature: Schema.Union(Schema.String, Schema.Array(Schema.String)),
     }),
   }),
 );

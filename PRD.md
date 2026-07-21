@@ -201,7 +201,7 @@ flowchart TD
 
 **Purpose:** Type definitions and Effect Schema validators for all Hydra API messages.
 
-**Coverage (from Hydra API v1.2.0):**
+**Coverage (from Hydra API v2.3.0):**
 
 | Category                        | Messages                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -304,25 +304,23 @@ Maps evolution-sdk Provider interface methods to Hydra APIs:
 | -------------------------- | ------------------------------------------- |
 | `hydra connect <url>`      | Connect to a hydra-node                     |
 | `hydra status`             | Show head state, participants, UTxO summary |
-| `hydra init`               | Initialize a new head                       |
-| `hydra commit <utxo-file>` | Commit UTxOs to initializing head           |
+| `hydra init`               | Initialize a new head (opens directly)      |
+| `hydra commit <utxo-file>` | Deposit UTxOs into an open head             |
 | `hydra close`              | Close the head                              |
 | `hydra fanout`             | Fan out after contestation                  |
-| `hydra abort`              | Abort before all commits                    |
 | `hydra config`             | Show/set configuration                      |
 
 Config precedence: CLI flags > `HYDRA_*` env vars > `~/.config/hydra-sdk/config.json` > defaults
 
 ### Hydra Node API Mapping
 
-The SDK wraps both WebSocket and HTTP interfaces of the `hydra-node` (API v1.2.0):
+The SDK wraps both WebSocket and HTTP interfaces of the `hydra-node` (API v2.3.0):
 
 **WebSocket (`ws://{host}:{port}/`):**
 
 | Direction     | Operation                                        | SDK Method                                |
 | ------------- | ------------------------------------------------ | ----------------------------------------- |
 | PUB (send)    | `Init`                                           | `head.init()`                             |
-| PUB           | `Abort`                                          | `head.abort()`                            |
 | PUB           | `NewTx`                                          | `head.submitTx()` / `provider.submitTx()` |
 | PUB           | `Recover`                                        | `head.recover(txId)`                      |
 | PUB           | `Decommit`                                       | `head.decommit(tx)`                       |
@@ -332,20 +330,18 @@ The SDK wraps both WebSocket and HTTP interfaces of the `hydra-node` (API v1.2.0
 | PUB           | `Fanout`                                         | `head.fanout()`                           |
 | PUB           | `SideLoadSnapshot`                               | `head.sideLoadSnapshot(snapshot)`         |
 | SUB (receive) | `Greetings`                                      | Connection metadata                       |
-| SUB           | `HeadIsInitializing`                             | State transition event                    |
-| SUB           | `Committed`                                      | State transition event                    |
-| SUB           | `HeadIsOpen`                                     | State transition event                    |
+| SUB           | `HeadIsOpen`                                     | State transition event (acks `Init`)      |
 | SUB           | `HeadIsClosed`                                   | State transition event                    |
 | SUB           | `HeadIsContested`                                | State transition event                    |
 | SUB           | `ReadyToFanout`                                  | State transition event                    |
-| SUB           | `HeadIsAborted`                                  | State transition event                    |
 | SUB           | `HeadIsFinalized`                                | State transition event                    |
 | SUB           | `TxValid` / `TxInvalid`                          | Transaction result                        |
 | SUB           | `SnapshotConfirmed`                              | Snapshot finality                         |
 | SUB           | `Decommit*` events                               | Decommit lifecycle                        |
-| SUB           | `Commit*` events                                 | Incremental commit lifecycle              |
+| SUB           | `Commit*` / `Deposit*` events                    | Incremental deposit lifecycle             |
 | SUB           | `Network*` / `Peer*`                             | Network health                            |
 | SUB           | `NodeUnsynced` / `NodeSynced`                    | Node sync status                          |
+| SUB           | `SyncedStatusReport`                             | L2 chain sync drift report                |
 | SUB           | `CommandFailed` / `RejectedInputBecauseUnsynced` | Error handling                            |
 
 **HTTP (`http://{host}:{port}/`):**
@@ -530,7 +526,7 @@ Multi-head orchestration across multiple `hydra-node` instances. Out of scope fo
 
 | Dependency                                    | Version                         | Purpose                                              |
 | --------------------------------------------- | ------------------------------- | ---------------------------------------------------- |
-| `hydra-node`                                  | >= 1.0.0 (tested against 1.2.0) | Target node API version                              |
+| `hydra-node`                                  | >= 2.0.0 (tested against 2.3.0) | Target node API version                              |
 | `effect`                                      | >= 3.10                         | Core runtime incl. `effect/Schema` (peer dependency) |
 | `@effect/cli`                                 | >= 0.x                          | CLI framework                                        |
 | evolution-sdk (`@intersectmbo/evolution-sdk`) | TBD                             | L1 providers + wallet + tx building                  |

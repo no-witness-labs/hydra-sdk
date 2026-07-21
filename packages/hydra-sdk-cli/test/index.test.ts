@@ -12,7 +12,7 @@ describe("CLI / Head integration", () => {
     const head = await Head.create({ url: "mock://localhost:4001" });
 
     await head.init();
-    expect(head.getState()).toBe("Initializing");
+    expect(head.getState()).toBe("Open");
 
     await head.dispose();
   });

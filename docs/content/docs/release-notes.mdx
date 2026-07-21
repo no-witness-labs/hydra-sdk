@@ -11,6 +11,19 @@ All packages are published to npm under the `@no-witness-labs` scope and follow 
 - GitHub releases: [no-witness-labs/hydra-sdk/releases](https://github.com/no-witness-labs/hydra-sdk/releases)
 - Full per-package changelogs: [hydra-sdk](https://github.com/no-witness-labs/hydra-sdk/blob/main/packages/hydra-sdk/CHANGELOG.md) · [hydra-sdk-cli](https://github.com/no-witness-labs/hydra-sdk/blob/main/packages/hydra-sdk-cli/CHANGELOG.md)
 
+## v2.0.0 (upcoming) — hydra-node v2 support
+
+> **Unreleased.** This version is in development on the `feat/hydra-v2` branch and is not yet published to npm; the current npm `latest` is v1.0.0.
+
+Major release targeting **hydra-node >= 2.0.0** (tested against 2.3.0). SDK 1.x remains the line for hydra-node 1.2.0. Breaking changes:
+
+- **Direct-open lifecycle** (ADR-33): `init()` opens the head directly and empty (Idle → Open). The commit phase is gone — no `Initializing` state, no `HeadIsInitializing`/`HeadIsAborted` events
+- **`abort()` removed** from the SDK and CLI; the `Abort`/`CollectCom` transactions no longer exist in the protocol, which also eliminates v1's stuck-in-CollectCom failure mode
+- **Commits are deposits**: funds enter an open head via incremental commits (`CommitRecorded` → `DepositActivated` → `CommitApproved` → `CommitFinalized`), with a deadline of 2 × the node's `--deposit-period` and `recover()` for expired deposits
+- **`HeadIsFinalized` payload**: `utxo` renamed to `finalizedUTxO`
+- **`Greetings.headStatus`** no longer includes `"Final"` (the node returns to `Idle` after fanout; `Final` remains an SDK-side `HeadStatus`)
+- **Devnet** updated to `ghcr.io/cardano-scaling/hydra-node:2.3.0` and `ghcr.io/intersectmbo/cardano-node:11.0.1` (Dijkstra genesis, P2P topology), with a configurable `depositPeriod` (default 30s)
+
 ## v1.0.0 — Stable release
 
 First stable release. The documented public API is now stable: breaking changes will only ship in a new major version.

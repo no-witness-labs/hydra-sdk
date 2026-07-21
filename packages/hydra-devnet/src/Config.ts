@@ -52,6 +52,12 @@ export interface HydraNodeConfig {
   readonly monitoringPort?: number;
   /** Contestation period in seconds (default: 60) */
   readonly contestationPeriod?: number;
+  /**
+   * Deposit period in seconds (default: 30).
+   * hydra-node's own default is 3600s, which makes incremental commits take
+   * up to an hour to activate — far too slow for a devnet.
+   */
+  readonly depositPeriod?: number;
   /** Unique node identifier (default: "devnet-1") */
   readonly nodeId?: string;
 }
@@ -102,6 +108,7 @@ export type NodeConfig = {
   readonly ShelleyGenesisFile: string;
   readonly AlonzoGenesisFile: string;
   readonly ConwayGenesisFile: string;
+  readonly DijkstraGenesisFile: string;
   readonly ApplicationName: string;
   readonly ApplicationVersion: number;
   readonly MaxKnownMajorProtocolVersion: number;
@@ -365,7 +372,7 @@ export type CardanoKey = {
  * @category constants
  */
 export const DEFAULT_CARDANO_NODE_IMAGE =
-  "ghcr.io/intersectmbo/cardano-node:10.5.3" as const;
+  "ghcr.io/intersectmbo/cardano-node:11.0.1" as const;
 
 /**
  * Default Hydra node Docker image.
@@ -373,7 +380,7 @@ export const DEFAULT_CARDANO_NODE_IMAGE =
  * @category constants
  */
 export const DEFAULT_HYDRA_NODE_IMAGE =
-  "ghcr.io/cardano-scaling/hydra-node:1.2.0" as const;
+  "ghcr.io/cardano-scaling/hydra-node:2.3.0" as const;
 
 // ---------------------------------------------------------------------------
 // Default Container Configuration
@@ -402,6 +409,7 @@ export const DEFAULT_HYDRA_NODE_CONFIG: Required<HydraNodeConfig> = {
   peerPort: 5001,
   monitoringPort: 6001,
   contestationPeriod: 60,
+  depositPeriod: 30,
   nodeId: "devnet-1",
 } as const;
 
@@ -433,6 +441,7 @@ export const DEFAULT_NODE_JSON_CONFIG: NodeConfig = {
   ShelleyGenesisFile: "genesis-shelley.json",
   AlonzoGenesisFile: "genesis-alonzo.json",
   ConwayGenesisFile: "genesis-conway.json",
+  DijkstraGenesisFile: "genesis-dijkstra.json",
   ApplicationName: "cardano-sl",
   ApplicationVersion: 1,
   MaxKnownMajorProtocolVersion: 2,
@@ -736,6 +745,22 @@ export const DEFAULT_CONWAY_GENESIS: ConwayGenesis = {
     threshold: 0.66,
   },
 };
+
+/**
+ * Default Dijkstra genesis configuration.
+ * Required by cardano-node 11+, which loads every era's genesis config even
+ * when the devnet only hard-forks up to Conway. Values mirror the hydra
+ * project's devnet configuration.
+ *
+ * @since 0.1.0
+ * @category constants
+ */
+export const DEFAULT_DIJKSTRA_GENESIS = {
+  maxRefScriptSizePerBlock: 1048576,
+  maxRefScriptSizePerTx: 204800,
+  refScriptCostStride: 25600,
+  refScriptCostMultiplier: 1.2,
+} as const;
 
 // ---------------------------------------------------------------------------
 // Default Cryptographic Keys (for block production)

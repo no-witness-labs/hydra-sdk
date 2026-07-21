@@ -7,7 +7,7 @@ export async function GET() {
   return NextResponse.json(hydra.getState());
 }
 
-/** POST /api/head — execute a head action. Body: { action: "connect" | "init" | "commit" | "close" | "fanout" | "abort" | "disconnect" } */
+/** POST /api/head — execute a head action. Body: { action: "connect" | "init" | "commit" | "close" | "fanout" | "disconnect" } */
 export async function POST(req: Request) {
   try {
     const { action } = (await req.json()) as { action: string };
@@ -26,8 +26,6 @@ export async function POST(req: Request) {
         return NextResponse.json(await hydra.close());
       case "fanout":
         return NextResponse.json(await hydra.fanout());
-      case "abort":
-        return NextResponse.json(await hydra.abort());
       default:
         return NextResponse.json(
           { error: `Unknown action: ${action}` },

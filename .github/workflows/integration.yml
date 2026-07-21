@@ -37,8 +37,8 @@ jobs:
 
       - name: Pull Docker images
         run: |
-          docker pull ghcr.io/intersectmbo/cardano-node:10.5.3
-          docker pull ghcr.io/cardano-scaling/hydra-node:1.2.0
+          docker pull ghcr.io/intersectmbo/cardano-node:11.0.1
+          docker pull ghcr.io/cardano-scaling/hydra-node:2.3.0
 
       - name: Run integration tests
         run: pnpm --filter @no-witness-labs/hydra-sdk test:integration

@@ -12,20 +12,11 @@ import { type ClientInputTag, HeadError, type HeadStatus } from "./Head.js";
 type TransitionKey = `${HeadStatus}:${string}`;
 
 const transitions: Record<TransitionKey, HeadStatus> = {
-  // Idle → Initializing via Init
-  "Idle:HeadIsInitializing": "Initializing",
-
-  // Initializing → Open when all participants have committed
-  "Initializing:HeadIsOpen": "Open",
-
-  // Initializing → Aborted via Abort
-  "Initializing:HeadIsAborted": "Aborted",
+  // Idle → Open via Init (hydra-node v2 opens directly; no Initializing phase)
+  "Idle:HeadIsOpen": "Open",
 
   // Open → Closed via Close or SafeClose
   "Open:HeadIsClosed": "Closed",
-
-  // Open → Aborted (emergency abort while head is open)
-  "Open:HeadIsAborted": "Aborted",
 
   // Closed → Closed via Contest (contestation deadline extended)
   "Closed:HeadIsContested": "Closed",
@@ -47,15 +38,12 @@ const transitions: Record<TransitionKey, HeadStatus> = {
 
 const commandAllowedFrom: Record<ClientInputTag, ReadonlySet<HeadStatus>> = {
   Init: new Set(["Idle"]),
-  Commit: new Set(["Initializing"]),
+  // Commit drafts an incremental deposit transaction; head must be Open.
+  Commit: new Set(["Open"]),
   NewTx: new Set(["Open"]),
   Close: new Set(["Open"]),
   SafeClose: new Set(["Open"]),
   Fanout: new Set(["FanoutPossible"]),
-  // Abort is valid from Initializing per the Hydra spec.
-  // Idle is included as a no-harm guard: aborting before any on-chain
-  // activity is a no-op rather than an error.
-  Abort: new Set(["Idle", "Initializing"]),
   // Recover a failed incremental commit deposit (only while head is Open)
   Recover: new Set(["Open"]),
   // Decommit UTxOs from the head back to L1 (only while head is Open)
@@ -70,22 +58,18 @@ const commandAllowedFrom: Record<ClientInputTag, ReadonlySet<HeadStatus>> = {
 
 const outputTagToStatus: Readonly<Record<string, HeadStatus>> = {
   HeadIsIdle: "Idle",
-  HeadIsInitializing: "Initializing",
   HeadIsOpen: "Open",
   HeadIsClosed: "Closed",
   ReadyToFanout: "FanoutPossible",
   HeadIsFinalized: "Final",
-  HeadIsAborted: "Aborted",
 };
 
 const statusToOutputTag: Readonly<Record<HeadStatus, string>> = {
   Idle: "HeadIsIdle",
-  Initializing: "HeadIsInitializing",
   Open: "HeadIsOpen",
   Closed: "HeadIsClosed",
   FanoutPossible: "ReadyToFanout",
   Final: "HeadIsFinalized",
-  Aborted: "HeadIsAborted",
 };
 
 /** Resolve a server output tag to its corresponding HeadStatus, if any. */
@@ -100,7 +84,7 @@ export const outputTagFromStatus = (status: HeadStatus): string | undefined =>
 // Terminal states – no commands allowed, no transitions out
 // ---------------------------------------------------------------------------
 
-const terminalStates: ReadonlySet<HeadStatus> = new Set(["Final", "Aborted"]);
+const terminalStates: ReadonlySet<HeadStatus> = new Set(["Final"]);
 
 // ---------------------------------------------------------------------------
 // FSM interface

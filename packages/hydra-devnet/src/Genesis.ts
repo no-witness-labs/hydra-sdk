@@ -48,6 +48,7 @@ import {
   buildShelleyGenesis,
   DEFAULT_ALONZO_GENESIS,
   DEFAULT_CONWAY_GENESIS,
+  DEFAULT_DIJKSTRA_GENESIS,
   DEFAULT_HYDRA_SK,
   DEFAULT_HYDRA_VK,
   DEFAULT_INITIAL_FUNDS_LOVELACE,
@@ -106,10 +107,13 @@ export interface GeneratedKeys {
 
 /**
  * Default topology configuration for the devnet (no peers).
+ * P2P topology format, required by cardano-node 11+.
  * @internal
  */
 const DEFAULT_TOPOLOGY = {
-  Producers: [],
+  localRoots: [],
+  publicRoots: [],
+  useLedgerAfterSlot: -1,
 };
 
 // =============================================================================
@@ -202,6 +206,7 @@ function generateKeysEffect(
  * - `genesis-shelley.json` — Shelley genesis with funded payment address
  * - `genesis-alonzo.json` — Alonzo genesis (Plutus parameters)
  * - `genesis-conway.json` — Conway genesis (governance parameters)
+ * - `genesis-dijkstra.json` — Dijkstra genesis (required by cardano-node 11+)
  * - `kes.skey` — KES signing key for block production
  * - `vrf.skey` — VRF signing key for block production
  * - `pool.cert` — Operational certificate for block production
@@ -258,6 +263,10 @@ function writeConfigFilesEffect(
           writeFile(
             join(tempDir, "genesis-conway.json"),
             JSON.stringify(DEFAULT_CONWAY_GENESIS, null, 2),
+          ),
+          writeFile(
+            join(tempDir, "genesis-dijkstra.json"),
+            JSON.stringify(DEFAULT_DIJKSTRA_GENESIS, null, 2),
           ),
           writeFile(
             join(tempDir, "kes.skey"),

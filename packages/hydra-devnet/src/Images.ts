@@ -16,10 +16,10 @@
  *
  * ```typescript
  * // Promise user
- * await Images.ensureAvailable('ghcr.io/cardano-scaling/hydra-node:0.21.0');
+ * await Images.ensureAvailable('ghcr.io/cardano-scaling/hydra-node:2.3.0');
  *
  * // Effect user
- * yield* Images.effect.ensureAvailable('ghcr.io/cardano-scaling/hydra-node:0.21.0');
+ * yield* Images.effect.ensureAvailable('ghcr.io/cardano-scaling/hydra-node:2.3.0');
  * ```
  *
  * @since 0.1.0

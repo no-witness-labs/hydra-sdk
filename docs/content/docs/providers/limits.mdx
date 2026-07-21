@@ -11,19 +11,20 @@ When building with Hydra and HydraProvider, you are constrained by the Hydra Hea
 
 The [Hydra Head protocol](https://hydra.family/head-protocol/) runs on Cardano and reuses its transaction and execution model. Key implications:
 
-- **Head lifecycle is L1-anchored**: `Init`, `Close`, `Contest`, `Fanout`, and `Abort` are on-chain transactions. Their size and execution costs are bounded by Cardano network parameters.
+- **Head lifecycle is L1-anchored**: `Init`, deposit (incremental commit), `Close`, `Contest`, and `Fanout` are on-chain transactions. Their size and execution costs are bounded by Cardano network parameters, and each is subject to L1 confirmation latency.
+- **Direct open, empty head**: Since hydra-node v2 (ADR-33), `init()` opens the head directly and empty (Idle → Open). There is no commit phase, no `Initializing` state, and no `Abort`/`CollectCom` transactions. Funds enter an already-open head via incremental commits (deposits).
 - **Participant set is fixed**: The number of parties is set at initialization and cannot be changed for that head. Adding or removing participants requires a new head.
 - **Consensus is multi-party**: All participants must agree on snapshots. Any party can initiate close, but others may contest within the contestation period before fanout.
 
 ## Transaction size limits
 
-Cardano network parameters apply to all Hydra protocol transactions (`Init`, `CollectCom`, `Close`, `Fanout`, etc.):
+Cardano network parameters apply to all Hydra protocol transactions (`Init`, deposit, `Close`, `Fanout`, etc.):
 
-| Parameter | Typical limit | Notes |
-|-----------|----------------|--------|
-| **Max transaction size** | 16,384 bytes | Affects `CollectCom` and other multi-party transactions |
-| **Max execution memory** | 14,000,000 units | Plutus execution budget |
-| **Max execution steps (CPU)** | 10,000,000,000 units | Plutus execution budget |
+| Parameter                     | Typical limit        | Notes                                              |
+| ----------------------------- | -------------------- | -------------------------------------------------- |
+| **Max transaction size**      | 16,384 bytes         | Affects deposit and other multi-party transactions |
+| **Max execution memory**      | 14,000,000 units     | Plutus execution budget                            |
+| **Max execution steps (CPU)** | 10,000,000,000 units | Plutus execution budget                            |
 
 L2 transactions submitted via HydraProvider (NewTx) are validated by the head participants and are subject to the **head's** protocol parameters (returned by `getProtocolParameters()`). Those are often derived from or aligned with the same network limits. Keep transaction size and script complexity within bounds to avoid validation failures.
 
@@ -31,26 +32,36 @@ L2 transactions submitted via HydraProvider (NewTx) are validated by the head pa
 
 The maximum number of participants in a head is constrained by:
 
-- **CollectCom transaction size**: The initialization step that collects commits from all parties must fit in a single L1 transaction. As the number of parties grows, CollectCom size and cost increase. Benchmarks show transaction size and memory usage rising sharply with participant count (e.g. approaching memory limits at around 6 parties in some configurations).
+- **On-chain verification cost**: Protocol transactions such as `Close` and `Contest` verify multi-signatures from all parties on L1. As the number of parties grows, transaction size and Plutus execution cost increase. Benchmarks show size and memory usage rising with participant count.
 - **Configuration**: The hydra-node will report when the configured maximum number of peers is exceeded. Stay within the node's configured and tested limits.
 
-**Practical guidance:** Use a small, fixed set of participants (e.g. 2–5) unless you have validated larger configurations. Test init/close/fanout with your exact participant count and commit patterns.
+**Practical guidance:** Use a small, fixed set of participants (e.g. 2–5) unless you have validated larger configurations. Test init/close/fanout with your exact participant count and deposit patterns.
 
 ## Known constraints
 
 These are well-documented in the [Hydra known issues and limitations](https://hydra.family/head-protocol/docs/known-issues):
 
-### Oversized UTxOs
+### Oversized commits: resolved in v2
 
-If participants commit UTxOs that are too large or too complex to be processed in **CollectCom** or **Abort** transactions, the head can get stuck in initialization. Funds can remain locked until the situation is resolved (e.g. protocol upgrade or manual recovery).
+In hydra-node v1, committing UTxOs that were too large or complex for the **CollectCom** or **Abort** transactions could wedge a head in initialization, with funds locked and no clean abort possible. This failure mode **no longer exists** in v2: heads open directly and empty (there is no commit phase, no `CollectCom`, and no `Abort`), and funds enter via incremental commits (deposits). A deposit that cannot be absorbed simply expires and can be recovered — the head itself is never blocked.
 
-**Mitigation:** Limit UTxO size and complexity when committing. Prefer smaller, simpler UTxOs for head participation.
+### Deposit deadline and expiry
 
-### Asset limits at finalization
+An incremental commit is a **deposit**: `commit()` drafts a deposit transaction that you sign and submit on L1, and the head absorbs it asynchronously (`CommitRecorded` → `DepositActivated` → `CommitApproved` → `CommitFinalized`). Each deposit has a deadline of **2 × the node's `--deposit-period`** (node default 3600s; the SDK devnet passes 30s). If the deposit is not absorbed before the deadline, the node emits `DepositExpired` and the funds stay locked in the deposit output.
 
-Heads can be **closed** with many assets, but **fanout** (finalization) has limits. The protocol documentation notes that heads cannot finalize with more than approximately **80 assets** in the final snapshot. Closing is still possible; fanout may fail or be restricted beyond that point.
+**Mitigation:** Monitor deposit lifecycle events and reclaim expired deposits with `recover(recoverTxId)`. Configure `--deposit-period` long enough for L1 confirmation plus head processing.
 
-**Mitigation:** Design heads so that the final UTxO set stays under the asset limit, or plan for multiple heads / fanout strategies if you need more assets.
+### Contestation period and finalization latency
+
+Closing a head is not instant: after `Close`, the head stays **Closed** for the full contestation period (during which any party may `Contest`), then becomes `FanoutPossible`. Every step — close, contest, fanout — is an L1 transaction subject to L1 confirmation latency.
+
+**Mitigation:** Choose a contestation period that balances safety (time to contest) against exit latency, and account for L1 confirmation times in your UX.
+
+### Fanout in multiple steps
+
+Since hydra 2.2, heads with large UTxO sets fan out in **multiple steps** (`PartialFanoutTx`/`FinalPartialFanoutTx` with BLS accumulator proofs). The previous per-head UTxO limit at finalization is **gone** — but fanout may take several L1 transactions, so finalization latency and total L1 cost grow with the size of the final UTxO set.
+
+**Mitigation:** Expect finalization of large heads to span multiple L1 transactions and confirmation windows; keep the final UTxO set small if fast exit matters.
 
 ### Minted tokens in an open head
 
@@ -58,14 +69,15 @@ Tokens **minted** inside an open head but **not burned** before closure can prev
 
 **Mitigation:** Burn any tokens minted in the head before closing, or avoid minting in the head if you intend to fan out.
 
-### Signing and abortability
+### Signing and recovery
 
-- **Sign only closable snapshots** — Avoid signing snapshots that cannot be closed/fanouted (e.g. due to asset count or minted tokens), to reduce risk of locked funds.
-- **Design for abortability** — Where possible, design flows so that heads can be aborted cleanly if something goes wrong, rather than relying only on close/fanout.
+- **Sign only closable snapshots** — Avoid signing snapshots that cannot be closed/fanouted (e.g. due to minted tokens), to reduce risk of locked funds.
+- **Design for recovery** — Handle deposit expiry (`DepositExpired` → `recover()`) and pending decommits in your flows, rather than relying only on the happy path to close/fanout.
 
 ## SDK-specific limits
 
 - **HydraProvider** — Same Provider interface as L1; `evaluateTx()` is not supported (throws). `getDatum()` is best-effort (inline datums in the snapshot only). No delegation on L2.
+- **Protocol parameters** — hydra-node's `/protocol-parameters` endpoint may omit some Plutus cost-model languages; `getProtocolParameters()` maps whichever cost models the node returns. Don't assume all of PlutusV1/V2/V3 are present.
 - **WebSocket** — The head connection is single WebSocket per `HydraHead` instance. Reconnection and backoff are configurable; avoid unbounded retries in production.
 - **Snapshot UTxOs** — `getSnapshotUtxos()` and address-filtered queries return the **current** snapshot. During high activity, the snapshot may change between query and submit; design for idempotency or retries where needed.
 

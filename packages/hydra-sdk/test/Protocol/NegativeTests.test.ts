@@ -122,9 +122,8 @@ describe("Negative schema validation", () => {
   it.effect("rejects TxOut with missing address", () =>
     Effect.gen(function* () {
       const input = {
-        tag: "Committed",
+        tag: "HeadIsOpen",
         headId: "820082582089ff4f3ff4a6052ec9d073",
-        parties: [{ vkey: "abc123" }],
         utxo: {
           "txhash#0": {
             // missing address
@@ -136,7 +135,7 @@ describe("Negative schema validation", () => {
       };
 
       const result = yield* Schema.decodeUnknown(
-        Protocol.CommittedMessageSchema,
+        Protocol.HeadIsOpenMessageSchema,
       )(input).pipe(Effect.either);
 
       expect(result._tag).toBe("Left");
@@ -146,9 +145,8 @@ describe("Negative schema validation", () => {
   it.effect("rejects TxOut with missing value", () =>
     Effect.gen(function* () {
       const input = {
-        tag: "Committed",
+        tag: "HeadIsOpen",
         headId: "820082582089ff4f3ff4a6052ec9d073",
-        parties: [{ vkey: "abc123" }],
         utxo: {
           "txhash#0": {
             address: "addr1...",
@@ -160,7 +158,7 @@ describe("Negative schema validation", () => {
       };
 
       const result = yield* Schema.decodeUnknown(
-        Protocol.CommittedMessageSchema,
+        Protocol.HeadIsOpenMessageSchema,
       )(input).pipe(Effect.either);
 
       expect(result._tag).toBe("Left");

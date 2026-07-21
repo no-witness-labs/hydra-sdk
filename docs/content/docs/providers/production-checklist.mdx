@@ -30,7 +30,8 @@ Before running Hydra heads and HydraProvider in production, work through securit
 ### Head and connection health
 
 - **WebSocket connection**: Monitor connection state and reconnection events. The SDK reconnects with backoff; track how often reconnects happen and alert on sustained failures.
-- **Head state**: Subscribe to head events and log or track state transitions (`HeadIsOpen`, `HeadIsClosed`, `HeadIsFinalized`, `HeadIsAborted`). Detect when the head is stuck (e.g. long time in Initializing or Closed without progress).
+- **Head state**: Subscribe to head events and log or track state transitions (`HeadIsOpen`, `HeadIsClosed`, `ReadyToFanout`, `HeadIsFinalized`). Detect when the head is stuck (e.g. long time in Closed without progress toward fanout).
+- **Deposits**: Track deposit lifecycle events (`CommitRecorded` → `DepositActivated` → `CommitApproved` → `CommitFinalized`). Alert on `DepositExpired` and trigger a `recover()` flow so expired deposits are reclaimed.
 
 ### Transactions and UTxOs
 
@@ -51,8 +52,8 @@ Before running Hydra heads and HydraProvider in production, work through securit
 
 ### Head lifecycle errors
 
-- **HeadError**: Lifecycle commands (`init`, `close`, `fanout`, `abort`) can fail with `HeadError` (e.g. invalid state). Check head state before issuing commands and handle errors (e.g. "Head is not Open") with clear user messaging or recovery flows.
-- **L1 failures**: Init, close, and fanout post transactions on L1. If L1 is congested or fees are misconfigured, these can fail. Monitor L1 node/indexer health and fee settings.
+- **HeadError**: Lifecycle commands (`init`, `commit`, `close`, `fanout`, `recover`) can fail with `HeadError` (e.g. invalid state). Check head state before issuing commands and handle errors (e.g. "Head is not Open") with clear user messaging or recovery flows.
+- **L1 failures**: Init, deposits (commits), close, and fanout post transactions on L1. If L1 is congested or fees are misconfigured, these can fail. For large UTxO sets, fanout may span multiple L1 transactions (partial fanout). Monitor L1 node/indexer health and fee settings.
 
 ### evaluateTx and getDatum
 
@@ -75,11 +76,12 @@ Before running Hydra heads and HydraProvider in production, work through securit
 
 - **URLs**: Configure WebSocket and HTTP URLs via environment variables or config (e.g. `HYDRA_WS_URL`, `HYDRA_HTTP_URL`). Use the same host/port with `ws(s)://` and `http(s)://`.
 - **Reconnection**: Tune reconnection (e.g. `maxRetries`, `initialDelayMs`, `maxDelayMs`) so the client recovers from short outages without hammering the node.
+- **Deposit period**: Configure the hydra-node's `--deposit-period` sensibly. The deposit deadline is 2 × the deposit period (node default 3600s); too short and deposits expire before they can be absorbed, too long and expired funds stay locked longer before `recover()` is possible.
 
 ### Testing before production
 
-- **Load and failure testing**: Run integration tests against a devnet or testnet with realistic load. Test reconnection, submit/await under failure, and head lifecycle (init, close, fanout).
-- **Limits**: Respect [Limits](/docs/providers/limits): participant count, transaction size, asset count at fanout, and minted-token rules. Validate your use case against these before production.
+- **Load and failure testing**: Run integration tests against a devnet or testnet with realistic load. Test reconnection, submit/await under failure, and head lifecycle (init, commit/deposit, close, fanout).
+- **Limits**: Respect [Limits](/docs/providers/limits): participant count, transaction size, deposit deadlines, fanout duration for large UTxO sets, and minted-token rules. Validate your use case against these before production.
 
 ## Summary checklist
 
@@ -89,6 +91,7 @@ Before running Hydra heads and HydraProvider in production, work through securit
 - [ ] WebSocket and head state monitored; TxInvalid and state transitions logged/tracked
 - [ ] Head and provider disposed on shutdown; `Head.withHead` or scoped Effect where appropriate
 - [ ] Config from environment; reconnection tuned
+- [ ] `--deposit-period` configured sensibly; `DepositExpired` monitored with a `recover()` flow in place
 - [ ] evaluateTx not used on L2; getDatum failure handled
 - [ ] Load and limits validated before production
 

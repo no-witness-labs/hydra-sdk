@@ -26,12 +26,12 @@ import { Cluster } from "@no-witness-labs/hydra-devnet";
 import { Head, Provider } from "@no-witness-labs/hydra-sdk";
 
 await Cluster.withCluster({}, async (cluster) => {
-  console.log("Hydra WebSocket:", cluster.hydraApiUrl);   // ws://localhost:4001
-  console.log("Hydra HTTP:    ", cluster.hydraHttpUrl);   // http://localhost:4001
+  console.log("Hydra WebSocket:", cluster.hydraApiUrl); // ws://localhost:4001
+  console.log("Hydra HTTP:    ", cluster.hydraHttpUrl); // http://localhost:4001
 
   const head = await Head.create({ url: cluster.hydraApiUrl });
-  await head.init();
-  // Commit UTxOs as needed, then use the head for L2 transactions
+  await head.init(); // head opens directly (hydra-node v2)
+  // Deposit UTxOs via commit() as needed, then use the head for L2 transactions
 
   const provider = new Provider.HydraProvider({
     head,
@@ -49,20 +49,21 @@ When `withCluster` exits, the cluster is stopped and removed. Use this in a test
 
 ### Devnet configuration
 
-Customize images, ports, and contestation period:
+Customize images, ports, contestation period, and deposit period:
 
 ```ts
 const cluster = Cluster.make({
   clusterName: "my-testnet",
   cardanoNode: {
-    image: "ghcr.io/intersectmbo/cardano-node:10.5.3",
+    image: "ghcr.io/intersectmbo/cardano-node:11.0.1",
     port: 3001,
     networkMagic: 42,
   },
   hydraNode: {
-    image: "ghcr.io/cardano-scaling/hydra-node:1.2.0",
+    image: "ghcr.io/cardano-scaling/hydra-node:2.3.0",
     apiPort: 4001,
     contestationPeriod: 60,
+    depositPeriod: 30,
   },
 });
 await cluster.start();
@@ -102,7 +103,7 @@ const provider = new Provider.HydraProvider({
 });
 ```
 
-2. **Head state**: Ensure the head is **Open** before submitting L2 transactions. In testnet, the head may already be open; in local devnet, run `init()` and commits first.
+2. **Head state**: Ensure the head is **Open** before submitting L2 transactions. In testnet, the head may already be open; in local devnet, run `init()` first (the head opens directly and empty on hydra-node v2) and deposit funds via `commit()` as needed.
 
 3. **Cleanup**: Dispose the head and (if applicable) stop the cluster in `afterAll` or similar so connections and containers don't leak.
 
@@ -132,17 +133,27 @@ Your code depends on `evolution-sdk`'s `Provider` interface. Implement a minimal
 import type { Provider } from "@evolution-sdk/evolution/sdk/provider/Provider";
 
 const createMockProvider = (overrides: Partial<Provider> = {}): Provider => ({
-  getProtocolParameters: async () => ({ /* ... */ }),
+  getProtocolParameters: async () => ({
+    /* ... */
+  }),
   getUtxos: async () => [],
   getUtxosWithUnit: async () => [],
-  getUtxoByUnit: async () => { throw new Error("not found"); },
+  getUtxoByUnit: async () => {
+    throw new Error("not found");
+  },
   getUtxosByOutRef: async () => [],
   getDelegation: async () => ({ poolId: null, rewards: 0n }),
-  getDatum: async () => { throw new Error("not found"); },
+  getDatum: async () => {
+    throw new Error("not found");
+  },
   awaitTx: async () => true,
-  submitTx: async () => ({ hash: new Uint8Array(32) } as any),
-  evaluateTx: async () => { throw new Error("not supported"); },
-  Effect: { /* same methods returning Effect.succeed / Effect.fail */ },
+  submitTx: async () => ({ hash: new Uint8Array(32) }) as any,
+  evaluateTx: async () => {
+    throw new Error("not supported");
+  },
+  Effect: {
+    /* same methods returning Effect.succeed / Effect.fail */
+  },
   ...overrides,
 });
 
@@ -178,10 +189,10 @@ For methods that actually call HTTP (e.g. `getUtxos`), use a real local node (e.
 
 ### Summary
 
-| Goal | Approach |
-|------|----------|
-| Local Hydra + Cardano | Use `@no-witness-labs/hydra-devnet` with `Cluster.withCluster`. |
+| Goal                           | Approach                                                                           |
+| ------------------------------ | ---------------------------------------------------------------------------------- |
+| Local Hydra + Cardano          | Use `@no-witness-labs/hydra-devnet` with `Cluster.withCluster`.                    |
 | Integration tests vs real node | Set `HYDRA_WS_URL` / `HYDRA_HTTP_URL`, ensure head is Open, dispose in `afterAll`. |
-| Unit tests, no node | Implement a mock `Provider` or use a mock WebSocket URL and stub HTTP. |
+| Unit tests, no node            | Implement a mock `Provider` or use a mock WebSocket URL and stub HTTP.             |
 
 See [Production Checklist](/docs/providers/production-checklist) and [Limits](/docs/providers/limits) for production and protocol constraints.

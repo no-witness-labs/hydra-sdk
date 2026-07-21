@@ -68,12 +68,10 @@ const wsToHttp = (wsUrl: string): string =>
 
 const validCommands: Record<Head.HeadStatus, Array<Head.ClientInputTag>> = {
   Idle: ["Init"],
-  Initializing: ["Commit", "Abort"],
-  Open: ["Close", "SafeClose", "Decommit"],
+  Open: ["Commit", "Close", "SafeClose", "Decommit"],
   Closed: ["Contest", "Fanout"],
   FanoutPossible: ["Fanout"],
   Final: [],
-  Aborted: [],
 };
 
 const keyMap: Record<string, Head.ClientInputTag> = {
@@ -81,19 +79,16 @@ const keyMap: Record<string, Head.ClientInputTag> = {
   x: "Close",
   s: "SafeClose",
   f: "Fanout",
-  a: "Abort",
   t: "Contest",
 };
 
 const stateColor = (state: Head.HeadStatus): string => {
   switch (state) {
     case "Idle": return "gray";
-    case "Initializing": return "yellow";
     case "Open": return "green";
     case "Closed": return "red";
     case "FanoutPossible": return "cyan";
     case "Final": return "blue";
-    case "Aborted": return "magenta";
   }
 };
 
@@ -146,7 +141,6 @@ const CommandHelp = ({ hasWallet, state }: { state: Head.HeadStatus; hasWallet: 
     { key: "x", label: "close", command: "Close" },
     { key: "s", label: "safeClose", command: "SafeClose" },
     { key: "f", label: "fanout", command: "Fanout" },
-    { key: "a", label: "abort", command: "Abort" },
     { key: "t", label: "contest", command: "Contest" },
   ];
 

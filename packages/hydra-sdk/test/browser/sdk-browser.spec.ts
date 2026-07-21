@@ -176,7 +176,7 @@ test("subscribe() delivers events in browser", async ({ page }) => {
     await head.dispose();
     return events;
   });
-  expect(tags).toContain("HeadIsInitializing");
+  expect(tags).toContain("HeadIsOpen");
 });
 
 // ---------------------------------------------------------------------------

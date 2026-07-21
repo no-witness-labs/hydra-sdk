@@ -5,12 +5,10 @@ import { useCallback, useEffect, useState } from "react";
 type HeadState =
   | "Disconnected"
   | "Idle"
-  | "Initializing"
   | "Open"
   | "Closed"
   | "FanoutPossible"
-  | "Final"
-  | "Aborted";
+  | "Final";
 
 interface L2Utxo {
   txHash: string;
@@ -161,10 +159,10 @@ export default function Home() {
               </Button>
               <Button
                 onClick={() => headAction("commit")}
-                disabled={isLoading || state !== "Initializing"}
+                disabled={isLoading || state !== "Open"}
                 color="#059669"
               >
-                {loading === "commit" ? "Committing..." : "Commit"}
+                {loading === "commit" ? "Depositing..." : "Commit (Deposit)"}
               </Button>
               <Button
                 onClick={() => headAction("close")}
@@ -179,16 +177,6 @@ export default function Home() {
                 color="#7c3aed"
               >
                 Fanout
-              </Button>
-              <Button
-                onClick={() => headAction("abort")}
-                disabled={
-                  isLoading ||
-                  (state !== "Idle" && state !== "Initializing")
-                }
-                color="#6b7280"
-              >
-                Abort
               </Button>
               <Button
                 onClick={() => headAction("disconnect")}

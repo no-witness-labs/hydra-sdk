@@ -7,38 +7,40 @@ description: Understand the Hydra Head lifecycle, state machine, and event handl
 
 A Hydra Head is an off-chain mini-ledger shared by a fixed set of participants. The `HydraHead` client manages the full lifecycle — from initialization through finalization — with built-in state machine validation.
 
+> **What changed in v2:** hydra-node v2 removed the commit phase (ADR-33). `init()` now opens the head **directly and empty** — there is no `Initializing` state, no `abort()`, and no Abort/CollectCom transactions. Funds enter the _open_ head via incremental commits (deposit transactions) and arrive asynchronously. hydra-sdk 2.x targets hydra-node >= 2.0.0 (tested against 2.3.0).
+
 ## Head Lifecycle
 
 Every head progresses through a series of states:
 
 ```
-Idle → Initializing → Open → Closed → FanoutPossible → Final
-                 ↘               ↘
-                  Aborted         Aborted
+Idle → Open → Closed → FanoutPossible → Final
 ```
 
-| State | Description |
-|-------|-------------|
-| `Idle` | Initial state, ready to initialize |
-| `Initializing` | Init transaction posted to L1, waiting for all parties to commit |
-| `Open` | All parties committed, head is operational for L2 transactions |
-| `Closed` | Close transaction posted to L1, in contestation period |
-| `FanoutPossible` | Contestation period ended, ready for fanout |
-| `Final` | Fanout transaction posted to L1, head is finalized |
-| `Aborted` | Initialization was aborted |
+| State            | Description                                                                                                     |
+| ---------------- | --------------------------------------------------------------------------------------------------------------- |
+| `Idle`           | Initial state, ready to initialize                                                                              |
+| `Open`           | Head is open and operational for L2 transactions; funds are added via incremental deposits                      |
+| `Closed`         | Close transaction posted to L1, in contestation period                                                          |
+| `FanoutPossible` | Contestation period ended, ready for fanout                                                                     |
+| `Final`          | Fanout transaction posted to L1, head is finalized (SDK-side terminal state; the node itself returns to `Idle`) |
 
 ## Commands
 
 Each command is only valid in specific states. The SDK's built-in FSM rejects invalid commands with a `HeadError`:
 
-| Command | Allowed From | Transitions To | Description |
-|---------|-------------|----------------|-------------|
-| `init()` | Idle | Initializing | Post init transaction to L1 |
-| `commit()` | Initializing | Open | Commit UTxOs into the head |
-| `close()` | Open | Closed | Post close transaction to L1 |
-| `safeClose()` | Open | Closed | Graceful close (waits for pending txs) |
-| `fanout()` | FanoutPossible | Final | Distribute final UTxO set back to L1 |
-| `abort()` | Idle, Initializing | Aborted | Abort head initialization |
+| Command       | Allowed From   | Transitions To | Description                                                    |
+| ------------- | -------------- | -------------- | -------------------------------------------------------------- |
+| `init()`      | Idle           | Open           | Post init transaction to L1; the head opens directly and empty |
+| `commit()`    | Open           | Open           | Draft a deposit transaction to add UTxOs into the open head    |
+| `close()`     | Open           | Closed         | Post close transaction to L1                                   |
+| `safeClose()` | Open           | Closed         | Graceful close (waits for pending txs)                         |
+| `fanout()`    | FanoutPossible | Final          | Distribute final UTxO set back to L1                           |
+| `recover()`   | Open           | Open           | Recover a failed incremental commit deposit                    |
+| `decommit()`  | Open           | Open           | Move UTxOs from the head back to L1                            |
+| `contest()`   | Closed         | Closed         | Contest the closure with a more recent snapshot                |
+
+`commit()` returns a draft deposit transaction; you sign and submit it to L1, and the node absorbs the funds into the head asynchronously (track `CommitRecorded` → `DepositActivated` → `CommitApproved` → `CommitFinalized`).
 
 ## Event Subscription
 
@@ -49,11 +51,11 @@ The head emits events for every protocol state change and transaction result.
 ```ts
 const unsubscribe = head.subscribe((event) => {
   switch (event.tag) {
-    case "HeadIsInitializing":
-      console.log("Head is initializing...");
-      break;
     case "HeadIsOpen":
       console.log("Head is open!");
+      break;
+    case "CommitFinalized":
+      console.log("Deposit absorbed into the head");
       break;
     case "HeadIsClosed":
       console.log("Head closed, contestation period started");
@@ -88,15 +90,11 @@ const program = Effect.scoped(
       url: "ws://localhost:4001",
     });
 
-    yield* head.effect
-      .events()
-      .pipe(
-        Stream.tap((event) =>
-          Effect.log(`${event.tag}`)
-        ),
-        Stream.takeUntil((event) => event.tag === "HeadIsFinalized"),
-        Stream.runDrain,
-      );
+    yield* head.effect.events().pipe(
+      Stream.tap((event) => Effect.log(`${event.tag}`)),
+      Stream.takeUntil((event) => event.tag === "HeadIsFinalized"),
+      Stream.runDrain,
+    );
   }),
 );
 ```
@@ -107,42 +105,44 @@ These are the events emitted by the Hydra node:
 
 ### State Transitions
 
-| Event | Description |
-|-------|-------------|
-| `HeadIsInitializing` | Init transaction observed on L1 |
-| `HeadIsOpen` | All parties committed, head is open |
-| `HeadIsClosed` | Close transaction observed on L1 |
-| `HeadIsContested` | A party contested with a more recent snapshot |
-| `ReadyToFanout` | Contestation period ended |
-| `HeadIsFinalized` | Fanout transaction confirmed on L1 |
-| `HeadIsAborted` | Abort transaction confirmed on L1 |
+| Event             | Description                                                                 |
+| ----------------- | --------------------------------------------------------------------------- |
+| `HeadIsOpen`      | Init transaction observed on L1, head is open                               |
+| `HeadIsClosed`    | Close transaction observed on L1                                            |
+| `HeadIsContested` | A party contested with a more recent snapshot                               |
+| `ReadyToFanout`   | Contestation period ended                                                   |
+| `HeadIsFinalized` | Fanout transaction confirmed on L1; carries the settled `finalizedUTxO` set |
 
 ### Transaction Events
 
-| Event | Description |
-|-------|-------------|
-| `TxValid` | Transaction accepted into the head |
-| `TxInvalid` | Transaction rejected with reason |
-| `SnapshotConfirmed` | Multi-party confirmed snapshot |
+| Event               | Description                        |
+| ------------------- | ---------------------------------- |
+| `TxValid`           | Transaction accepted into the head |
+| `TxInvalid`         | Transaction rejected with reason   |
+| `SnapshotConfirmed` | Multi-party confirmed snapshot     |
 
 ### Network Events
 
-| Event | Description |
-|-------|-------------|
-| `PeerConnected` | A peer connected to the network |
-| `PeerDisconnected` | A peer disconnected |
-| `Greetings` | Initial connection response with head status |
+| Event              | Description                                  |
+| ------------------ | -------------------------------------------- |
+| `PeerConnected`    | A peer connected to the network              |
+| `PeerDisconnected` | A peer disconnected                          |
+| `Greetings`        | Initial connection response with head status |
 
 ### Commit/Decommit Events
 
-| Event | Description |
-|-------|-------------|
-| `CommitRecorded` | Incremental commit deposit recorded |
-| `CommitApproved` | Deposit approved by all parties |
-| `CommitFinalized` | Deposit confirmed on L1 |
-| `DecommitRequested` | Decommit request recorded |
-| `DecommitApproved` | Decommit approved by all parties |
-| `DecommitFinalized` | UTxO distributed back to L1 |
+A successful incremental commit emits `CommitRecorded` → `DepositActivated` → `CommitApproved` → `CommitFinalized`:
+
+| Event               | Description                                                                   |
+| ------------------- | ----------------------------------------------------------------------------- |
+| `CommitRecorded`    | Deposit transaction observed on L1                                            |
+| `DepositActivated`  | Deposit is active and eligible to be absorbed into the head                   |
+| `CommitApproved`    | Deposit approved by all parties                                               |
+| `CommitFinalized`   | Deposit absorbed into the head                                                |
+| `DepositExpired`    | Deposit deadline passed without absorption (use `recover()` to reclaim funds) |
+| `DecommitRequested` | Decommit request recorded                                                     |
+| `DecommitApproved`  | Decommit approved by all parties                                              |
+| `DecommitFinalized` | UTxO distributed back to L1                                                   |
 
 ## Error Handling
 
@@ -160,11 +160,15 @@ try {
 // Effect API
 import { Effect } from "effect";
 
-const result = yield* head.effect.init().pipe(
-  Effect.catchTag("HeadError", (error) =>
-    Effect.log(`Failed: ${error.message}`),
-  ),
-);
+const program = Effect.gen(function* () {
+  yield* head.effect
+    .init()
+    .pipe(
+      Effect.catchTag("HeadError", (error) =>
+        Effect.log(`Failed: ${error.message}`),
+      ),
+    );
+});
 ```
 
 ## Reconnection
@@ -175,11 +179,11 @@ The WebSocket transport automatically reconnects with exponential backoff:
 const head = await Head.create({
   url: "ws://localhost:4001",
   reconnect: {
-    maxRetries: 10,       // give up after 10 attempts
-    initialDelayMs: 500,  // first retry after 500ms
-    maxDelayMs: 30_000,   // cap delay at 30s
-    factor: 1.7,          // exponential factor
-    jitter: 0.2,          // randomize ±20%
+    maxRetries: 10, // give up after 10 attempts
+    initialDelayMs: 500, // first retry after 500ms
+    maxDelayMs: 30_000, // cap delay at 30s
+    factor: 1.7, // exponential factor
+    jitter: 0.2, // randomize ±20%
   },
 });
 ```
@@ -195,8 +199,8 @@ const head = await Head.create({
   url: "ws://localhost:4001",
   reconnect: { maxRetries: 10 },
   heartbeat: {
-    intervalMs: 30_000,   // check every 30s (default)
-    timeoutMs: 10_000,    // stale after 10s of silence (default)
+    intervalMs: 30_000, // check every 30s (default)
+    timeoutMs: 10_000, // stale after 10s of silence (default)
   },
 });
 ```
@@ -213,7 +217,9 @@ When the head state changes during a disconnect (e.g. another participant closed
 head.subscribe((event) => {
   if (event.tag === "ConnectionRestored") {
     const { previousStatus, restoredStatus } = event.payload;
-    console.log(`State changed during disconnect: ${previousStatus} → ${restoredStatus}`);
+    console.log(
+      `State changed during disconnect: ${previousStatus} → ${restoredStatus}`,
+    );
   }
 });
 ```
@@ -241,7 +247,9 @@ await Head.withHead({ url: "ws://localhost:4001" }, async (head) => {
 // Effect scoped (recommended for Effect users)
 const program = Effect.scoped(
   Effect.gen(function* () {
-    const head = yield* Head.effect.createScoped({ url: "ws://localhost:4001" });
+    const head = yield* Head.effect.createScoped({
+      url: "ws://localhost:4001",
+    });
     // automatically disposed when scope closes
   }),
 );

@@ -648,6 +648,8 @@ function createHydraNodeEffect(
             scriptsTxId,
             "--contestation-period",
             `${config.hydraNode.contestationPeriod}s`,
+            "--deposit-period",
+            `${config.hydraNode.depositPeriod}s`,
           ],
         });
       },

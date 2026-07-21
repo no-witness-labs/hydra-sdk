@@ -44,19 +44,6 @@ async function signAndSubmitCommit(cluster: Cluster.Cluster): Promise<void> {
   ]);
 }
 
-/** Draft an empty commit via hydra-sdk Provider, sign, and submit to L1. */
-async function commitEmpty(cluster: Cluster.Cluster): Promise<void> {
-  const draftTx = (await Effect.runPromise(
-    Provider.postCommit(cluster.hydraHttpUrl, {}),
-  )) as { cborHex: string };
-
-  await writeFile(
-    join(cluster.tempDir!, "commit-draft.json"),
-    JSON.stringify(draftTx),
-  );
-  await signAndSubmitCommit(cluster);
-}
-
 /**
  * Commit funded UTxOs into the head.
  *
@@ -230,23 +217,16 @@ describe("Hydra SDK — Head Lifecycle Integration", () => {
   }, 120_000);
 
   // -------------------------------------------------------------------------
-  // 1. Full lifecycle: connect → init → commit → open → close → fanout
+  // 1. Full lifecycle: connect → init → open → close → fanout
+  //    (hydra-node v2 opens directly; commits become deposits during Open)
   // -------------------------------------------------------------------------
-  it("full lifecycle: init → commit → open → close → fanout", async () => {
+  it("full lifecycle: init → open → close → fanout", async () => {
     const head = await Head.create({ url: cluster.hydraApiUrl });
 
     try {
       expect(head.getState()).toBe("Idle");
 
       await head.init();
-      expect(head.getState()).toBe("Initializing");
-
-      const events = head.subscribeEvents();
-      await commitEmpty(cluster);
-
-      for await (const event of events) {
-        if (event.tag === "HeadIsOpen") break;
-      }
       expect(head.getState()).toBe("Open");
 
       await head.close();
@@ -282,12 +262,13 @@ describe("Hydra SDK — Head Lifecycle Integration", () => {
 
     try {
       await head.init();
+      expect(head.getState()).toBe("Open");
 
-      // Commit real UTxOs so the head has funds to transact
+      // Deposit funded UTxOs into the now-open head so it has funds to transact
       const events = head.subscribeEvents();
       await commitFunds(cluster);
       for await (const event of events) {
-        if (event.tag === "HeadIsOpen") break;
+        if (event.tag === "CommitFinalized") break;
       }
       expect(head.getState()).toBe("Open");
 
@@ -354,48 +335,6 @@ describe("Hydra SDK — Head Lifecycle Integration", () => {
   }, 600_000);
 });
 
-describe("Hydra SDK — Abort Path", () => {
-  let cluster: Cluster.Cluster;
-
-  beforeAll(async () => {
-    cluster = makeCluster("hydra-sdk-abort", {
-      node: 9003,
-      submit: 9092,
-      api: 9403,
-      peer: 9503,
-      mon: 9603,
-    });
-    await cluster.start();
-  }, 300_000);
-
-  afterAll(async () => {
-    try {
-      await cluster?.remove();
-    } catch {
-      // Best-effort cleanup
-    }
-  }, 120_000);
-
-  // -------------------------------------------------------------------------
-  // 2. Abort path: init → abort
-  // -------------------------------------------------------------------------
-  it("init → abort transitions to Aborted", async () => {
-    const head = await Head.create({ url: cluster.hydraApiUrl });
-
-    try {
-      expect(head.getState()).toBe("Idle");
-
-      await head.init();
-      expect(head.getState()).toBe("Initializing");
-
-      await head.abort();
-      expect(head.getState()).toBe("Aborted");
-    } finally {
-      await head.dispose();
-    }
-  }, 600_000);
-});
-
 describe("Hydra SDK — Event Subscription", () => {
   let cluster: Cluster.Cluster;
 
@@ -431,12 +370,12 @@ describe("Hydra SDK — Event Subscription", () => {
         collectedTags.push(event.tag);
       });
 
-      // init() only resolves after HeadIsInitializing is received and dispatched,
-      // so by this point the callback has already been invoked
+      // init() only resolves after HeadIsOpen is received and dispatched
+      // (hydra-node v2 opens directly), so the callback has already fired.
       await head.init();
       unsub();
 
-      expect(collectedTags).toContain("HeadIsInitializing");
+      expect(collectedTags).toContain("HeadIsOpen");
     } finally {
       await head.dispose();
     }
@@ -482,7 +421,7 @@ describe("Hydra SDK — Reconnection", () => {
       expect(head.getState()).toBe("Idle");
 
       await head.init();
-      expect(head.getState()).toBe("Initializing");
+      expect(head.getState()).toBe("Open");
 
       // Restart hydra-node to force disconnect + reconnect
       await Container.stop(cluster.hydraNode!);
@@ -490,12 +429,16 @@ describe("Hydra SDK — Reconnection", () => {
 
       // Wait for reconnection + Greetings with restored state
       await new Promise((r) => setTimeout(r, 15_000));
-      expect(head.getState()).toBe("Initializing");
+      expect(head.getState()).toBe("Open");
 
       // Prove the connection is live by executing a command that requires
-      // a working WebSocket — abort() sends Abort and awaits HeadIsAborted
-      await head.abort();
-      expect(head.getState()).toBe("Aborted");
+      // a working WebSocket — close() sends Close and awaits HeadIsClosed.
+      await head.close();
+      expect(head.getState()).toBe("Closed");
+
+      // v2 has no abort: fan out so the node returns to Idle for the next test
+      await head.fanout();
+      expect(head.getState()).toBe("Final");
     } finally {
       await head.dispose();
     }
@@ -539,10 +482,14 @@ describe("Hydra SDK — Reconnection", () => {
 
       // Prove the connection is live by sending a command
       await head.init();
-      expect(head.getState()).toBe("Initializing");
+      expect(head.getState()).toBe("Open");
 
-      await head.abort();
-      expect(head.getState()).toBe("Aborted");
+      await head.close();
+      expect(head.getState()).toBe("Closed");
+
+      // v2 has no abort: fan out so the node returns to Idle for the next test
+      await head.fanout();
+      expect(head.getState()).toBe("Final");
     } finally {
       await head.dispose();
     }
@@ -577,7 +524,7 @@ describe("Hydra SDK — Reconnection", () => {
       });
 
       await head.init();
-      expect(head.getState()).toBe("Initializing");
+      expect(head.getState()).toBe("Open");
 
       // Restart hydra-node — persistence may cause state to differ
       await Container.stop(cluster.hydraNode!);
@@ -588,18 +535,13 @@ describe("Hydra SDK — Reconnection", () => {
 
       // State should be consistent (same as before disconnect)
       const currentState = head.getState();
-      expect(["Idle", "Initializing"]).toContain(currentState);
+      expect(["Idle", "Open"]).toContain(currentState);
 
       unsub();
 
       // If state changed during reconnect, ConnectionRestored should have been emitted
-      if (currentState !== "Initializing") {
+      if (currentState !== "Open") {
         expect(connectionRestoredEvents.length).toBeGreaterThan(0);
-      }
-
-      // Clean up: abort to return to a terminal state
-      if (currentState === "Initializing") {
-        await head.abort();
       }
     } finally {
       await head.dispose();
