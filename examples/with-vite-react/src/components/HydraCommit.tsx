@@ -20,6 +20,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type HeadStatus = Head.HeadStatus;
 
+type DepositPhase =
+  | "Submitted"
+  | "Recorded"
+  | "Activated"
+  | "Finalized"
+  | "Expired";
+
 interface Props {
   walletApi: CardanoWalletApi;
 }
@@ -143,7 +150,9 @@ export default function HydraCommit({ walletApi }: Props) {
     error?: string;
   }>({ results: {} });
   const blockfrostProvider = useMemo(() => {
-    const key = import.meta.env.VITE_BLOCKFROST_KEY_PREPROD as string | undefined;
+    const key = import.meta.env.VITE_BLOCKFROST_KEY_PREPROD as
+      | string
+      | undefined;
     return key ? blockfrostPreprod(key) : null;
   }, []);
   const maestroProvider = useMemo(() => {
@@ -162,6 +171,24 @@ export default function HydraCommit({ walletApi }: Props) {
   const [sendAda, setSendAda] = useState("");
   const [decommitAda, setDecommitAda] = useState("");
   const [recoverTxId, setRecoverTxId] = useState("");
+
+  // Deposit lifecycle tracking. In v2 a commit is a deposit that lands on L1,
+  // then is absorbed into the head asynchronously:
+  //   Submitted → Recorded → Activated → Finalized (funds now in head)
+  //                                    ↘ Expired    (funds stuck → recover)
+  // Submitting the tx is only step 1 — the commit is not done until Finalized.
+  const [deposits, setDeposits] = useState<
+    Record<string, { phase: DepositPhase; deadline?: string }>
+  >({});
+  const [l2Refresh, setL2Refresh] = useState(0);
+  const setDepositPhase = useCallback(
+    (txId: string, phase: DepositPhase, deadline?: string) =>
+      setDeposits((d) => ({
+        ...d,
+        [txId]: { phase, deadline: deadline ?? d[txId]?.deadline },
+      })),
+    [],
+  );
 
   const headRef = useRef<Head.HydraHead | null>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
@@ -200,7 +227,8 @@ export default function HydraCommit({ walletApi }: Props) {
     });
   }, [hydraProvider, appendLog]);
 
-  // Auto-fetch L2 UTxOs when head becomes Open; clear on other states
+  // Auto-fetch L2 UTxOs when head becomes Open, when a deposit finalizes
+  // (l2Refresh bump), or clear on other states.
   useEffect(() => {
     if (status === "Open" && hydraProvider) {
       fetchL2Utxos().catch(() => {});
@@ -208,7 +236,7 @@ export default function HydraCommit({ walletApi }: Props) {
       setL2Utxos([]);
       setL2Balance(null);
     }
-  }, [status, hydraProvider, fetchL2Utxos]);
+  }, [status, hydraProvider, fetchL2Utxos, l2Refresh]);
 
   // -- Connect / Disconnect ---------------------------------------------------
 
@@ -230,6 +258,36 @@ export default function HydraCommit({ walletApi }: Props) {
       h.subscribe((event) => {
         appendLog(event.tag, event.payload);
         setStatus(h.getState());
+
+        // Track the deposit (incremental commit) lifecycle. Each event names
+        // its deposit by tx id, so a commit can be followed to completion.
+        const p = (event.payload ?? {}) as {
+          pendingDeposit?: string;
+          depositTxId?: string;
+          deadline?: string;
+        };
+        switch (event.tag) {
+          case "CommitRecorded":
+            if (p.pendingDeposit)
+              setDepositPhase(p.pendingDeposit, "Recorded", p.deadline);
+            break;
+          case "DepositActivated":
+            if (p.depositTxId)
+              setDepositPhase(p.depositTxId, "Activated", p.deadline);
+            break;
+          case "CommitFinalized":
+            if (p.depositTxId) setDepositPhase(p.depositTxId, "Finalized");
+            // Funds are now inside the head — refresh the L2 UTxO set.
+            setL2Refresh((n) => n + 1);
+            break;
+          case "DepositExpired":
+            if (p.depositTxId) {
+              setDepositPhase(p.depositTxId, "Expired");
+              // Pre-fill the recover input so the stuck funds are one click away.
+              setRecoverTxId(p.depositTxId);
+            }
+            break;
+        }
         // A repeat "Greetings" means the SDK transparently re-established the
         // WebSocket after a drop — i.e. recovery behavior.
         if (event.tag === "Greetings") {
@@ -245,7 +303,7 @@ export default function HydraCommit({ walletApi }: Props) {
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [url, appendLog]);
+  }, [url, appendLog, setDepositPhase]);
 
   const handleDisconnect = useCallback(async () => {
     if (!headRef.current) return;
@@ -604,10 +662,24 @@ export default function HydraCommit({ walletApi }: Props) {
         const submittedTxId = await walletApi.submitTx(finalTxHex);
         appendLog("TxSubmitted", { txId: submittedTxId });
 
-        // Refresh UTxOs after commit (Blockfrost may lag a few seconds)
+        // The deposit is now on L1 but NOT yet in the head. Track it through
+        // the async lifecycle (Recorded → Activated → Finalized) via the event
+        // subscription; the "Deposit status" panel reflects real completion.
+        setDepositPhase(submittedTxId, "Submitted");
+
+        // Refresh wallet UTxOs (the selected inputs are now spent on L1).
         setTimeout(() => fetchUtxos().catch(() => {}), 3000);
       }),
-    [url, utxos, selectedUtxos, walletApi, fireAction, appendLog, fetchUtxos],
+    [
+      url,
+      utxos,
+      selectedUtxos,
+      walletApi,
+      fireAction,
+      appendLog,
+      fetchUtxos,
+      setDepositPhase,
+    ],
   );
 
   // -- UTxO selection ---------------------------------------------------------
@@ -741,9 +813,11 @@ export default function HydraCommit({ walletApi }: Props) {
           </div>
           <p className="text-xs text-gray-500">
             The identical call{" "}
-            <code className="text-gray-300">provider.getProtocolParameters()</code>{" "}
-            runs against Blockfrost (L1), Maestro (L1), or the Hydra L2 provider —
-            only the provider instance changes.
+            <code className="text-gray-300">
+              provider.getProtocolParameters()
+            </code>{" "}
+            runs against Blockfrost (L1), Maestro (L1), or the Hydra L2 provider
+            — only the provider instance changes.
           </p>
           <div className="flex flex-wrap gap-2">
             {SWAP_PROVIDERS.map((p) => (
@@ -791,8 +865,8 @@ export default function HydraCommit({ walletApi }: Props) {
             </div>
           )}
           <p className="text-[11px] text-gray-600">
-            Note L2 fees are 0 (Hydra) while L1 has real fees — same typed result,
-            swapped backend.
+            Note L2 fees are 0 (Hydra) while L1 has real fees — same typed
+            result, swapped backend.
           </p>
         </div>
       )}
@@ -862,6 +936,57 @@ export default function HydraCommit({ walletApi }: Props) {
               Refresh L2 ({l2Utxos.length})
             </button>
           )}
+        </div>
+      )}
+
+      {/* Deposit (incremental commit) status — a commit is not complete until
+          Finalized; an Expired deposit can be recovered in one click. */}
+      {Object.keys(deposits).length > 0 && (
+        <div className="space-y-2 rounded border border-emerald-900/40 bg-gray-950/50 p-4">
+          <h3 className="text-sm font-medium text-emerald-400">
+            Deposit status
+          </h3>
+          <ul className="space-y-1.5 text-xs">
+            {Object.entries(deposits)
+              .reverse()
+              .map(([txId, { phase }]) => {
+                const color =
+                  phase === "Finalized"
+                    ? "bg-emerald-700"
+                    : phase === "Expired"
+                      ? "bg-rose-700"
+                      : "bg-amber-700";
+                return (
+                  <li key={txId} className="flex items-center gap-2">
+                    <span
+                      className={`rounded px-1.5 py-0.5 font-medium ${color}`}
+                    >
+                      {phase}
+                    </span>
+                    <code className="text-gray-400">
+                      {txId.slice(0, 12)}…{txId.slice(-6)}
+                    </code>
+                    {phase === "Finalized" && (
+                      <span className="text-emerald-500">in head ✓</span>
+                    )}
+                    {phase === "Expired" && (
+                      <button
+                        onClick={() => handleRecover(txId)}
+                        disabled={submitting}
+                        className="rounded bg-rose-600 px-2 py-0.5 font-medium hover:bg-rose-700 disabled:opacity-30"
+                      >
+                        Recover
+                      </button>
+                    )}
+                    {phase !== "Finalized" && phase !== "Expired" && (
+                      <span className="text-gray-500">
+                        awaiting absorption…
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
+          </ul>
         </div>
       )}
 
