@@ -1,5 +1,12 @@
 # @no-witness-labs/example-node-scripts
 
+## 0.0.3
+
+### Patch Changes
+
+- Updated dependencies [28c2500]
+  - @no-witness-labs/hydra-sdk@2.0.0
+
 ## 0.0.2
 
 ### Patch Changes
